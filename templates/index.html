@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google ADK Voice Chatbot</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        h1 {
+            color: #4285f4;
+            margin-bottom: 1.5rem;
+        }
+
+        #status {
+            margin-bottom: 1rem;
+            color: #666;
+            font-style: italic;
+            min-height: 1.5em;
+        }
+
+        .mic-btn {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            font-size: 32px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+        }
+
+        .mic-btn:hover {
+            background-color: #3367d6;
+        }
+
+        .mic-btn:active {
+            transform: scale(0.95);
+        }
+
+        .mic-btn.listening {
+            background-color: #ea4335;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 20px rgba(234, 67, 53, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(234, 67, 53, 0);
+            }
+        }
+
+        #transcript {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: left;
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin-bottom: 0.5rem;
+        }
+
+        .user {
+            color: #4285f4;
+            font-weight: bold;
+        }
+
+        .bot {
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Google ADK Voice Bot</h1>
+        <div id="status">Click the microphone to speak</div>
+        <button id="micBtn" class="mic-btn">🎤</button>
+        <div id="transcript"></div>
+    </div>
+
+    <script>
+        const micBtn = document.getElementById('micBtn');
+        const statusDiv = document.getElementById('status');
+        const transcriptDiv = document.getElementById('transcript');
+
+        let sessionId = null;
+        let recognition;
+
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => {
+                micBtn.classList.add('listening');
+                statusDiv.textContent = "Listening...";
+            };
+
+            recognition.onend = () => {
+                micBtn.classList.remove('listening');
+                statusDiv.textContent = "Processing...";
+            };
+
+            recognition.onresult = async (event) => {
+                const transcript = event.results[0][0].transcript;
+                addMessage('You', transcript);
+
+                try {
+                    const requestBody = { message: transcript };
+                    if (sessionId) {
+                        requestBody.session_id = sessionId;
+                    }
+
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+
+                    const data = await response.json();
+                    console.log('Received data:', data);
+                    console.log('Response text:', data.response);
+
+                    if (data.session_id) {
+                        sessionId = data.session_id;
+                    }
+
+                    const botResponse = data.response;
+                    console.log('Bot response:', botResponse);
+                    addMessage('Bot', botResponse);
+                    speak(botResponse);
+                    statusDiv.textContent = "Click microphone to speak";
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    statusDiv.textContent = "Error communicating with server";
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error', event.error);
+                statusDiv.textContent = "Error: " + event.error;
+                micBtn.classList.remove('listening');
+            };
+        } else {
+            statusDiv.textContent = "Web Speech API not supported in this browser.";
+            micBtn.disabled = true;
+        }
+
+        micBtn.addEventListener('click', () => {
+            if (micBtn.classList.contains('listening')) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        });
+
+        function addMessage(sender, text) {
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.innerHTML = `<span class="${sender.toLowerCase()}">${sender}:</span> ${text}`;
+            transcriptDiv.appendChild(div);
+            transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+        }
+
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,7 @@
+google-generativeai
+fastapi
+uvicorn
+python-multipart
+google-adk
+jinja2
+websockets
