@@ -205,9 +205,51 @@
             transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
         }
 
-        function speak(text) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            window.speechSynthesis.speak(utterance);
+        async function speak(text) {
+            try {
+                // Call the Google TTS endpoint
+                const response = await fetch('/tts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        language_code: 'en-US',
+                        voice_name: 'en-US-Neural2-F'  // Natural female voice
+                    })
+                });
+
+                const data = await response.json();
+
+                // Convert base64 audio to blob and play
+                const audioBlob = base64ToBlob(data.audio, 'audio/mp3');
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+
+                audio.play();
+
+                // Clean up the URL after playing
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                };
+
+            } catch (error) {
+                console.error('TTS Error:', error);
+                // Fallback to browser speech synthesis
+                const utterance = new SpeechSynthesisUtterance(text);
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function base64ToBlob(base64, mimeType) {
+            const byteCharacters = atob(base64);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
         }
     </script>
 </body>
