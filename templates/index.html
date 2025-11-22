@@ -8,7 +8,7 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -18,18 +18,179 @@
         }
 
         .container {
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
             padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
             text-align: center;
             max-width: 500px;
             width: 90%;
         }
 
         h1 {
-            color: #4285f4;
+            color: #667eea;
             margin-bottom: 1.5rem;
+            font-size: 2rem;
+        }
+
+        /* Avatar Container */
+        .avatar-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 1.5rem auto;
+        }
+
+        /* Animated rings */
+        .avatar-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            opacity: 0;
+        }
+
+        .avatar-ring.ring-1 {
+            width: 150px;
+            height: 150px;
+        }
+
+        .avatar-ring.ring-2 {
+            width: 170px;
+            height: 170px;
+        }
+
+        .avatar-ring.ring-3 {
+            width: 190px;
+            height: 190px;
+        }
+
+        .avatar-ring.speaking {
+            animation: ringPulse 1.5s ease-out infinite;
+        }
+
+        @keyframes ringPulse {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+        }
+
+        .avatar-ring.ring-2.speaking {
+            animation-delay: 0.3s;
+        }
+
+        .avatar-ring.ring-3.speaking {
+            animation-delay: 0.6s;
+        }
+
+        /* Avatar circle */
+        .avatar {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+            transition: transform 0.3s ease;
+            z-index: 10;
+        }
+
+        .avatar.speaking {
+            animation: avatarBounce 0.6s ease-in-out infinite;
+        }
+
+        @keyframes avatarBounce {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* Avatar face */
+        .avatar-face {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Eyes */
+        .avatar-eyes {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 15px;
+        }
+
+        .avatar-eye {
+            width: 12px;
+            height: 12px;
+            background: white;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .avatar-eye::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #333;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Mouth */
+        .avatar-mouth {
+            width: 40px;
+            height: 20px;
+            border: 3px solid white;
+            border-top: none;
+            border-radius: 0 0 40px 40px;
+            transition: all 0.2s ease;
+        }
+
+        .avatar.speaking .avatar-mouth {
+            animation: mouthTalk 0.3s ease-in-out infinite;
+        }
+
+        @keyframes mouthTalk {
+
+            0%,
+            100% {
+                height: 20px;
+                border-radius: 0 0 40px 40px;
+            }
+
+            50% {
+                height: 25px;
+                border-radius: 0 0 50px 50px;
+            }
         }
 
         #status {
@@ -37,10 +198,11 @@
             color: #666;
             font-style: italic;
             min-height: 1.5em;
+            font-size: 0.95rem;
         }
 
         .mic-btn {
-            background-color: #4285f4;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             border-radius: 50%;
@@ -48,15 +210,17 @@
             height: 80px;
             font-size: 32px;
             cursor: pointer;
-            transition: background-color 0.3s, transform 0.1s;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
 
         .mic-btn:hover {
-            background-color: #3367d6;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
         }
 
         .mic-btn:active {
@@ -64,7 +228,7 @@
         }
 
         .mic-btn.listening {
-            background-color: #ea4335;
+            background: linear-gradient(135deg, #ea4335 0%, #d32f2f 100%);
             animation: pulse 1.5s infinite;
         }
 
@@ -85,20 +249,28 @@
         #transcript {
             margin-top: 2rem;
             padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 8px;
+            background: rgba(248, 249, 250, 0.8);
+            border-radius: 12px;
             text-align: left;
             min-height: 100px;
             max-height: 300px;
             overflow-y: auto;
+            backdrop-filter: blur(5px);
         }
 
         .message {
             margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+
+        .message:hover {
+            background: rgba(102, 126, 234, 0.1);
         }
 
         .user {
-            color: #4285f4;
+            color: #667eea;
             font-weight: bold;
         }
 
@@ -111,6 +283,23 @@
 <body>
     <div class="container">
         <h1>Google ADK Voice Bot</h1>
+
+        <!-- Animated Avatar -->
+        <div class="avatar-container">
+            <div class="avatar-ring ring-1"></div>
+            <div class="avatar-ring ring-2"></div>
+            <div class="avatar-ring ring-3"></div>
+            <div class="avatar" id="avatar">
+                <div class="avatar-face">
+                    <div class="avatar-eyes">
+                        <div class="avatar-eye"></div>
+                        <div class="avatar-eye"></div>
+                    </div>
+                    <div class="avatar-mouth"></div>
+                </div>
+            </div>
+        </div>
+
         <div id="status">Click the microphone to speak</div>
         <button id="micBtn" class="mic-btn">🎤</button>
         <div id="transcript"></div>
@@ -227,17 +416,44 @@
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioUrl);
 
-                audio.play();
+                // Get avatar and rings elements
+                const avatar = document.getElementById('avatar');
+                const rings = document.querySelectorAll('.avatar-ring');
 
-                // Clean up the URL after playing
+                // Start avatar animation when audio starts playing
+                audio.onplay = () => {
+                    avatar.classList.add('speaking');
+                    rings.forEach(ring => ring.classList.add('speaking'));
+                };
+
+                // Stop avatar animation when audio ends
                 audio.onended = () => {
+                    avatar.classList.remove('speaking');
+                    rings.forEach(ring => ring.classList.remove('speaking'));
                     URL.revokeObjectURL(audioUrl);
                 };
+
+                audio.play();
 
             } catch (error) {
                 console.error('TTS Error:', error);
                 // Fallback to browser speech synthesis
                 const utterance = new SpeechSynthesisUtterance(text);
+
+                // Animate avatar for fallback speech too
+                const avatar = document.getElementById('avatar');
+                const rings = document.querySelectorAll('.avatar-ring');
+
+                utterance.onstart = () => {
+                    avatar.classList.add('speaking');
+                    rings.forEach(ring => ring.classList.add('speaking'));
+                };
+
+                utterance.onend = () => {
+                    avatar.classList.remove('speaking');
+                    rings.forEach(ring => ring.classList.remove('speaking'));
+                };
+
                 window.speechSynthesis.speak(utterance);
             }
         }
