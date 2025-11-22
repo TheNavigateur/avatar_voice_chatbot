@@ -34,300 +34,19 @@
             font-size: 2rem;
         }
 
-        /* Avatar Container */
+        /* Three.js Avatar Container */
         .avatar-container {
             position: relative;
-            width: 200px;
-            height: 240px;
+            width: 300px;
+            height: 300px;
             margin: 1.5rem auto;
-            perspective: 1000px;
         }
 
-        /* Animated rings */
-        .avatar-ring {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            border-radius: 50%;
-            border: 3px solid rgba(102, 126, 234, 0.3);
-            opacity: 0;
-        }
-
-        .avatar-ring.ring-1 {
-            width: 200px;
-            height: 200px;
-        }
-
-        .avatar-ring.ring-2 {
-            width: 230px;
-            height: 230px;
-        }
-
-        .avatar-ring.ring-3 {
-            width: 260px;
-            height: 260px;
-        }
-
-        .avatar-ring.speaking {
-            animation: ringPulse 1.5s ease-out infinite;
-        }
-
-        @keyframes ringPulse {
-            0% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(0.8);
-            }
-
-            50% {
-                opacity: 0.6;
-            }
-
-            100% {
-                opacity: 0;
-                transform: translate(-50%, -50%) scale(1.2);
-            }
-        }
-
-        .avatar-ring.ring-2.speaking {
-            animation-delay: 0.3s;
-        }
-
-        .avatar-ring.ring-3.speaking {
-            animation-delay: 0.6s;
-        }
-
-        /* 3D Avatar */
-        .avatar {
-            position: relative;
-            width: 200px;
-            height: 240px;
-            z-index: 10;
-            transform-style: preserve-3d;
-            transition: transform 0.3s ease;
-        }
-
-        .avatar.speaking {
-            animation: avatarFloat 2s ease-in-out infinite;
-        }
-
-        @keyframes avatarFloat {
-
-            0%,
-            100% {
-                transform: translateY(0px);
-            }
-
-            50% {
-                transform: translateY(-8px);
-            }
-        }
-
-        /* Head */
-        .avatar-head {
-            position: relative;
-            width: 120px;
-            height: 140px;
-            margin: 0 auto;
-            background: linear-gradient(135deg, #ffd1a9 0%, #ffb88c 100%);
-            border-radius: 60px 60px 70px 70px;
-            box-shadow:
-                0 10px 30px rgba(0, 0, 0, 0.2),
-                inset -5px -5px 15px rgba(0, 0, 0, 0.1),
-                inset 5px 5px 15px rgba(255, 255, 255, 0.3);
-        }
-
-        /* Hair */
-        .avatar-hair {
-            position: absolute;
-            top: -15px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 130px;
-            height: 80px;
-            background: linear-gradient(135deg, #4a3f35 0%, #6b5d52 100%);
-            border-radius: 65px 65px 40px 40px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-
-        .avatar-hair::before {
-            content: '';
-            position: absolute;
-            top: 20px;
-            left: -10px;
-            width: 40px;
-            height: 60px;
-            background: linear-gradient(135deg, #4a3f35 0%, #6b5d52 100%);
-            border-radius: 20px 0 0 30px;
-        }
-
-        .avatar-hair::after {
-            content: '';
-            position: absolute;
-            top: 20px;
-            right: -10px;
-            width: 40px;
-            height: 60px;
-            background: linear-gradient(135deg, #4a3f35 0%, #6b5d52 100%);
-            border-radius: 0 20px 30px 0;
-        }
-
-        /* Eyes */
-        .avatar-eyes {
-            position: absolute;
-            top: 50px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 35px;
-        }
-
-        .avatar-eye {
-            width: 18px;
-            height: 22px;
-            background: white;
-            border-radius: 50%;
-            position: relative;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .avatar-eye::after {
-            content: '';
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background: #2c3e50;
-            border-radius: 50%;
-            top: 6px;
-            left: 4px;
-            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .avatar-eye::before {
-            content: '';
-            position: absolute;
-            width: 3px;
-            height: 3px;
-            background: white;
-            border-radius: 50%;
-            top: 8px;
-            left: 7px;
-            z-index: 1;
-        }
-
-        /* Eyebrows */
-        .avatar-eyebrow {
-            position: absolute;
-            top: 42px;
-            width: 22px;
-            height: 4px;
-            background: #4a3f35;
-            border-radius: 2px;
-        }
-
-        .avatar-eyebrow.left {
-            left: 25px;
-            transform: rotate(-5deg);
-        }
-
-        .avatar-eyebrow.right {
-            right: 25px;
-            transform: rotate(5deg);
-        }
-
-        /* Nose */
-        .avatar-nose {
-            position: absolute;
-            top: 75px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 12px;
-            height: 18px;
-            background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.05) 100%);
-            border-radius: 6px;
-        }
-
-        .avatar-nose::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 16px;
-            height: 6px;
-            background: rgba(0, 0, 0, 0.03);
-            border-radius: 50%;
-        }
-
-        /* Mouth */
-        .avatar-mouth {
-            position: absolute;
-            top: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 40px;
-            height: 8px;
-            background: #d4756e;
-            border-radius: 0 0 20px 20px;
-            transition: all 0.2s ease;
-            box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .avatar.speaking .avatar-mouth {
-            animation: mouthTalk3D 0.3s ease-in-out infinite;
-        }
-
-        @keyframes mouthTalk3D {
-
-            0%,
-            100% {
-                height: 8px;
-                border-radius: 0 0 20px 20px;
-            }
-
-            50% {
-                height: 20px;
-                border-radius: 0 0 25px 25px;
-                background: #c96860;
-            }
-        }
-
-        /* Neck */
-        .avatar-neck {
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 50px;
-            height: 35px;
-            background: linear-gradient(135deg, #ffc299 0%, #ffb380 100%);
-            border-radius: 0 0 25px 25px;
-            box-shadow: inset 0 -5px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Shoulders */
-        .avatar-shoulders {
-            position: absolute;
-            bottom: -40px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 160px;
-            height: 50px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 80px 80px 0 0;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Collar */
-        .avatar-collar {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 70px;
-            height: 20px;
-            background: #5a6fd8;
-            clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
+        #avatar-canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            background: transparent;
         }
 
         #status {
@@ -421,34 +140,233 @@
     <div class="container">
         <h1>Google ADK Voice Bot</h1>
 
-        <!-- Animated Avatar -->
+        <!-- Three.js 3D Avatar -->
         <div class="avatar-container">
-            <div class="avatar-ring ring-1"></div>
-            <div class="avatar-ring ring-2"></div>
-            <div class="avatar-ring ring-3"></div>
-            <div class="avatar" id="avatar">
-                <div class="avatar-head">
-                    <div class="avatar-hair"></div>
-                    <div class="avatar-eyebrow left"></div>
-                    <div class="avatar-eyebrow right"></div>
-                    <div class="avatar-eyes">
-                        <div class="avatar-eye"></div>
-                        <div class="avatar-eye"></div>
-                    </div>
-                    <div class="avatar-nose"></div>
-                    <div class="avatar-mouth"></div>
-                    <div class="avatar-neck"></div>
-                </div>
-                <div class="avatar-shoulders">
-                    <div class="avatar-collar"></div>
-                </div>
-            </div>
+            <canvas id="avatar-canvas"></canvas>
         </div>
 
         <div id="status">Click the microphone to speak</div>
         <button id="micBtn" class="mic-btn">🎤</button>
         <div id="transcript"></div>
     </div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- GLTFLoader for loading 3D models -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <!-- Three.js Avatar Setup -->
+    <script>
+        // Three.js Scene Setup
+        let scene, camera, renderer, avatar, mixer, clock;
+        let isSpeaking = false;
+        let animationId;
+        let headBone, jawBone;
+
+        function initThreeJS() {
+            const canvas = document.getElementById('avatar-canvas');
+            const container = document.querySelector('.avatar-container');
+
+            // Scene
+            scene = new THREE.Scene();
+
+            // Camera - positioned for close-up face view like a video call
+            camera = new THREE.PerspectiveCamera(
+                40,  // Slightly wider field of view for better framing
+                container.clientWidth / container.clientHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(0, 0.4, 1.5);  // Closer but not too close - video call distance
+            camera.lookAt(0, 0.4, 0);  // Look at face level
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                alpha: true,
+                antialias: true
+            });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setClearColor(0x000000, 0);
+            renderer.outputEncoding = THREE.sRGBEncoding;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(1, 2, 3);
+            scene.add(directionalLight);
+
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            fillLight.position.set(-1, 0, -1);
+            scene.add(fillLight);
+
+            // Clock for animations
+            clock = new THREE.Clock();
+
+            // Load Avatar
+            loadAvatar();
+
+            // Animation loop
+            animate();
+        }
+
+        function loadAvatar() {
+            const loader = new THREE.GLTFLoader();
+
+            // Using a verified Ready Player Me avatar URL
+            // This is a full-body realistic human model
+            const modelUrl = 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb';
+
+            console.log('Starting to load 3D model from:', modelUrl);
+            statusDiv.textContent = "Loading 3D avatar...";
+
+            loader.load(
+                modelUrl,
+                function (gltf) {
+                    console.log('Model loaded successfully!', gltf);
+                    avatar = gltf.scene;
+
+                    // Scale and position the model for close-up face view
+                    avatar.scale.set(1, 1, 1);
+                    avatar.position.set(0, -0.85, 0);  // Slightly lower to center face in view
+
+                    // Make avatar face camera
+                    avatar.rotation.y = Math.PI;
+
+                    scene.add(avatar);
+
+                    console.log('Avatar added to scene');
+                    statusDiv.textContent = "Click the microphone to speak";
+
+                    // Setup animations if available
+                    if (gltf.animations && gltf.animations.length > 0) {
+                        mixer = new THREE.AnimationMixer(avatar);
+                        console.log('Animation mixer created with', gltf.animations.length, 'animations');
+                    }
+
+                    // Try to find head and jaw bones for animation
+                    let boneCount = 0;
+                    avatar.traverse((child) => {
+                        if (child.isBone) {
+                            boneCount++;
+                            console.log('Found bone:', child.name);
+                            if (child.name.toLowerCase().includes('head')) {
+                                headBone = child;
+                                console.log('Head bone found!');
+                            }
+                            if (child.name.toLowerCase().includes('jaw')) {
+                                jawBone = child;
+                                console.log('Jaw bone found!');
+                            }
+                        }
+                    });
+
+                    console.log('Total bones found:', boneCount);
+                    console.log('Avatar loaded successfully - this is a realistic human model!');
+                },
+                function (xhr) {
+                    const percentComplete = (xhr.loaded / xhr.total * 100).toFixed(0);
+                    console.log(percentComplete + '% loaded');
+                    statusDiv.textContent = `Loading avatar: ${percentComplete}%`;
+                },
+                function (error) {
+                    console.error('Error loading avatar:', error);
+                    console.error('Error details:', error.message);
+                    statusDiv.textContent = "Error loading avatar, using fallback";
+                    // Fallback: create a simple placeholder
+                    createFallbackAvatar();
+                }
+            );
+        }
+
+        function createFallbackAvatar() {
+            // Simple fallback if model fails to load
+            avatar = new THREE.Group();
+
+            const headGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+            const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffd4b3 });
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.position.y = 1.6;
+            avatar.add(head);
+
+            const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.4, 0.8, 16);
+            const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x667eea });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.8;
+            avatar.add(body);
+
+            scene.add(avatar);
+            console.log('Using fallback avatar');
+        }
+
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+
+            // Update animation mixer if it exists
+            if (mixer) {
+                const delta = clock.getDelta();
+                mixer.update(delta);
+            }
+
+            // Make avatar always face the camera (if loaded)
+            if (avatar) {
+                avatar.lookAt(camera.position);
+            }
+
+            // Speaking animation
+            if (isSpeaking && avatar) {
+                const time = Date.now() * 0.01;
+
+                // Animate jaw bone if available
+                if (jawBone) {
+                    jawBone.rotation.x = Math.sin(time) * 0.15;
+                }
+
+                // Animate head bone for subtle movement
+                if (headBone) {
+                    headBone.position.y += Math.sin(time * 0.5) * 0.002;
+                }
+
+                // Fallback: animate entire avatar if no bones found
+                if (!jawBone && !headBone) {
+                    avatar.position.y = Math.sin(time * 0.5) * 0.05;
+                }
+            } else if (avatar) {
+                // Reset to neutral
+                if (jawBone) {
+                    jawBone.rotation.x = 0;
+                }
+                if (!jawBone && !headBone) {
+                    avatar.position.y = 0;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Start speaking animation
+        function startSpeaking() {
+            isSpeaking = true;
+        }
+
+        // Stop speaking animation
+        function stopSpeaking() {
+            isSpeaking = false;
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const container = document.querySelector('.avatar-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // Initialize Three.js when page loads
+        window.addEventListener('load', initThreeJS);
+    </script>
 
     <script>
         const micBtn = document.getElementById('micBtn');
@@ -561,20 +479,14 @@
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioUrl);
 
-                // Get avatar and rings elements
-                const avatar = document.getElementById('avatar');
-                const rings = document.querySelectorAll('.avatar-ring');
-
-                // Start avatar animation when audio starts playing
+                // Start Three.js avatar animation when audio starts playing
                 audio.onplay = () => {
-                    avatar.classList.add('speaking');
-                    rings.forEach(ring => ring.classList.add('speaking'));
+                    startSpeaking();
                 };
 
-                // Stop avatar animation when audio ends
+                // Stop Three.js avatar animation when audio ends
                 audio.onended = () => {
-                    avatar.classList.remove('speaking');
-                    rings.forEach(ring => ring.classList.remove('speaking'));
+                    stopSpeaking();
                     URL.revokeObjectURL(audioUrl);
                 };
 
@@ -585,18 +497,13 @@
                 // Fallback to browser speech synthesis
                 const utterance = new SpeechSynthesisUtterance(text);
 
-                // Animate avatar for fallback speech too
-                const avatar = document.getElementById('avatar');
-                const rings = document.querySelectorAll('.avatar-ring');
-
+                // Animate Three.js avatar for fallback speech too
                 utterance.onstart = () => {
-                    avatar.classList.add('speaking');
-                    rings.forEach(ring => ring.classList.add('speaking'));
+                    startSpeaking();
                 };
 
                 utterance.onend = () => {
-                    avatar.classList.remove('speaking');
-                    rings.forEach(ring => ring.classList.remove('speaking'));
+                    stopSpeaking();
                 };
 
                 window.speechSynthesis.speak(utterance);
