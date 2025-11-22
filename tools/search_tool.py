@@ -1,8 +1,8 @@
-from googlesearch import search
+from duckduckgo_search import DDGS
 
 def perform_google_search(query: str) -> str:
     """
-    Perform a Google Search and return the top results.
+    Perform a web search (via DuckDuckGo) and return the top results.
     
     Args:
         query: The search query.
@@ -12,14 +12,15 @@ def perform_google_search(query: str) -> str:
     """
     try:
         results = []
-        # Fetch top 5 results
-        for result in search(query, num_results=5, advanced=True):
-            results.append(f"- {result.title}: {result.description} ({result.url})")
+        # Fetch top 5 results using DuckDuckGo
+        with DDGS() as ddgs:
+            for result in ddgs.text(query, max_results=5):
+                results.append(f"- {result['title']}: {result['body']} ({result['href']})")
             
         if not results:
             return "No search results found."
             
-        return "Top Google Search Results:\n" + "\n".join(results)
+        return "Top Web Search Results:\n" + "\n".join(results)
         
     except Exception as e:
-        return f"Error performing Google Search: {str(e)}"
+        return f"Error performing Web Search: {str(e)}"
