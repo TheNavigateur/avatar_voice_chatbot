@@ -168,6 +168,8 @@
         let analyser;
         let dataArray;
         let currentAudioVolume = 0;
+        let audioElement; // Reusable audio element
+        let audioSource; // Reusable audio source
 
         function initThreeJS() {
             const canvas = document.getElementById('avatar-canvas');
@@ -588,35 +590,40 @@
                 // Convert base64 audio to blob and play
                 const audioBlob = base64ToBlob(data.audio, 'audio/mp3');
                 const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
 
-                // Setup Web Audio API for volume analysis
-                if (!audioContext) {
+                // Setup Web Audio API and audio element (only once)
+                if (!audioElement) {
+                    audioElement = new Audio();
+
+                    // Create AudioContext and analyser
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
                     analyser = audioContext.createAnalyser();
                     analyser.fftSize = 256;
                     const bufferLength = analyser.frequencyBinCount;
                     dataArray = new Uint8Array(bufferLength);
+
+                    // Create source and connect (only once!)
+                    audioSource = audioContext.createMediaElementSource(audioElement);
+                    audioSource.connect(analyser);
+                    analyser.connect(audioContext.destination);
                 }
 
-                // Connect audio to analyser
-                const source = audioContext.createMediaElementSource(audio);
-                source.connect(analyser);
-                analyser.connect(audioContext.destination);
+                // Set new audio source and play
+                audioElement.src = audioUrl;
 
                 // Start Three.js avatar animation when audio starts playing
-                audio.onplay = () => {
+                audioElement.onplay = () => {
                     startSpeaking();
                     updateAudioVolume(); // Start analyzing audio volume
                 };
 
                 // Stop Three.js avatar animation when audio ends
-                audio.onended = () => {
+                audioElement.onended = () => {
                     stopSpeaking();
                     URL.revokeObjectURL(audioUrl);
                 };
 
-                audio.play();
+                audioElement.play();
 
             } catch (error) {
                 console.error('TTS Error:', error);
