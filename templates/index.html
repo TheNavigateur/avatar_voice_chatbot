@@ -163,6 +163,12 @@
         let animationId;
         let headBone, jawBone;
 
+        // Audio analysis for mouth movement
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let currentAudioVolume = 0;
+
         function initThreeJS() {
             const canvas = document.getElementById('avatar-canvas');
             const container = document.querySelector('.avatar-container');
@@ -370,15 +376,14 @@
                 // Priority 1: Animate using morph targets (blend shapes) for lip movement
                 if (window.morphTargetMesh) {
                     const mesh = window.morphTargetMesh;
-                    // Subtle, natural mouth movement
-                    const mouthValue = (Math.sin(time * 2) + 1) * 0.25; // 0 to 0.5 range for natural mouth opening
+                    // Use audio volume for natural, synchronized mouth movement
+                    const mouthValue = currentAudioVolume * 2.5; // Scale volume to natural mouth opening range
 
                     if (window.mouthOpenIndex >= 0) {
                         mesh.morphTargetInfluences[window.mouthOpenIndex] = mouthValue;
-                        console.log('Animating mouth morph target:', mouthValue.toFixed(2));
                     }
                     if (window.jawOpenIndex >= 0) {
-                        // Subtle jaw opening for natural teeth separation
+                        // Jaw opens proportionally to mouth
                         mesh.morphTargetInfluences[window.jawOpenIndex] = mouthValue * 0.4;
                     }
                 }
@@ -434,6 +439,29 @@
         // Stop speaking animation
         function stopSpeaking() {
             isSpeaking = false;
+            currentAudioVolume = 0; // Reset volume
+        }
+
+        // Update audio volume from analyser
+        function updateAudioVolume() {
+            if (!isSpeaking || !analyser) return;
+
+            analyser.getByteFrequencyData(dataArray);
+
+            // Calculate average volume
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+
+            // Normalize to 0-1 range and smooth it
+            currentAudioVolume = average / 255;
+
+            // Continue updating while speaking
+            if (isSpeaking) {
+                requestAnimationFrame(updateAudioVolume);
+            }
         }
 
         // Handle window resize
@@ -559,9 +587,24 @@
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioUrl);
 
+                // Setup Web Audio API for volume analysis
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 256;
+                    const bufferLength = analyser.frequencyBinCount;
+                    dataArray = new Uint8Array(bufferLength);
+                }
+
+                // Connect audio to analyser
+                const source = audioContext.createMediaElementSource(audio);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+
                 // Start Three.js avatar animation when audio starts playing
                 audio.onplay = () => {
                     startSpeaking();
+                    updateAudioVolume(); // Start analyzing audio volume
                 };
 
                 // Stop Three.js avatar animation when audio ends
