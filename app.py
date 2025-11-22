@@ -24,8 +24,8 @@ class ChatRequest(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
-    language_code: str = "en-US"
-    voice_name: str = "en-US-Neural2-F"  # Female neural voice
+    language_code: str = "en-GB"
+    voice_name: str = "en-GB-Chirp3-HD-Algenib"
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):

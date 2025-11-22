@@ -28,6 +28,7 @@ class VoiceAgent:
             Your primary capability is searching Google to answer user queries.
             Keep your responses concise and conversational, suitable for being spoken aloud.
             When you find information, summarize it clearly.
+            Try to use no more than 10 words in your response.
             """
         )
 
