@@ -37,9 +37,10 @@
         /* Avatar Container */
         .avatar-container {
             position: relative;
-            width: 150px;
-            height: 150px;
+            width: 200px;
+            height: 240px;
             margin: 1.5rem auto;
+            perspective: 1000px;
         }
 
         /* Animated rings */
@@ -54,18 +55,18 @@
         }
 
         .avatar-ring.ring-1 {
-            width: 150px;
-            height: 150px;
+            width: 200px;
+            height: 200px;
         }
 
         .avatar-ring.ring-2 {
-            width: 170px;
-            height: 170px;
+            width: 230px;
+            height: 230px;
         }
 
         .avatar-ring.ring-3 {
-            width: 190px;
-            height: 190px;
+            width: 260px;
+            height: 260px;
         }
 
         .avatar-ring.speaking {
@@ -96,101 +97,237 @@
             animation-delay: 0.6s;
         }
 
-        /* Avatar circle */
+        /* 3D Avatar */
         .avatar {
             position: relative;
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
-            transition: transform 0.3s ease;
+            width: 200px;
+            height: 240px;
             z-index: 10;
+            transform-style: preserve-3d;
+            transition: transform 0.3s ease;
         }
 
         .avatar.speaking {
-            animation: avatarBounce 0.6s ease-in-out infinite;
+            animation: avatarFloat 2s ease-in-out infinite;
         }
 
-        @keyframes avatarBounce {
+        @keyframes avatarFloat {
 
             0%,
             100% {
-                transform: scale(1);
+                transform: translateY(0px);
             }
 
             50% {
-                transform: scale(1.05);
+                transform: translateY(-8px);
             }
         }
 
-        /* Avatar face */
-        .avatar-face {
+        /* Head */
+        .avatar-head {
             position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            width: 120px;
+            height: 140px;
+            margin: 0 auto;
+            background: linear-gradient(135deg, #ffd1a9 0%, #ffb88c 100%);
+            border-radius: 60px 60px 70px 70px;
+            box-shadow:
+                0 10px 30px rgba(0, 0, 0, 0.2),
+                inset -5px -5px 15px rgba(0, 0, 0, 0.1),
+                inset 5px 5px 15px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Hair */
+        .avatar-hair {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 130px;
+            height: 80px;
+            background: linear-gradient(135deg, #4a3f35 0%, #6b5d52 100%);
+            border-radius: 65px 65px 40px 40px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .avatar-hair::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: -10px;
+            width: 40px;
+            height: 60px;
+            background: linear-gradient(135deg, #4a3f35 0%, #6b5d52 100%);
+            border-radius: 20px 0 0 30px;
+        }
+
+        .avatar-hair::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            right: -10px;
+            width: 40px;
+            height: 60px;
+            background: linear-gradient(135deg, #4a3f35 0%, #6b5d52 100%);
+            border-radius: 0 20px 30px 0;
         }
 
         /* Eyes */
         .avatar-eyes {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
-            gap: 30px;
-            margin-bottom: 15px;
+            gap: 35px;
         }
 
         .avatar-eye {
-            width: 12px;
-            height: 12px;
+            width: 18px;
+            height: 22px;
             background: white;
             border-radius: 50%;
             position: relative;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .avatar-eye::after {
             content: '';
             position: absolute;
-            width: 6px;
-            height: 6px;
-            background: #333;
+            width: 10px;
+            height: 10px;
+            background: #2c3e50;
             border-radius: 50%;
-            top: 50%;
+            top: 6px;
+            left: 4px;
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .avatar-eye::before {
+            content: '';
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: white;
+            border-radius: 50%;
+            top: 8px;
+            left: 7px;
+            z-index: 1;
+        }
+
+        /* Eyebrows */
+        .avatar-eyebrow {
+            position: absolute;
+            top: 42px;
+            width: 22px;
+            height: 4px;
+            background: #4a3f35;
+            border-radius: 2px;
+        }
+
+        .avatar-eyebrow.left {
+            left: 25px;
+            transform: rotate(-5deg);
+        }
+
+        .avatar-eyebrow.right {
+            right: 25px;
+            transform: rotate(5deg);
+        }
+
+        /* Nose */
+        .avatar-nose {
+            position: absolute;
+            top: 75px;
             left: 50%;
-            transform: translate(-50%, -50%);
+            transform: translateX(-50%);
+            width: 12px;
+            height: 18px;
+            background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.05) 100%);
+            border-radius: 6px;
+        }
+
+        .avatar-nose::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 50%;
         }
 
         /* Mouth */
         .avatar-mouth {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
             width: 40px;
-            height: 20px;
-            border: 3px solid white;
-            border-top: none;
-            border-radius: 0 0 40px 40px;
+            height: 8px;
+            background: #d4756e;
+            border-radius: 0 0 20px 20px;
             transition: all 0.2s ease;
+            box-shadow: inset 0 -2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .avatar.speaking .avatar-mouth {
-            animation: mouthTalk 0.3s ease-in-out infinite;
+            animation: mouthTalk3D 0.3s ease-in-out infinite;
         }
 
-        @keyframes mouthTalk {
+        @keyframes mouthTalk3D {
 
             0%,
             100% {
-                height: 20px;
-                border-radius: 0 0 40px 40px;
+                height: 8px;
+                border-radius: 0 0 20px 20px;
             }
 
             50% {
-                height: 25px;
-                border-radius: 0 0 50px 50px;
+                height: 20px;
+                border-radius: 0 0 25px 25px;
+                background: #c96860;
             }
+        }
+
+        /* Neck */
+        .avatar-neck {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 35px;
+            background: linear-gradient(135deg, #ffc299 0%, #ffb380 100%);
+            border-radius: 0 0 25px 25px;
+            box-shadow: inset 0 -5px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Shoulders */
+        .avatar-shoulders {
+            position: absolute;
+            bottom: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 160px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 80px 80px 0 0;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Collar */
+        .avatar-collar {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 70px;
+            height: 20px;
+            background: #5a6fd8;
+            clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
         }
 
         #status {
@@ -290,12 +427,20 @@
             <div class="avatar-ring ring-2"></div>
             <div class="avatar-ring ring-3"></div>
             <div class="avatar" id="avatar">
-                <div class="avatar-face">
+                <div class="avatar-head">
+                    <div class="avatar-hair"></div>
+                    <div class="avatar-eyebrow left"></div>
+                    <div class="avatar-eyebrow right"></div>
                     <div class="avatar-eyes">
                         <div class="avatar-eye"></div>
                         <div class="avatar-eye"></div>
                     </div>
+                    <div class="avatar-nose"></div>
                     <div class="avatar-mouth"></div>
+                    <div class="avatar-neck"></div>
+                </div>
+                <div class="avatar-shoulders">
+                    <div class="avatar-collar"></div>
                 </div>
             </div>
         </div>
