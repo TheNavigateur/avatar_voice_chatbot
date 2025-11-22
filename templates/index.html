@@ -370,14 +370,16 @@
                 // Priority 1: Animate using morph targets (blend shapes) for lip movement
                 if (window.morphTargetMesh) {
                     const mesh = window.morphTargetMesh;
-                    const mouthValue = (Math.sin(time * 2) + 1) * 0.4; // 0 to 0.8 range for mouth opening
+                    // Subtle, natural mouth movement
+                    const mouthValue = (Math.sin(time * 2) + 1) * 0.25; // 0 to 0.5 range for natural mouth opening
 
                     if (window.mouthOpenIndex >= 0) {
                         mesh.morphTargetInfluences[window.mouthOpenIndex] = mouthValue;
                         console.log('Animating mouth morph target:', mouthValue.toFixed(2));
                     }
                     if (window.jawOpenIndex >= 0) {
-                        mesh.morphTargetInfluences[window.jawOpenIndex] = mouthValue * 0.5;
+                        // Subtle jaw opening for natural teeth separation
+                        mesh.morphTargetInfluences[window.jawOpenIndex] = mouthValue * 0.4;
                     }
                 }
                 // Priority 2: Animate jaw bone if available
