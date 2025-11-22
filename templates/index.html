@@ -249,22 +249,68 @@
 
                     // Try to find head and jaw bones for animation
                     let boneCount = 0;
+                    let morphTargetMesh = null;
+                    let mouthOpenIndex = -1;
+                    let jawOpenIndex = -1;
+
                     avatar.traverse((child) => {
                         if (child.isBone) {
                             boneCount++;
+                            const boneName = child.name.toLowerCase();
                             console.log('Found bone:', child.name);
-                            if (child.name.toLowerCase().includes('head')) {
+
+                            // Look for head bone (various naming conventions)
+                            if (boneName.includes('head') || boneName.includes('neck_01')) {
                                 headBone = child;
-                                console.log('Head bone found!');
+                                console.log('✓ Head bone found:', child.name);
                             }
-                            if (child.name.toLowerCase().includes('jaw')) {
+
+                            // Look for jaw bone (various naming conventions)
+                            if (boneName.includes('jaw') ||
+                                boneName.includes('chin') ||
+                                boneName.includes('mouth') ||
+                                boneName === 'cc_base_jawroot' ||
+                                boneName === 'mixamorig:jaw') {
                                 jawBone = child;
-                                console.log('Jaw bone found!');
+                                console.log('✓ Jaw bone found:', child.name);
                             }
+                        }
+
+                        // Check for morph targets (blend shapes) for facial animation
+                        if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
+                            const morphNames = Object.keys(child.morphTargetDictionary);
+                            console.log('✓ Morph targets found on mesh:', child.name);
+                            console.log('  Available morphs:', morphNames);
+
+                            // Look for mouth-related morph targets
+                            morphNames.forEach(name => {
+                                const lowerName = name.toLowerCase();
+                                if (lowerName.includes('mouthopen') || lowerName.includes('mouth_open')) {
+                                    mouthOpenIndex = child.morphTargetDictionary[name];
+                                    morphTargetMesh = child;
+                                    console.log('  ✓ Found mouthOpen morph:', name, 'at index', mouthOpenIndex);
+                                }
+                                if (lowerName.includes('jawopen') || lowerName.includes('jaw_open')) {
+                                    jawOpenIndex = child.morphTargetDictionary[name];
+                                    morphTargetMesh = child;
+                                    console.log('  ✓ Found jawOpen morph:', name, 'at index', jawOpenIndex);
+                                }
+                            });
                         }
                     });
 
+                    // Store morph target info globally for animation
+                    if (morphTargetMesh) {
+                        window.morphTargetMesh = morphTargetMesh;
+                        window.mouthOpenIndex = mouthOpenIndex;
+                        window.jawOpenIndex = jawOpenIndex;
+                    }
+
                     console.log('Total bones found:', boneCount);
+                    console.log('Head bone:', headBone ? headBone.name : 'NOT FOUND');
+                    console.log('Jaw bone:', jawBone ? jawBone.name : 'NOT FOUND');
+                    console.log('Morph target mesh:', morphTargetMesh ? 'FOUND' : 'NOT FOUND');
+                    console.log('Mouth morph indices:', { mouthOpen: mouthOpenIndex, jawOpen: jawOpenIndex });
                     console.log('Avatar loaded successfully - this is a realistic human model!');
                 },
                 function (xhr) {
@@ -321,27 +367,57 @@
             if (isSpeaking && avatar) {
                 const time = Date.now() * 0.01;
 
-                // Animate jaw bone if available
-                if (jawBone) {
-                    jawBone.rotation.x = Math.sin(time) * 0.15;
+                // Priority 1: Animate using morph targets (blend shapes) for lip movement
+                if (window.morphTargetMesh) {
+                    const mesh = window.morphTargetMesh;
+                    const mouthValue = (Math.sin(time * 2) + 1) * 0.4; // 0 to 0.8 range for mouth opening
+
+                    if (window.mouthOpenIndex >= 0) {
+                        mesh.morphTargetInfluences[window.mouthOpenIndex] = mouthValue;
+                        console.log('Animating mouth morph target:', mouthValue.toFixed(2));
+                    }
+                    if (window.jawOpenIndex >= 0) {
+                        mesh.morphTargetInfluences[window.jawOpenIndex] = mouthValue * 0.5;
+                    }
+                }
+                // Priority 2: Animate jaw bone if available
+                else if (jawBone) {
+                    jawBone.rotation.x = Math.sin(time) * 0.3;
+                    console.log('Animating jaw bone');
                 }
 
-                // Animate head bone for subtle movement
+                // Animate head bone for subtle movement (works with any method)
                 if (headBone) {
                     headBone.position.y += Math.sin(time * 0.5) * 0.002;
                 }
 
-                // Fallback: animate entire avatar if no bones found
-                if (!jawBone && !headBone) {
-                    avatar.position.y = Math.sin(time * 0.5) * 0.05;
+                // Priority 3: Fallback - animate entire avatar if no facial animation available
+                if (!window.morphTargetMesh && !jawBone && !headBone) {
+                    avatar.position.y = Math.sin(time * 0.5) * 0.15;
+                    avatar.scale.y = 1 + Math.sin(time) * 0.05;
+                    avatar.scale.x = 1 + Math.sin(time) * 0.02;
+                    avatar.rotation.z = Math.sin(time * 0.3) * 0.05;
+                    console.log('Using enhanced fallback animation (no facial controls found)');
                 }
             } else if (avatar) {
                 // Reset to neutral
+                if (window.morphTargetMesh) {
+                    const mesh = window.morphTargetMesh;
+                    if (window.mouthOpenIndex >= 0) {
+                        mesh.morphTargetInfluences[window.mouthOpenIndex] = 0;
+                    }
+                    if (window.jawOpenIndex >= 0) {
+                        mesh.morphTargetInfluences[window.jawOpenIndex] = 0;
+                    }
+                }
                 if (jawBone) {
                     jawBone.rotation.x = 0;
                 }
-                if (!jawBone && !headBone) {
+                if (!window.morphTargetMesh && !jawBone && !headBone) {
                     avatar.position.y = 0;
+                    avatar.scale.y = 1;
+                    avatar.scale.x = 1;
+                    avatar.rotation.z = 0;
                 }
             }
 
@@ -454,7 +530,7 @@
         function addMessage(sender, text) {
             const div = document.createElement('div');
             div.className = 'message';
-            div.innerHTML = `<span class="${sender.toLowerCase()}">${sender}:</span> ${text}`;
+            div.innerHTML = `< span class="${sender.toLowerCase()}" > ${sender}:</span > ${text}`;
             transcriptDiv.appendChild(div);
             transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
         }
