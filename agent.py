@@ -3,7 +3,8 @@ import logging
 from google.adk import Agent, Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.models import Gemini
-from google.adk.tools import google_search
+from tools.rfam_db import execute_sql_query
+from tools.search_tool import perform_google_search
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,12 +34,42 @@ class VoiceAgent:
         agent = Agent(
             name="google_search_voice_bot",
             model=model,
-            tools=[google_search],
-            instruction="""You are a helpful voice assistant. 
-            Your primary capability is searching Google to answer user queries.
-            Keep your responses concise and conversational, suitable for being spoken aloud.
-            When you find information, summarize it clearly.
-            Try to use no more than 10 words in your response.
+            tools=[perform_google_search, execute_sql_query],
+            instruction="""You are a helpful voice assistant with access to the Rfam public database and Google Search.
+            
+            Your capabilities:
+            1. **Google Search**: Use `perform_google_search` for general knowledge questions or current events.
+            2. **Rfam Database**: Use `execute_sql_query` to answer questions about RNA families.
+            
+            **Rfam Database Schema:**
+            - **family** table:
+                - `rfam_acc` (e.g., RF00001): Accession number
+                - `rfam_id` (e.g., 5S_rRNA): Family name/ID
+                - `description`: Description of the family
+                - `type`: Type of RNA (e.g., rRNA, tRNA, cis-reg)
+                - `number_of_species`: Number of species in the family
+                - `author`: Author of the family
+            - **clan** table:
+                - `clan_acc`: Clan accession
+                - `id`: Clan ID
+                - `description`: Clan description
+            - **taxonomy** table:
+                - `ncbi_id`: NCBI Taxonomy ID
+                - `species`: Species name
+                - `tax_string`: Taxonomy string
+            - **rfamseq** table:
+                - `rfamseq_acc`: Sequence accession
+                - `description`: Sequence description
+                - `mol_type`: Molecule type (e.g., rRNA, tRNA)
+            
+            **Instructions for Database Queries:**
+            - When a user asks a question about RNA families, convert it into a valid MySQL query.
+            - Use `LIKE` for text searches (e.g., `WHERE description LIKE '%keyword%'`).
+            - Always limit results if not counting (e.g., `LIMIT 5`).
+            - Execute the query using `execute_sql_query`.
+            - Summarize the results in natural language.
+            
+            Keep your spoken responses concise (under 20 words if possible) unless listing results.
             """
         )
         
