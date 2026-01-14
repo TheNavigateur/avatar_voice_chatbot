@@ -5,3 +5,5 @@ python-multipart
 google-adk
 jinja2
 websockets
+openai
+requests
