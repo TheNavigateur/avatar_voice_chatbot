@@ -1,8 +1,9 @@
 #!/bin/bash
 echo "Starting Google ADK Voice Chatbot..."
-export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
-export GOOGLE_CSE_ID="YOUR_GOOGLE_CSE_ID"
-export GOOGLE_CSE_API_KEY="YOUR_GOOGLE_CSE_API_KEY"
-export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
-export ELEVENLABS_API_KEY="YOUR_ELEVENLABS_API_KEY"
+# Load secrets if available
+if [ -f secrets.sh ]; then
+    source secrets.sh
+else
+    echo "Warning: secrets.sh not found. Ensure API keys are set."
+fi
 python3 app.py
