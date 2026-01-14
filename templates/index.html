@@ -56,7 +56,10 @@
             flex-direction: column;
             height: 100%;
             min-width: 300px;
+            /* No justify-center needed for text only */
         }
+
+        /* Removed .right-panel.chat-active styles */
 
         h1 {
             color: #667eea;
@@ -113,23 +116,45 @@
             transform: scale(0.95);
         }
 
-        .mic-btn.listening {
-            background: linear-gradient(135deg, #ea4335 0%, #d32f2f 100%);
-            animation: pulse 1.5s infinite;
+        /* Start/Stop Button Styles */
+        .action-btn {
+            font-size: 1.2rem;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 auto;
+            width: 80%;
+            max-width: 300px;
         }
 
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.4);
-            }
+        .start-btn {
+            background: linear-gradient(135deg, #42d392 0%, #647eff 100%);
+            color: white;
+        }
 
-            70% {
-                box-shadow: 0 0 0 20px rgba(234, 67, 53, 0);
-            }
+        .start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(66, 211, 146, 0.4);
+        }
 
-            100% {
-                box-shadow: 0 0 0 0 rgba(234, 67, 53, 0);
-            }
+        .stop-btn {
+            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+            color: white;
+        }
+
+        .stop-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 65, 108, 0.4);
+        }
+
+        .hidden {
+            display: none;
         }
 
         #transcript {
@@ -143,7 +168,10 @@
             overflow-y: auto;
             backdrop-filter: blur(5px);
             width: 100%;
+            flex: 1;
+            /* Take remaining height in right panel */
             box-sizing: border-box;
+            max-height: 600px;
         }
 
         .message {
@@ -189,6 +217,24 @@
                 margin-top: 1rem;
             }
         }
+
+        .interaction-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 80px;
+            /* Fixed height taller than button */
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        #status {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #666;
+            text-align: center;
+        }
     </style>
 </head>
 
@@ -198,7 +244,7 @@
 
         <div class="main-content">
             <div class="left-panel">
-                <div class="controls" style="margin-bottom: 1rem; text-align: center;">
+                <div class="controls" style="margin-bottom: 0.5rem; text-align: center;">
                     <label for="ttsProvider" style="margin-right: 0.5rem; color: #333;">Voice Provider:</label>
                     <select id="ttsProvider" style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc;">
                         <option value="google">Google Chirp (Default)</option>
@@ -212,8 +258,10 @@
                     <canvas id="avatar-canvas"></canvas>
                 </div>
 
-                <div id="status">Click the microphone to speak</div>
-                <button id="micBtn" class="mic-btn">🎤</button>
+                <div class="interaction-container">
+                    <div id="status" class="hidden"></div>
+                    <button id="startBtn" class="action-btn start-btn">Start Conversation</button>
+                </div>
             </div>
 
             <div class="right-panel">
@@ -230,10 +278,16 @@
     <!-- Three.js Avatar Setup -->
     <script>
         // Three.js Scene Setup
-        let scene, camera, renderer, avatar, mixer, clock;
+        let scene,
+            camera,
+            renderer,
+            avatar,
+            mixer,
+            clock;
         let isSpeaking = false;
         let animationId;
-        let headBone, jawBone;
+        let headBone,
+            jawBone;
 
         // Audio analysis for mouth movement
         let audioContext;
@@ -251,14 +305,12 @@
             scene = new THREE.Scene();
 
             // Camera - positioned for close-up face view like a video call
-            camera = new THREE.PerspectiveCamera(
-                40,  // Slightly wider field of view for better framing
+            camera = new THREE.PerspectiveCamera(40, // Slightly wider field of view for better framing
                 container.clientWidth / container.clientHeight,
                 0.1,
-                1000
-            );
-            camera.position.set(0, 0, 0.52);  // Closer but not too close - video call distance
-            camera.lookAt(0, 0, 0);  // Look at face level
+                1000);
+            camera.position.set(0, 0, 0.52); // Closer but not too close - video call distance
+            camera.lookAt(0, 0, 0); // Look at face level
 
             // Renderer
             renderer = new THREE.WebGLRenderer({
@@ -297,16 +349,14 @@
 
             // Using a verified Ready Player Me avatar URL
             // This is a full-body realistic human model
-            const modelUrl =
-                //'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb'
+            const modelUrl = //'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb'
                 'https://models.readyplayer.me/6921e87fbcfe438b18908217.glb'
                 ;
 
             console.log('Starting to load 3D model from:', modelUrl);
             statusDiv.textContent = "Loading 3D avatar...";
 
-            loader.load(
-                modelUrl,
+            loader.load(modelUrl,
                 function (gltf) {
                     console.log('Model loaded successfully!', gltf);
                     avatar = gltf.scene;
@@ -320,12 +370,12 @@
 
                     // Scale and position the model for close-up face view
                     avatar.scale.set(1, 1, 1);
-                    avatar.position.set(0, -size.y + 0.15, 0);  // Slightly lower to center face in view
+                    avatar.position.set(0, -size.y + 0.15, 0); // Slightly lower to center face in view
 
                     scene.add(avatar);
 
                     console.log('Avatar added to scene');
-                    statusDiv.textContent = "Click the microphone to speak";
+                    statusDiv.textContent = "";
 
                     // Setup animations if available
                     if (gltf.animations && gltf.animations.length > 0) {
@@ -352,11 +402,7 @@
                             }
 
                             // Look for jaw bone (various naming conventions)
-                            if (boneName.includes('jaw') ||
-                                boneName.includes('chin') ||
-                                boneName.includes('mouth') ||
-                                boneName === 'cc_base_jawroot' ||
-                                boneName === 'mixamorig:jaw') {
+                            if (boneName.includes('jaw') || boneName.includes('chin') || boneName.includes('mouth') || boneName === 'cc_base_jawroot' || boneName === 'mixamorig:jaw') {
                                 jawBone = child;
                                 console.log('✓ Jaw bone found:', child.name);
                             }
@@ -371,11 +417,13 @@
                             // Look for mouth-related morph targets
                             morphNames.forEach(name => {
                                 const lowerName = name.toLowerCase();
+
                                 if (lowerName.includes('mouthopen') || lowerName.includes('mouth_open')) {
                                     mouthOpenIndex = child.morphTargetDictionary[name];
                                     morphTargetMesh = child;
                                     console.log('  ✓ Found mouthOpen morph:', name, 'at index', mouthOpenIndex);
                                 }
+
                                 if (lowerName.includes('jawopen') || lowerName.includes('jaw_open')) {
                                     jawOpenIndex = child.morphTargetDictionary[name];
                                     morphTargetMesh = child;
@@ -396,22 +444,33 @@
                     console.log('Head bone:', headBone ? headBone.name : 'NOT FOUND');
                     console.log('Jaw bone:', jawBone ? jawBone.name : 'NOT FOUND');
                     console.log('Morph target mesh:', morphTargetMesh ? 'FOUND' : 'NOT FOUND');
-                    console.log('Mouth morph indices:', { mouthOpen: mouthOpenIndex, jawOpen: jawOpenIndex });
+
+                    console.log('Mouth morph indices:', {
+                        mouthOpen: mouthOpenIndex, jawOpen: jawOpenIndex
+                    });
                     console.log('Avatar loaded successfully - this is a realistic human model!');
-                },
+                }
+
+                ,
                 function (xhr) {
                     const percentComplete = (xhr.loaded / xhr.total * 100).toFixed(0);
                     console.log(percentComplete + '% loaded');
-                    statusDiv.textContent = `Loading avatar: ${percentComplete}%`;
-                },
+
+                    statusDiv.textContent = `Loading avatar: $ {
+                    percentComplete
+                }
+
+                %`;
+                }
+
+                ,
                 function (error) {
                     console.error('Error loading avatar:', error);
                     console.error('Error details:', error.message);
                     statusDiv.textContent = "Error loading avatar, using fallback";
                     // Fallback: create a simple placeholder
                     createFallbackAvatar();
-                }
-            );
+                });
         }
 
         function createFallbackAvatar() {
@@ -419,13 +478,19 @@
             avatar = new THREE.Group();
 
             const headGeometry = new THREE.SphereGeometry(0.3, 32, 32);
-            const headMaterial = new THREE.MeshPhongMaterial({ color: 0xffd4b3 });
+
+            const headMaterial = new THREE.MeshPhongMaterial({
+                color: 0xffd4b3
+            });
             const head = new THREE.Mesh(headGeometry, headMaterial);
             head.position.y = 1.6;
             avatar.add(head);
 
             const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.4, 0.8, 16);
-            const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0x667eea });
+
+            const bodyMaterial = new THREE.MeshPhongMaterial({
+                color: 0x667eea
+            });
             const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
             body.position.y = 0.8;
             avatar.add(body);
@@ -462,11 +527,13 @@
                     if (window.mouthOpenIndex >= 0) {
                         mesh.morphTargetInfluences[window.mouthOpenIndex] = mouthValue;
                     }
+
                     if (window.jawOpenIndex >= 0) {
                         // Jaw opens proportionally to mouth
                         mesh.morphTargetInfluences[window.jawOpenIndex] = mouthValue * 0.4;
                     }
                 }
+
                 // Priority 2: Animate jaw bone if available
                 else if (jawBone) {
                     jawBone.rotation.x = Math.sin(time) * 0.3;
@@ -486,20 +553,27 @@
                     avatar.rotation.z = Math.sin(time * 0.3) * 0.05;
                     console.log('Using enhanced fallback animation (no facial controls found)');
                 }
-            } else if (avatar) {
+            }
+
+            else if (avatar) {
+
                 // Reset to neutral
                 if (window.morphTargetMesh) {
                     const mesh = window.morphTargetMesh;
+
                     if (window.mouthOpenIndex >= 0) {
                         mesh.morphTargetInfluences[window.mouthOpenIndex] = 0;
                     }
+
                     if (window.jawOpenIndex >= 0) {
                         mesh.morphTargetInfluences[window.jawOpenIndex] = 0;
                     }
                 }
+
                 if (jawBone) {
                     jawBone.rotation.x = 0;
                 }
+
                 if (!window.morphTargetMesh && !jawBone && !headBone) {
                     avatar.position.y = 0;
                     avatar.scale.y = 1;
@@ -530,9 +604,11 @@
 
             // Calculate average volume
             let sum = 0;
+
             for (let i = 0; i < dataArray.length; i++) {
                 sum += dataArray[i];
             }
+
             const average = sum / dataArray.length;
 
             // Normalize to 0-1 range and smooth it
@@ -555,46 +631,89 @@
         // Initialize Three.js when page loads
         window.addEventListener('load', initThreeJS);
     </script>
-
-    <script>
-        const micBtn = document.getElementById('micBtn');
+    <script>const startBtn = document.getElementById('startBtn');
         const statusDiv = document.getElementById('status');
         const transcriptDiv = document.getElementById('transcript');
 
         let sessionId = null;
         let recognition;
+        let isConversationActive = false; // Flag for continuous mode
+        let isBotSpeaking = false; // Flag to prevent self-triggering
+        let isProcessing = false; // Flag to prevent restart during fetch
 
         if ('webkitSpeechRecognition' in window) {
             recognition = new webkitSpeechRecognition();
-            recognition.continuous = false;
+            recognition.continuous = false; // We manually restart
             recognition.interimResults = false;
             recognition.lang = 'en-US';
 
             recognition.onstart = () => {
-                micBtn.classList.add('listening');
-                statusDiv.textContent = "Listening...";
-            };
+                statusDiv.textContent = "Listening... 🟢";
+                statusDiv.style.color = "#42d392"; // Greenish
+            }
+
+                ;
 
             recognition.onend = () => {
-                micBtn.classList.remove('listening');
-                statusDiv.textContent = "Processing...";
-            };
+
+                // If conversation is active and we are NOT processing a result and NOT speaking
+                // Then it was just a silence timeout or no-speech event. Restart listening.
+                if (isConversationActive && !isBotSpeaking && !isProcessing) {
+                    console.log('Recognition ended (silence), restarting loop...');
+
+                    // Don't change status text to "Processing", keep "Listening" (or similar) 
+                    // to avoid confusing the user.
+                    try {
+                        recognition.start();
+                    }
+
+                    catch (e) {
+                        // Ignore if already started
+                    }
+                }
+
+                else if (!isConversationActive) {
+                    // Only show "Processing" if we are truly stopping/done? 
+                    // Actually if we are not active, we are just stopped.
+                    statusDiv.textContent = "";
+                    statusDiv.style.color = "#666";
+                }
+
+                // If isProcessing is true, do NOTHING here. Let the fetch/speak completion handle the restart.
+            }
+
+                ;
 
             recognition.onresult = async (event) => {
                 const transcript = event.results[0][0].transcript;
                 addMessage('You', transcript);
 
+                // Set processing flag to true so onend doesn't restart listing immediately
+                isProcessing = true;
+
+                // Visual feedback for processing
+                statusDiv.textContent = "Thinking... 🧠";
+                statusDiv.style.color = "#764ba2"; // Purple
+
                 try {
-                    const requestBody = { message: transcript };
+                    const requestBody = {
+                        message: transcript
+                    }
+
+                        ;
+
                     if (sessionId) {
                         requestBody.session_id = sessionId;
                     }
 
                     const response = await fetch('/chat', {
+
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
-                        },
+                        }
+
+                        ,
                         body: JSON.stringify(requestBody)
                     });
 
@@ -607,52 +726,142 @@
                         sessionId = data.session_id;
                     }
 
-                    const botResponse = data.response;
-                    console.log('Bot response:', botResponse);
-                    addMessage('Bot', botResponse);
-                    speak(botResponse);
-                    statusDiv.textContent = "Click microphone to speak";
+                    let botResponse = data.response;
+                    console.log('Bot response (raw):', botResponse);
 
-                } catch (error) {
+                    // Check for termination token
+                    let shouldEndConversation = false;
+
+                    if (botResponse.includes('[END_CONVERSATION]')) {
+                        shouldEndConversation = true;
+                        botResponse = botResponse.replace('[END_CONVERSATION]', '').trim();
+                    }
+
+                    addMessage('Bot', botResponse);
+
+                    // Respond
+                    await speak(botResponse, shouldEndConversation);
+
+                    // Do NOT call stopConversationMode() here immediately.
+                    // It will be handled in speak() -> onended callback.
+
+                }
+
+                catch (error) {
                     console.error('Error:', error);
                     statusDiv.textContent = "Error communicating with server";
+                    isProcessing = false; // Reset if error
+
+                    // Force restart listening if error occurred
+                    if (isConversationActive) {
+                        try {
+                            recognition.start();
+                        }
+
+                        catch (e) { }
+                    }
                 }
-            };
+            }
+
+                ;
+
 
             recognition.onerror = (event) => {
                 console.error('Speech recognition error', event.error);
-                statusDiv.textContent = "Error: " + event.error;
-                micBtn.classList.remove('listening');
-            };
-        } else {
-            statusDiv.textContent = "Web Speech API not supported in this browser.";
-            micBtn.disabled = true;
+
+                if (event.error === 'no-speech' && isConversationActive && !isBotSpeaking) {
+                    // Just restart if it timed out with no speech
+                    statusDiv.textContent = "Still listening...";
+                    // onend will likely handle the restart
+                }
+
+                else {
+                    statusDiv.textContent = "Error: " + event.error;
+                }
+            }
+
+                ;
         }
 
-        micBtn.addEventListener('click', () => {
-            if (micBtn.classList.contains('listening')) {
-                recognition.stop();
-            } else {
+        else {
+            statusDiv.textContent = "Web Speech API not supported in this browser.";
+            startBtn.disabled = true;
+        }
+
+        function startConversationMode() {
+            isConversationActive = true;
+
+            // UI Updates
+            startBtn.classList.add('hidden');
+            statusDiv.classList.remove('hidden'); // Show status
+            statusDiv.textContent = "Starting...";
+
+            // Start listening immediately
+            try {
                 recognition.start();
             }
-        });
+
+            catch (e) {
+                console.error("Could not start recognition:", e);
+                statusDiv.textContent = "Error starting listening. Please try again.";
+            }
+        }
+
+        function stopConversationMode() {
+            isConversationActive = false;
+
+            if (recognition) {
+                recognition.stop();
+            }
+
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+            }
+
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+
+            stopSpeaking(); // Avatar animation stop
+
+            // UI Updates
+            startBtn.classList.remove('hidden');
+            statusDiv.textContent = "";
+            statusDiv.classList.add('hidden'); // Hide status
+        }
+
+        startBtn.addEventListener('click', startConversationMode);
+
 
         function addMessage(sender, text) {
             const div = document.createElement('div');
             div.className = 'message';
+
             div.innerHTML = `<span class="${sender.toLowerCase()}">${sender}:</span> ${text}`;
             transcriptDiv.appendChild(div);
             transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
         }
 
-        async function speak(text) {
+        async function speak(text, shouldEnd = false) {
+            isBotSpeaking = true;
+
+            // Stop listening while speaking to prevent feedback loop
+            if (recognition) {
+                recognition.stop();
+            }
+
             try {
+
                 // Call the Google TTS endpoint
                 const response = await fetch('/tts', {
+
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    },
+                    }
+
+                    ,
                     body: JSON.stringify({
                         text: text,
                         text: text,
@@ -691,30 +900,85 @@
                 // Start Three.js avatar animation when audio starts playing
                 audioElement.onplay = () => {
                     startSpeaking();
-                    updateAudioVolume(); // Start analyzing audio volume
-                };
+                    updateAudioVolume();
+                    statusDiv.textContent = "Speaking... 🗣️";
+                    statusDiv.style.color = "#667eea"; // Blue
+                }
+
+                    ;
 
                 // Stop Three.js avatar animation when audio ends
                 audioElement.onended = () => {
                     stopSpeaking();
                     URL.revokeObjectURL(audioUrl);
-                };
 
-                audioElement.play();
+                    isBotSpeaking = false;
+                    isProcessing = false; // Done processing/speaking
 
-            } catch (error) {
+                    // RESTART LISTENING HERE if conversation is active AND not ending
+                    if (isConversationActive && !shouldEnd) {
+                        statusDiv.textContent = "Listening... 🟢";
+                        statusDiv.style.color = "#42d392";
+
+                        try {
+                            recognition.start();
+                        }
+
+                        catch (e) {
+                            console.log('Already started');
+                        }
+                    }
+
+                    else if (shouldEnd) {
+                        // End conversation properly AFTER audio finishes
+                        stopConversationMode();
+                    }
+                }
+
+                    ;
+
+                await audioElement.play();
+
+            }
+
+            catch (error) {
                 console.error('TTS Error:', error);
+
                 // Fallback to browser speech synthesis
                 const utterance = new SpeechSynthesisUtterance(text);
 
                 // Animate Three.js avatar for fallback speech too
                 utterance.onstart = () => {
                     startSpeaking();
-                };
+                }
+
+                    ;
 
                 utterance.onend = () => {
                     stopSpeaking();
-                };
+                    isBotSpeaking = false;
+                    isProcessing = false; // Done processing/speaking
+
+                    // RESTART LISTENING HERE (Fallback)
+                    if (isConversationActive && !shouldEnd) {
+                        statusDiv.textContent = "Listening... 🟢";
+                        statusDiv.style.color = "#42d392";
+
+                        try {
+                            recognition.start();
+                        }
+
+                        catch (e) {
+                            console.log('Already started');
+                        }
+                    }
+
+                    else if (shouldEnd) {
+                        stopConversationMode();
+                    }
+                }
+
+                    ;
 
                 window.speechSynthesis.speak(utterance);
             }
@@ -723,12 +987,18 @@
         function base64ToBlob(base64, mimeType) {
             const byteCharacters = atob(base64);
             const byteNumbers = new Array(byteCharacters.length);
+
             for (let i = 0; i < byteCharacters.length; i++) {
                 byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
+
             const byteArray = new Uint8Array(byteNumbers);
-            return new Blob([byteArray], { type: mimeType });
+
+            return new Blob([byteArray], {
+                type: mimeType
+            });
         }
+
     </script>
 </body>
 
