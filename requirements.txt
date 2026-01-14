@@ -7,3 +7,7 @@ jinja2
 websockets
 openai
 requests
+google-cloud-texttospeech
+pydantic
+mysql-connector-python
+duckduckgo-search
