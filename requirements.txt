@@ -9,5 +9,7 @@ openai
 requests
 google-cloud-texttospeech
 pydantic
+pytest
+httpx
 mysql-connector-python
 duckduckgo-search

@@ -30,3 +30,5 @@ test_*.py
 .DS_Store
 Thumbs.db
 secrets.sh
+gcp_sa_key.json
+*.json
