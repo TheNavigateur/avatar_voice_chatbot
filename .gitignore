@@ -24,7 +24,6 @@ server.log
 
 # Debug files
 debug_output*.txt
-test_*.py
 
 # OS
 .DS_Store
