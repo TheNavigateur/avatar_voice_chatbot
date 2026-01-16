@@ -316,7 +316,13 @@
         // Expression System
         let currentEmotion = "Neutral";
         let blinkInterval;
-        let isBlinking = false;
+
+        // Blink State Object for Timeline Animation
+        window.blinkState = {
+            isBlinking: false,
+            startTime: 0,
+            duration: 150 // default, will be randomized
+        };
 
         // Map Emotions to ARKit Blend Shapes (approximate for RPM)
         const expressionMap = {
@@ -414,11 +420,13 @@
 
             // Start Blinking Engine
             startBlinking();
+
+            // VISUAL DEBUG OVERLAY REMOVED
         }
 
         function startBlinking() {
-            // Random blink interval between 3 and 6 seconds
-            const nextBlink = Math.random() * 3000 + 3000;
+            // Random blink interval between 1 and 3.5 seconds (more frequent)
+            const nextBlink = Math.random() * 2500 + 1000;
             setTimeout(() => {
                 triggerBlink();
                 startBlinking();
@@ -426,23 +434,30 @@
         }
 
         function triggerBlink() {
-            if (!window.morphTargetMesh) return;
+            if (!window.facialMeshes || window.facialMeshes.length === 0) {
+                // Silent fail is bad for debugging, let's log once
+                if (!window.hasLoggedBlinkFail) {
+                    console.warn("Blinking triggered but no meshes found!");
+                    window.hasLoggedBlinkFail = true;
+                }
+                return;
+            }
 
-            isBlinking = true;
-            // Blink duration approx 150ms
-            setTimeout(() => {
-                isBlinking = false;
-            }, 150);
+            // Randomize blink characteristics based on biological data (~200ms average)
+            window.blinkState.startTime = Date.now();
+            window.blinkState.duration = 170 + Math.random() * 50; // 170ms to 220ms total
+            window.blinkState.isBlinking = true;
+
+            // console.log("Blink!", window.blinkState.duration.toFixed(0) + "ms");
         }
+
+
 
         function loadAvatar() {
             const loader = new THREE.GLTFLoader();
 
-            // Using a verified Ready Player Me avatar URL
-            // This is a full-body realistic human model
-            const modelUrl = //'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb'
-                'https://models.readyplayer.me/6921e87fbcfe438b18908217.glb'
-                ;
+            // Using a verified Ready Player Me avatar URL with ARKit support
+            const modelUrl = 'https://models.readyplayer.me/6921e87fbcfe438b18908217.glb?morphTargets=ARKit';
 
             console.log('Starting to load 3D model from:', modelUrl);
             statusDiv.textContent = "Loading 3D avatar...";
@@ -452,241 +467,250 @@
                     console.log('Model loaded successfully!', gltf);
                     avatar = gltf.scene;
 
-                    // Calculate and log model height before adding to scene
                     const box = new THREE.Box3().setFromObject(avatar);
                     const size = new THREE.Vector3();
                     box.getSize(size);
-                    console.log('Avatar Height (before scene add):', size.y);
-                    console.log('Avatar Dimensions (before scene add):', size);
 
-                    // Scale and position the model for close-up face view
                     avatar.scale.set(1, 1, 1);
-                    avatar.position.set(0, -size.y + 0.15, 0); // Slightly lower to center face in view
+                    avatar.position.set(0, -size.y + 0.15, 0);
 
                     scene.add(avatar);
-
                     console.log('Avatar added to scene');
                     statusDiv.textContent = "";
 
-                    // Setup animations if available
                     if (gltf.animations && gltf.animations.length > 0) {
                         mixer = new THREE.AnimationMixer(avatar);
-                        console.log('Animation mixer created with', gltf.animations.length, 'animations');
                     }
 
-                    // Try to find head and jaw bones for animation
-                    let boneCount = 0;
-                    let morphTargetMesh = null;
-                    let mouthOpenIndex = -1;
-                    let jawOpenIndex = -1;
+                    // --- NEW BROADCAST LOGIC ---
+                    window.facialMeshes = []; // Store ALL meshes with facial morphs
 
                     avatar.traverse((child) => {
                         if (child.isBone) {
-                            boneCount++;
                             const boneName = child.name.toLowerCase();
-                            console.log('Found bone:', child.name);
-
-                            // Look for head bone (various naming conventions)
-                            if (boneName.includes('head') || boneName.includes('neck_01')) {
-                                headBone = child;
-                                console.log('✓ Head bone found:', child.name);
-                            }
-
-                            // Look for jaw bone (various naming conventions)
-                            if (boneName.includes('jaw') || boneName.includes('chin') || boneName.includes('mouth') || boneName === 'cc_base_jawroot' || boneName === 'mixamorig:jaw') {
-                                jawBone = child;
-                                console.log('✓ Jaw bone found:', child.name);
-                            }
+                            if (boneName.includes('head') || boneName.includes('neck_01')) headBone = child;
+                            if (boneName.includes('jaw') || boneName.includes('chin')) jawBone = child;
                         }
 
-                        // Check for morph targets (blend shapes) for facial animation
-                        if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
+                        if (child.isMesh && child.morphTargetDictionary) {
                             const morphNames = Object.keys(child.morphTargetDictionary);
-                            console.log('✓ Morph targets found on mesh:', child.name);
-                            console.log('  Available morphs:', morphNames);
+                            // console.log(`Found Mesh: ${child.name} (${morphNames.length} targets)`);
 
-                            // Look for mouth-related morph targets
-                            morphNames.forEach(name => {
-                                const lowerName = name.toLowerCase();
+                            const meshData = {
+                                mesh: child,
+                                name: child.name,
+                                blinkIndices: [],
+                                mouthOpenIndex: -1,
+                                jawOpenIndex: -1,
+                                lipLowerIndices: [],
+                                lipUpperIndices: [],
+                                mouthFunnelIndex: -1
+                            };
 
-                                if (lowerName.includes('mouthopen') || lowerName.includes('mouth_open')) {
-                                    mouthOpenIndex = child.morphTargetDictionary[name];
-                                    morphTargetMesh = child;
-                                    console.log('  ✓ Found mouthOpen morph:', name, 'at index', mouthOpenIndex);
+                            let foundSomething = false;
+
+                            for (const key in child.morphTargetDictionary) {
+                                const lowerKey = key.toLowerCase();
+                                // Check Blinks - make as permissive as possible for debugging
+                                if (lowerKey.includes('blink') ||
+                                    (lowerKey.includes('eye') && lowerKey.includes('close')) ||
+                                    lowerKey === 'eyesclosed') {
+                                    meshData.blinkIndices.push(child.morphTargetDictionary[key]);
+                                    foundSomething = true;
+                                    console.log(`  -> Found Blink target on ${child.name}: ${key}`);
+                                }
+                                // Check Mouth (Base Open)
+                                if (lowerKey.includes('mouthopen') || lowerKey.includes('mouth_open')) {
+                                    meshData.mouthOpenIndex = child.morphTargetDictionary[key];
+                                    foundSomething = true;
+                                }
+                                if (lowerKey.includes('jawopen') || lowerKey.includes('jaw_open')) {
+                                    meshData.jawOpenIndex = child.morphTargetDictionary[key];
+                                    foundSomething = true;
                                 }
 
-                                if (lowerName.includes('jawopen') || lowerName.includes('jaw_open')) {
-                                    jawOpenIndex = child.morphTargetDictionary[name];
-                                    morphTargetMesh = child;
-                                    console.log('  ✓ Found jawOpen morph:', name, 'at index', jawOpenIndex);
+                                // Check Lip Retractors (To show teeth!)
+                                if (lowerKey.includes('mouthlowerdown')) {
+                                    meshData.lipLowerIndices = meshData.lipLowerIndices || [];
+                                    meshData.lipLowerIndices.push(child.morphTargetDictionary[key]);
+                                    foundSomething = true;
                                 }
-                            });
+                                if (lowerKey.includes('mouthupperup')) {
+                                    meshData.lipUpperIndices = meshData.lipUpperIndices || [];
+                                    meshData.lipUpperIndices.push(child.morphTargetDictionary[key]);
+                                    foundSomething = true;
+                                }
+
+                                // Check Mouth Funnel (For "Middle" / "Relaxed" look)
+                                if (lowerKey.includes('mouthfunnel')) {
+                                    meshData.mouthFunnelIndex = child.morphTargetDictionary[key];
+                                    foundSomething = true;
+                                }
+                            }
+
+                            if (foundSomething) {
+                                window.facialMeshes.push(meshData);
+                                console.log(`✓ ADDED MESH: ${child.name} (Blinks: ${meshData.blinkIndices.length})`);
+                            } else if (morphNames.length > 0) {
+                                // Log ignored meshes that have morphs just in case
+                                // console.log(`  Ignored Mesh with matches: ${child.name}`);
+                            }
                         }
                     });
+                    // ---------------------------
 
-                    // Store morph target info globally for animation
-                    if (morphTargetMesh) {
-                        window.morphTargetMesh = morphTargetMesh;
-                        window.mouthOpenIndex = mouthOpenIndex;
-                        window.jawOpenIndex = jawOpenIndex;
-                    }
-
-                    console.log('Total bones found:', boneCount);
-                    console.log('Head bone:', headBone ? headBone.name : 'NOT FOUND');
-                    console.log('Jaw bone:', jawBone ? jawBone.name : 'NOT FOUND');
-                    console.log('Morph target mesh:', morphTargetMesh ? 'FOUND' : 'NOT FOUND');
-
-                    console.log('Mouth morph indices:', {
-                        mouthOpen: mouthOpenIndex, jawOpen: jawOpenIndex
-                    });
-                    console.log('Avatar loaded successfully - this is a realistic human model!');
-                }
-
-                ,
+                    console.log(`Total Facial Meshes Identified: ${window.facialMeshes.length}`);
+                },
                 function (xhr) {
                     const percentComplete = (xhr.loaded / xhr.total * 100).toFixed(0);
-                    console.log(percentComplete + '% loaded');
-
-                    statusDiv.textContent = `Loading avatar: $ {
-                    percentComplete
-                }
-
-                %`;
-                }
-
-                ,
+                    // console.log(percentComplete + '% loaded');
+                },
                 function (error) {
                     console.error('Error loading avatar:', error);
-                    console.error('Error details:', error.message);
-                    statusDiv.textContent = "Error loading avatar, using fallback";
-                    // Fallback: create a simple placeholder
                     createFallbackAvatar();
                 });
         }
 
         function createFallbackAvatar() {
-            // Simple fallback if model fails to load
+            // Keep fallback simple
             avatar = new THREE.Group();
-
-            const headGeometry = new THREE.SphereGeometry(0.3, 32, 32);
-
-            const headMaterial = new THREE.MeshPhongMaterial({
-                color: 0xffd4b3
-            });
-            const head = new THREE.Mesh(headGeometry, headMaterial);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshPhongMaterial({ color: 0xffd4b3 }));
             head.position.y = 1.6;
             avatar.add(head);
-
-            const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.4, 0.8, 16);
-
-            const bodyMaterial = new THREE.MeshPhongMaterial({
-                color: 0x667eea
-            });
-            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-            body.position.y = 0.8;
-            avatar.add(body);
-
             scene.add(avatar);
-            console.log('Using fallback avatar');
         }
 
         function animate() {
             animationId = requestAnimationFrame(animate);
 
-            // Update animation mixer if it exists
-            if (mixer) {
-                const delta = clock.getDelta();
-                mixer.update(delta);
-            }
+            if (mixer) mixer.update(clock.getDelta());
+            const time = Date.now() * 0.001;
 
-            // --- ANIMATION CORE ---
-            if (avatar && window.morphTargetMesh) {
-                const mesh = window.morphTargetMesh;
-                const time = Date.now() * 0.001;
+            // --- ANIMATION CORE (BROADCAST) ---
+            if (avatar && window.facialMeshes && window.facialMeshes.length > 0) {
 
-                // 1. Reset all known morphs to 0 first (clean slate)
-                // In a robust engine we'd only reset the ones we use, but iterating dictionary keys is safer for now
-                // Optimization: getting keys every frame is bad, usually we'd cache indices.
-                // For now, let's just reset the ones in our Expression Map + Lip Sync specific ones
+                // Update ALL relevant meshes
+                window.facialMeshes.forEach(meshData => {
+                    const mesh = meshData.mesh;
 
-                // Helper to safely set weight
-                const setWeight = (name, val) => {
-                    const idx = mesh.morphTargetDictionary[name];
-                    if (idx !== undefined) {
-                        mesh.morphTargetInfluences[idx] = val;
+                    // 1. Reset / Decay all weights on this mesh slightly
+                    for (let i = 0; i < mesh.morphTargetInfluences.length; i++) {
+                        mesh.morphTargetInfluences[i] = THREE.MathUtils.lerp(mesh.morphTargetInfluences[i], 0, 0.1);
                     }
-                };
 
-                // Reset common expression morphs (brute force clear of core set)
-                // A better way is to iterate all expressionMap keys and reset them.
-                // Or just assume 'Neutral' is 0.
-                // Let's iterate available morphs and zero them? No, too expensive.
-                // Let's just Apply Tone -> Apply Lip Sync -> Apply Blink.
+                    // 2. Apply Base Expression (if map exists)
+                    if (currentEmotion && expressionMap[currentEmotion]) {
+                        const targetShapes = expressionMap[currentEmotion];
+                        for (const [shapeName, targetCtx] of Object.entries(targetShapes)) {
+                            // CONFLICT RESOLUTION:
+                            // If we are speaking, suppress static mouth shapes that fight the lip sync.
+                            // e.g. 'mouthRollLower' hides teeth, 'mouthPucker' asserts closing.
+                            if (isSpeaking) {
+                                if (shapeName.includes('mouth') || shapeName.includes('jaw') || shapeName.includes('cheek')) {
+                                    // Skip or drastically reduce this static shape so talking takes over
+                                    continue;
+                                }
+                            }
 
-                // Actually, blend shapes are additive usually. We need to clear previous frame's influence 
-                // if we want to change expressions cleanly.
-                // Simpler approach: We just set the target values every frame.
-
-                // Default: Reset everything to 0? 
-                // RPM avatars have many morphs. Resetting 52 every frame is fine in JS (it's just an array).
-                for (let i = 0; i < mesh.morphTargetInfluences.length; i++) {
-                    mesh.morphTargetInfluences[i] = THREE.MathUtils.lerp(mesh.morphTargetInfluences[i], 0, 0.1); // Smooth return to neutral
-                }
-
-                // 2. Apply Base Expression
-                if (currentEmotion && expressionMap[currentEmotion]) {
-                    const targetShapes = expressionMap[currentEmotion];
-                    for (const [shapeName, targetCtx] of Object.entries(targetShapes)) {
-                        const idx = mesh.morphTargetDictionary[shapeName];
-                        if (idx !== undefined) {
-                            // Smoothly interpolate to target weight
-                            const current = mesh.morphTargetInfluences[idx];
-                            mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, targetCtx, 0.1);
+                            const idx = mesh.morphTargetDictionary[shapeName];
+                            if (idx !== undefined) {
+                                const current = mesh.morphTargetInfluences[idx];
+                                mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, targetCtx, 0.1);
+                            }
                         }
                     }
-                }
 
-                // 3. Apply Lip Sync (Mouth Movement) overrides
-                if (isSpeaking) {
-                    const mouthValue = currentAudioVolume * 2.5;
+                    // 3. Apply Lip Sync
+                    if (isSpeaking) {
+                        // Volume multiplier
+                        let val = Math.min(currentAudioVolume * 2.5, 1.2);
 
-                    if (window.mouthOpenIndex >= 0) {
-                        // Additive? Or Override?
-                        // If we are smiling, opening mouth is additive.
-                        // But jawOpen might conflict.
-                        const current = mesh.morphTargetInfluences[window.mouthOpenIndex];
-                        // Smoothly open
-                        mesh.morphTargetInfluences[window.mouthOpenIndex] = THREE.MathUtils.lerp(current, mouthValue, 0.2);
+                        const effectFactor = 1.0;
+
+                        // 1. Jaw Open (Structure)
+                        if (meshData.jawOpenIndex >= 0) {
+                            const current = mesh.morphTargetInfluences[meshData.jawOpenIndex];
+                            // Reduced Jaw: 0.25 (was 0.5) - Subtle structure, relying on lips for teeth
+                            mesh.morphTargetInfluences[meshData.jawOpenIndex] = THREE.MathUtils.lerp(current, val * 0.06, effectFactor);
+                        }
+
+                        // 2. Mouth Open (General)
+                        if (meshData.mouthOpenIndex >= 0) {
+                            const current = mesh.morphTargetInfluences[meshData.mouthOpenIndex];
+                            mesh.morphTargetInfluences[meshData.mouthOpenIndex] = THREE.MathUtils.lerp(current, val * 0.15, effectFactor);
+                        }
+
+                        // 3. Lip Retractors (Show Teeth!)
+                        const teethFactor = 0.5; // How much to pull lips back
+
+                        if (meshData.lipLowerIndices && meshData.lipLowerIndices.length > 0) {
+                            meshData.lipLowerIndices.forEach(idx => {
+                                const current = mesh.morphTargetInfluences[idx];
+                                mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, val * teethFactor, effectFactor);
+                            });
+                        }
+                        if (meshData.lipUpperIndices && meshData.lipUpperIndices.length > 0) {
+                            meshData.lipUpperIndices.forEach(idx => {
+                                const current = mesh.morphTargetInfluences[idx];
+                                mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, val * teethFactor * 0.0, effectFactor); // Upper moves less
+                            });
+                        }
+
+                        // 4. Mouth Funnel (The "Middle" Fix)
+                        // This pulls the corners in, making it look less "wide/strained"
+                        if (meshData.mouthFunnelIndex >= 0) {
+                            const current = mesh.morphTargetInfluences[meshData.mouthFunnelIndex];
+                            // Apply moderate funneling to round out the shape
+                            mesh.morphTargetInfluences[meshData.mouthFunnelIndex] = THREE.MathUtils.lerp(current, val * 0.4, effectFactor);
+                        }
                     }
-                    if (window.jawOpenIndex >= 0) {
-                        const current = mesh.morphTargetInfluences[window.jawOpenIndex];
-                        mesh.morphTargetInfluences[window.jawOpenIndex] = THREE.MathUtils.lerp(current, mouthValue * 0.3, 0.2);
+
+                    // 4. Apply Blink (Natural Curve based on research)
+                    // Research: Closing (~63ms) is faster than Opening (~138ms). Total ~200ms.
+                    if (window.blinkState.isBlinking) {
+                        const elapsed = Date.now() - window.blinkState.startTime;
+                        const duration = window.blinkState.duration;
+                        const progress = elapsed / duration;
+
+                        let weight = 0;
+
+                        if (progress < 0.35) {
+                            // Phase 1: Closing (0 -> 1) - Fast (35% of time)
+                            // Use EaseInQuad (t^2) to simulate accelerating snap shut
+                            const p = progress / 0.35;
+                            weight = p * p;
+                        } else if (progress < 0.45) {
+                            // Phase 2: Hold Closed (10% of time) - Brief contact
+                            weight = 1.0;
+                        } else if (progress < 1.0) {
+                            // Phase 3: Opening (1 -> 0) - Slower (55% of time)
+                            const openProgress = (progress - 0.45) / 0.55;
+                            // Use EaseOutCubic (1 - (1-t)^3) for "Viscous Settle" behavior
+                            // Opens quickly at first, then very slowly settles for the last bit
+                            const inv = 1 - openProgress;
+                            weight = inv * inv * inv * inv; // Actually EaseOutQuart/Quint for drama
+                        } else {
+                            // Phase 4: Done
+                            window.blinkState.isBlinking = false;
+                            weight = 0;
+                        }
+
+                        // Apply calculated weight to all blink targets
+                        if (meshData.blinkIndices.length > 0) {
+                            meshData.blinkIndices.forEach(idx => {
+                                mesh.morphTargetInfluences[idx] = weight;
+                            });
+                        }
                     }
-                }
+                });
 
-                // 4. Apply Blinking (High Priority)
-                if (isBlinking) {
-                    setWeight('eyeBlinkLeft', 1.0);
-                    setWeight('eyeBlinkRight', 1.0);
-                }
-
-                // 5. Idle Head Movement (Procedural)
+                // 5. Idle Head Movement
                 if (headBone) {
-                    headBone.rotation.y = Math.sin(time * 0.5) * 0.05; // Look left/right slowly
-                    headBone.rotation.x = Math.sin(time * 0.3) * 0.02; // Nod slightly
+                    headBone.rotation.y = Math.sin(time * 0.5) * 0.05;
+                    headBone.rotation.x = Math.sin(time * 0.3) * 0.02;
                 }
             }
-            else if (avatar && !window.morphTargetMesh) {
-                // Fallback animation for non-morph avatars (Spheres etc)
-                const time = Date.now() * 0.001;
-                if (isSpeaking) {
-                    avatar.position.y = Math.sin(time * 10) * 0.02;
-                    avatar.scale.y = 1 + Math.sin(time * 20) * 0.05;
-                } else {
-                    avatar.position.y = Math.sin(time) * 0.02;
-                    avatar.scale.y = 1;
-                }
-            }
+
 
             renderer.render(scene, camera);
         }
@@ -745,7 +769,8 @@
         // Initialize Three.js when page loads
         window.addEventListener('load', initThreeJS);
     </script>
-    <script>const startBtn = document.getElementById('startBtn');
+    <script>
+        const startBtn = document.getElementById('startBtn');
         const statusDiv = document.getElementById('status');
         const transcriptDiv = document.getElementById('transcript');
 
@@ -775,7 +800,7 @@
                 if (isConversationActive && !isBotSpeaking && !isProcessing) {
                     console.log('Recognition ended (silence), restarting loop...');
 
-                    // Don't change status text to "Processing", keep "Listening" (or similar) 
+                    // Don't change status text to "Processing", keep "Listening" (or similar)
                     // to avoid confusing the user.
                     try {
                         recognition.start();
@@ -787,7 +812,7 @@
                 }
 
                 else if (!isConversationActive) {
-                    // Only show "Processing" if we are truly stopping/done? 
+                    // Only show "Processing" if we are truly stopping/done?
                     // Actually if we are not active, we are just stopped.
                     statusDiv.textContent = "";
                     statusDiv.style.color = "#666";
@@ -1129,18 +1154,9 @@
             const byteCharacters = atob(base64);
             const byteNumbers = new Array(byteCharacters.length);
 
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-
-            const byteArray = new Uint8Array(byteNumbers);
-
-            return new Blob([byteArray], {
-                type: mimeType
-            });
-        }
-
-    </script>
+            for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); } const byteArray = new
+                Uint8Array(byteNumbers); return new Blob([byteArray], { type: mimeType });
+        } </script>
 </body>
 
 </html>
