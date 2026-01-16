@@ -14,7 +14,7 @@ from openai import OpenAI
 app = FastAPI()
 
 # Mount static files if needed (we'll just use templates for now)
-# app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
