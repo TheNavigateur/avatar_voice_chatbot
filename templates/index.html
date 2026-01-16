@@ -313,6 +313,59 @@
         let audioElement; // Reusable audio element
         let audioSource; // Reusable audio source
 
+        // Expression System
+        let currentEmotion = "Neutral";
+        let blinkInterval;
+        let isBlinking = false;
+
+        // Map Emotions to ARKit Blend Shapes (approximate for RPM)
+        const expressionMap = {
+            "Neutral": {},
+            "Happy": {
+                "mouthSmile": 0.7,
+                "browInnerUp": 0.4,
+                "cheekPuff": 0.2,
+                "eyeSquintLeft": 0.3,
+                "eyeSquintRight": 0.3
+            },
+            "Sad": {
+                "mouthFrownLeft": 0.5,
+                "mouthFrownRight": 0.5,
+                "browDownLeft": 0.4,
+                "browDownRight": 0.4,
+                "eyeLookDownLeft": 0.2,
+                "eyeLookDownRight": 0.2
+            },
+            "Surprised": {
+                "eyeWideLeft": 0.6,
+                "eyeWideRight": 0.6,
+                "jawOpen": 0.1,
+                "browInnerUp": 0.6,
+                "browOuterUpLeft": 0.5,
+                "browOuterUpRight": 0.5
+            },
+            "Thinking": {
+                "browDownLeft": 0.3,
+                "browInnerUp": 0.3,
+                "mouthPucker": 0.3,
+                "eyeLookUpRight": 0.4,
+                "eyeLookUpLeft": 0.4
+            },
+            "Angry": {
+                "browDownLeft": 0.8,
+                "browDownRight": 0.8,
+                "mouthShrugLower": 0.4,
+                "eyeSquintLeft": 0.5,
+                "eyeSquintRight": 0.5
+            },
+            "Confused": {
+                "browDownLeft": 0.5,
+                "browOuterUpRight": 0.5,
+                "mouthRollLower": 0.3,
+                "eyeLookInLeft": 0.3
+            }
+        };
+
         function initThreeJS() {
             const canvas = document.getElementById('avatar-canvas');
             const container = document.querySelector('.avatar-container');
@@ -358,6 +411,28 @@
 
             // Animation loop
             animate();
+
+            // Start Blinking Engine
+            startBlinking();
+        }
+
+        function startBlinking() {
+            // Random blink interval between 3 and 6 seconds
+            const nextBlink = Math.random() * 3000 + 3000;
+            setTimeout(() => {
+                triggerBlink();
+                startBlinking();
+            }, nextBlink);
+        }
+
+        function triggerBlink() {
+            if (!window.morphTargetMesh) return;
+
+            isBlinking = true;
+            // Blink duration approx 150ms
+            setTimeout(() => {
+                isBlinking = false;
+            }, 150);
         }
 
         function loadAvatar() {
@@ -524,77 +599,92 @@
                 mixer.update(delta);
             }
 
-            // Make avatar always face the camera (if loaded)
-            // Commented out to allow manual rotation control
-            // if (avatar) {
-            //     avatar.lookAt(camera.position);
-            // }
+            // --- ANIMATION CORE ---
+            if (avatar && window.morphTargetMesh) {
+                const mesh = window.morphTargetMesh;
+                const time = Date.now() * 0.001;
 
-            // Speaking animation
-            if (isSpeaking && avatar) {
-                const time = Date.now() * 0.01;
+                // 1. Reset all known morphs to 0 first (clean slate)
+                // In a robust engine we'd only reset the ones we use, but iterating dictionary keys is safer for now
+                // Optimization: getting keys every frame is bad, usually we'd cache indices.
+                // For now, let's just reset the ones in our Expression Map + Lip Sync specific ones
 
-                // Priority 1: Animate using morph targets (blend shapes) for lip movement
-                if (window.morphTargetMesh) {
-                    const mesh = window.morphTargetMesh;
-                    // Use audio volume for natural, synchronized mouth movement
-                    const mouthValue = currentAudioVolume * 2.5; // Scale volume to natural mouth opening range
+                // Helper to safely set weight
+                const setWeight = (name, val) => {
+                    const idx = mesh.morphTargetDictionary[name];
+                    if (idx !== undefined) {
+                        mesh.morphTargetInfluences[idx] = val;
+                    }
+                };
+
+                // Reset common expression morphs (brute force clear of core set)
+                // A better way is to iterate all expressionMap keys and reset them.
+                // Or just assume 'Neutral' is 0.
+                // Let's iterate available morphs and zero them? No, too expensive.
+                // Let's just Apply Tone -> Apply Lip Sync -> Apply Blink.
+
+                // Actually, blend shapes are additive usually. We need to clear previous frame's influence 
+                // if we want to change expressions cleanly.
+                // Simpler approach: We just set the target values every frame.
+
+                // Default: Reset everything to 0? 
+                // RPM avatars have many morphs. Resetting 52 every frame is fine in JS (it's just an array).
+                for (let i = 0; i < mesh.morphTargetInfluences.length; i++) {
+                    mesh.morphTargetInfluences[i] = THREE.MathUtils.lerp(mesh.morphTargetInfluences[i], 0, 0.1); // Smooth return to neutral
+                }
+
+                // 2. Apply Base Expression
+                if (currentEmotion && expressionMap[currentEmotion]) {
+                    const targetShapes = expressionMap[currentEmotion];
+                    for (const [shapeName, targetCtx] of Object.entries(targetShapes)) {
+                        const idx = mesh.morphTargetDictionary[shapeName];
+                        if (idx !== undefined) {
+                            // Smoothly interpolate to target weight
+                            const current = mesh.morphTargetInfluences[idx];
+                            mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, targetCtx, 0.1);
+                        }
+                    }
+                }
+
+                // 3. Apply Lip Sync (Mouth Movement) overrides
+                if (isSpeaking) {
+                    const mouthValue = currentAudioVolume * 2.5;
 
                     if (window.mouthOpenIndex >= 0) {
-                        mesh.morphTargetInfluences[window.mouthOpenIndex] = mouthValue;
+                        // Additive? Or Override?
+                        // If we are smiling, opening mouth is additive.
+                        // But jawOpen might conflict.
+                        const current = mesh.morphTargetInfluences[window.mouthOpenIndex];
+                        // Smoothly open
+                        mesh.morphTargetInfluences[window.mouthOpenIndex] = THREE.MathUtils.lerp(current, mouthValue, 0.2);
                     }
-
                     if (window.jawOpenIndex >= 0) {
-                        // Jaw opens proportionally to mouth
-                        mesh.morphTargetInfluences[window.jawOpenIndex] = mouthValue * 0.4;
+                        const current = mesh.morphTargetInfluences[window.jawOpenIndex];
+                        mesh.morphTargetInfluences[window.jawOpenIndex] = THREE.MathUtils.lerp(current, mouthValue * 0.3, 0.2);
                     }
                 }
 
-                // Priority 2: Animate jaw bone if available
-                else if (jawBone) {
-                    jawBone.rotation.x = Math.sin(time) * 0.3;
-                    console.log('Animating jaw bone');
+                // 4. Apply Blinking (High Priority)
+                if (isBlinking) {
+                    setWeight('eyeBlinkLeft', 1.0);
+                    setWeight('eyeBlinkRight', 1.0);
                 }
 
-                // Animate head bone for subtle movement (works with any method)
+                // 5. Idle Head Movement (Procedural)
                 if (headBone) {
-                    headBone.position.y += Math.sin(time * 0.5) * 0.002;
-                }
-
-                // Priority 3: Fallback - animate entire avatar if no facial animation available
-                if (!window.morphTargetMesh && !jawBone && !headBone) {
-                    avatar.position.y = Math.sin(time * 0.5) * 0.15;
-                    avatar.scale.y = 1 + Math.sin(time) * 0.05;
-                    avatar.scale.x = 1 + Math.sin(time) * 0.02;
-                    avatar.rotation.z = Math.sin(time * 0.3) * 0.05;
-                    console.log('Using enhanced fallback animation (no facial controls found)');
+                    headBone.rotation.y = Math.sin(time * 0.5) * 0.05; // Look left/right slowly
+                    headBone.rotation.x = Math.sin(time * 0.3) * 0.02; // Nod slightly
                 }
             }
-
-            else if (avatar) {
-
-                // Reset to neutral
-                if (window.morphTargetMesh) {
-                    const mesh = window.morphTargetMesh;
-
-                    if (window.mouthOpenIndex >= 0) {
-                        mesh.morphTargetInfluences[window.mouthOpenIndex] = 0;
-                    }
-
-                    if (window.jawOpenIndex >= 0) {
-                        mesh.morphTargetInfluences[window.jawOpenIndex] = 0;
-                    }
-                }
-
-                if (jawBone) {
-                    jawBone.rotation.x = 0;
-                }
-
-                if (!window.morphTargetMesh && !jawBone && !headBone) {
-                    avatar.position.y = 0;
+            else if (avatar && !window.morphTargetMesh) {
+                // Fallback animation for non-morph avatars (Spheres etc)
+                const time = Date.now() * 0.001;
+                if (isSpeaking) {
+                    avatar.position.y = Math.sin(time * 10) * 0.02;
+                    avatar.scale.y = 1 + Math.sin(time * 20) * 0.05;
+                } else {
+                    avatar.position.y = Math.sin(time) * 0.02;
                     avatar.scale.y = 1;
-                    avatar.scale.x = 1;
-                    avatar.rotation.z = 0;
                 }
             }
 
@@ -610,6 +700,14 @@
         function stopSpeaking() {
             isSpeaking = false;
             currentAudioVolume = 0; // Reset volume
+
+            // Reset expression to neutral when done speaking (optional, or keep it lingering?)
+            // Let's linger on the expression for a second then fade?
+            // For now, let's keep it until next turn or reset after a delay.
+            // Actually, resetting to Neutral immediately feels robotic. Let's start a timeout to reset.
+            setTimeout(() => {
+                if (!isSpeaking) currentEmotion = "Neutral";
+            }, 2000);
         }
 
         // Update audio volume from analyser
@@ -751,6 +849,33 @@
                     if (botResponse.includes('[END_CONVERSATION]')) {
                         shouldEndConversation = true;
                         botResponse = botResponse.replace('[END_CONVERSATION]', '').trim();
+                    }
+
+                    // --- EMOTION PARSING ---
+                    // Look for [Expression: X] tag
+                    const expressionRegex = /\[Expression:\s*([a-zA-Z]+)\]/i;
+                    const match = botResponse.match(expressionRegex);
+
+                    if (match && match[1]) {
+                        // Found an emotion tag!
+                        let detectedEmotion = match[1];
+                        // Normalize case (e.g. "happy" -> "Happy")
+                        detectedEmotion = detectedEmotion.charAt(0).toUpperCase() + detectedEmotion.slice(1).toLowerCase();
+
+                        console.log("Detected Emotion:", detectedEmotion);
+
+                        if (expressionMap[detectedEmotion]) {
+                            currentEmotion = detectedEmotion;
+                        } else {
+                            console.log("Unknown emotion:", detectedEmotion, "defaulting to Neutral");
+                            currentEmotion = "Neutral";
+                        }
+
+                        // Remove tag from spoken text so we don't say "Expression Happy"
+                        botResponse = botResponse.replace(expressionRegex, '').trim();
+                    } else {
+                        // Default fallback if no tag found (though system prompt should enforce it)
+                        currentEmotion = "Neutral";
                     }
 
                     addMessage('Bot', botResponse);

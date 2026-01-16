@@ -71,6 +71,12 @@ class VoiceAgent:
             
             Keep your spoken responses concise (under 20 words if possible) unless listing results.
             
+            **Expression Tagging:**
+            - You MUST begin every response with an emotion tag in the format `[Expression: EmotionName]`.
+            - Allowed Emotions: `Neutral`, `Happy`, `Sad`, `Surprised`, `Thinking`, `Angry`, `Confused`.
+            - Choose the emotion that best fits the content of your response.
+            - Example: `[Expression: Happy] I found 5 results for that query!`
+
             ALWAYS end your final response or turn with a question like "Can I help you with anything else?" or "Is there anything else?" to invite further conversation.
             
             HOWEVER, if the user explicitly says "no", "nothing else", "stop", "bye", or otherwise indicates they are done:
