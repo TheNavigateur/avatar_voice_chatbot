@@ -60,7 +60,7 @@
 
         h1 {
             color: #667eea;
-            margin-bottom: 1.5rem;
+            margin-bottom: 0;
             font-size: 2rem;
         }
 
@@ -326,8 +326,8 @@
 
 <div class="container">
     <h1>Ask Jack about the RFAM database</h1>
-    <p class="subtitle">By Naveen Chawla. Work in progress - natural language voice conversation with a custom 3D
-        avatar with an SQL database, Google Search capable, integrated with three prominent text-to-speech voice AI
+    <p class="subtitle">By Naveen Chawla. Work in progress - natural language voice conversation with custom 3D
+        avatars with an SQL database, Google Search capable, integrated with prominent text-to-speech voice AI
         model systems</p>
 
     <div class="main-content">
@@ -343,9 +343,9 @@
 
                 <label for="avatarSelector" style="margin-right: 0.5rem; color: #333;">Avatar:</label>
                 <select id="avatarSelector" style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc;">
-                    <option value="vrm_shadow" selected>Shadow (Anime)</option>
+                    <option value="vrm_shadow">Shadow (Anime)</option>
                     <option value="vrm_jack">Jack (Anime 1.0)</option>
-                    <option value="glb">Ready Player Me</option>
+                    <option value="glb" selected>Ready Player Me</option>
                 </select>
             </div>
 
@@ -486,7 +486,7 @@
 
     function loadCurrentAvatar() {
         const selector = document.getElementById('avatarSelector');
-        const selectedValue = selector ? selector.value : 'vrm_shadow';
+        const selectedValue = selector ? selector.value : 'glb';
 
         if (selectedValue.startsWith('vrm')) {
             currentAvatarType = 'vrm';
