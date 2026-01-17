@@ -56,10 +56,7 @@
             flex-direction: column;
             height: 100%;
             min-width: 300px;
-            /* No justify-center needed for text only */
         }
-
-        /* Removed .right-panel.chat-active styles */
 
         h1 {
             color: #667eea;
@@ -72,7 +69,7 @@
             position: relative;
             width: 300px;
             height: 300px;
-            margin: 0 auto 1.5rem auto;
+            margin: 0 auto 0 auto;
         }
 
         #avatar-canvas {
@@ -99,123 +96,190 @@
             height: 80px;
             font-size: 32px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: transform 0.2s, box-shadow 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
 
         .mic-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
         }
 
-        .mic-btn:active {
-            transform: scale(0.95);
+        .mic-btn.listening {
+            animation: pulse 1.5s infinite;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
+            box-shadow: 0 4px 15px rgba(238, 82, 83, 0.4);
         }
 
-        /* Start/Stop Button Styles */
         .action-btn {
-            font-size: 1.2rem;
-            padding: 1rem 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             border: none;
-            border-radius: 50px;
+            border-radius: 30px;
+            padding: 12px 30px;
+            font-size: 1rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin: 0 auto;
-            width: 80%;
-            max-width: 300px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            margin: 10px;
+            font-weight: 600;
         }
 
-        .start-btn {
-            background: linear-gradient(135deg, #42d392 0%, #647eff 100%);
-            color: white;
-        }
-
-        .start-btn:hover {
+        .action-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(66, 211, 146, 0.4);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
         }
 
-        .stop-btn {
-            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
-            color: white;
+        .action-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
-        .stop-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 65, 108, 0.4);
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(238, 82, 83, 0.7);
+            }
+
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 10px rgba(238, 82, 83, 0);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(238, 82, 83, 0);
+            }
         }
 
-        .hidden {
-            display: none;
-        }
-
+        /* Chat Layout */
         #transcript {
             margin-top: 0;
             padding: 1rem;
-            background: rgba(248, 249, 250, 0.8);
-            border-radius: 12px;
-            text-align: left;
-            flex: 1;
-            min-height: 0;
+            border-radius: 15px;
+            background: #f8f9fa;
+            min-height: 200px;
+            max-height: 500px;
             overflow-y: auto;
-            backdrop-filter: blur(5px);
-            width: 100%;
+            /* Flex layout for bubbles */
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+
+            text-align: left;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
             flex: 1;
-            /* Take remaining height in right panel */
+            width: 100%;
             box-sizing: border-box;
-            max-height: 600px;
         }
 
         .message {
-            margin-bottom: 0.5rem;
-            padding: 0.5rem;
-            border-radius: 8px;
-            transition: background 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            max-width: 80%;
+            animation: fadeIn 0.3s ease;
         }
 
-        .message:hover {
-            background: rgba(102, 126, 234, 0.1);
+        .user-message {
+            align-self: flex-end;
+            align-items: flex-end;
         }
 
-        .user {
+        .bot-message {
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+
+        .message-bubble {
+            padding: 10px 15px;
+            border-radius: 18px;
+            position: relative;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .user-message .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot-message .message-bubble {
+            background: #e4e6eb;
+            color: #050505;
+            border-bottom-left-radius: 4px;
+        }
+
+        .sender-name {
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+            opacity: 0.8;
+            margin-left: 10px;
+            /* Slight indent */
+        }
+
+        .user-message .sender-name {
+            margin-right: 10px;
+            margin-left: 0;
             color: #667eea;
+            text-align: right;
+            display: none;
+            /* Hide 'You' label for cleaner look, or set to block if preferred */
+        }
+
+        .bot-message .sender-name {
+            color: #666;
+            /* display: block; */
+            display: none;
+            /* Let's hide both for now for pure bubble look, unless user wants them. Code below puts them inside bubble? No, separate. */
+        }
+
+        /* Let's actually put the name INSIDE the bubble for "similar layout" request if we want */
+        /* Re-reading request: "Layout 'You' and 'Bot' in a similar way" */
+        /* I'll use a structure where name is bold inside the bubble for now, to replicate old feel but better */
+
+        .message-content-inner {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bubble-sender {
             font-weight: bold;
+            font-size: 0.8em;
+            margin-bottom: 2px;
+            opacity: 0.9;
         }
 
-        .bot {
-            color: #333;
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        /* Mobile Responsiveness */
-        @media (max-width: 768px) {
-            .main-content {
-                flex-direction: column;
-                align-items: center;
-            }
+        .hidden {
+            display: none !important;
+        }
 
-            .left-panel,
-            .right-panel {
-                width: 100%;
-                min-width: unset;
-            }
-
-            .right-panel {
-                height: 300px;
-                /* Fixed height for chat on mobile */
-                flex: none;
-            }
-
-            #transcript {
-                margin-top: 1rem;
-            }
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
         }
 
         .interaction-container {
@@ -226,937 +290,644 @@
             height: 80px;
             /* Fixed height taller than button */
             width: 100%;
-            margin-top: 1rem;
+            margin-top: 0;
         }
 
-        #status {
-            font-size: 1.1rem;
-            font-weight: 500;
-            color: #666;
-            text-align: center;
-        }
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
 
-        .subtitle {
-            text-align: center;
-            color: #666;
-            font-size: 0.95rem;
-            margin-top: -1rem;
-            margin-bottom: 2rem;
-            max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.5;
-            font-style: italic;
+            .right-panel {
+                width: 100%;
+                min-width: auto;
+                min-height: 300px;
+            }
+
+            .container {
+                padding: 1.5rem;
+                height: auto;
+                max-height: none;
+            }
         }
     </style>
 </head>
 
-<body>
-    <div class="container">
-        <h1>Ask Jack about the RFAM database</h1>
-        <p class="subtitle">By Naveen Chawla. Work in progress - natural language voice conversation with a custom 3D
-            avatar with an SQL database, Google Search capable, integrated with three prominent text-to-speech voice AI
-            model systems</p>
+<div class="container">
+    <h1>Ask Jack about the RFAM database</h1>
+    <p class="subtitle">By Naveen Chawla. Work in progress - natural language voice conversation with a custom 3D
+        avatar with an SQL database, Google Search capable, integrated with three prominent text-to-speech voice AI
+        model systems</p>
 
-        <div class="main-content">
-            <div class="left-panel">
-                <div class="controls" style="margin-bottom: 0.5rem; text-align: center;">
-                    <label for="ttsProvider" style="margin-right: 0.5rem; color: #333;">Select Voice Provider:</label>
-                    <select id="ttsProvider" style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc;">
-                        <option value="google">Google Chirp</option>
-                        <option value="openai" selected>OpenAI (Default)</option>
-                        <option value="elevenlabs">ElevenLabs (Pro)</option>
-                    </select>
-                </div>
-
-                <!-- Three.js 3D Avatar -->
-                <div class="avatar-container">
-                    <canvas id="avatar-canvas"></canvas>
-                </div>
-
-                <div class="interaction-container">
-                    <div id="status" class="hidden"></div>
-                    <button id="startBtn" class="action-btn start-btn">Start Conversation</button>
-                </div>
+    <div class="main-content">
+        <div class="left-panel">
+            <div class="controls" style="margin-bottom: 0.5rem; text-align: center;">
+                <label for="ttsProvider" style="margin-right: 0.5rem; color: #333;">Select Voice Provider:</label>
+                <select id="ttsProvider" style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc;">
+                    <option value="google">Google Chirp</option>
+                    <option value="openai" selected>OpenAI (Default)</option>
+                    <option value="elevenlabs">ElevenLabs (Pro)</option>
+                </select>
             </div>
 
-            <div class="right-panel">
-                <div id="transcript"></div>
+            <!-- Three.js 3D Avatar -->
+            <!-- Three.js 3D Avatar -->
+            <div class="avatar-container">
+                <div id="avatar-loader"
+                    style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #667eea; font-weight: bold; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 8px; pointer-events: none;">
+                    Loading Avatar...</div>
+                <canvas id="avatar-canvas"></canvas>
+            </div>
+
+            <div class="interaction-container">
+                <div id="status" class="hidden"></div>
+                <button id="startBtn" class="action-btn start-btn">Start Conversation</button>
             </div>
         </div>
+
+        <div class="right-panel">
+            <div id="transcript"></div>
+        </div>
     </div>
-
-    <!-- Three.js Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- GLTFLoader for loading 3D models -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-
-    <!-- Three.js Avatar Setup -->
-    <script>
-        // Three.js Scene Setup
-        let scene,
-            camera,
-            renderer,
-            avatar,
-            mixer,
-            clock;
-        let isSpeaking = false;
-        let animationId;
-        let headBone,
-            jawBone;
-
-        // Audio analysis for mouth movement
-        let audioContext;
-        let analyser;
-        let dataArray;
-        let currentAudioVolume = 0;
-        let audioElement; // Reusable audio element
-        let audioSource; // Reusable audio source
-
-        // Expression System
-        let currentEmotion = "Neutral";
-        let blinkInterval;
-
-        // Blink State Object for Timeline Animation
-        window.blinkState = {
-            isBlinking: false,
-            startTime: 0,
-            duration: 150 // default, will be randomized
-        };
-
-        // Map Emotions to ARKit Blend Shapes (approximate for RPM)
-        const expressionMap = {
-            "Neutral": {},
-            "Happy": {
-                "mouthSmile": 0.7,
-                "browInnerUp": 0.4,
-                "cheekPuff": 0.2,
-                "eyeSquintLeft": 0.3,
-                "eyeSquintRight": 0.3
-            },
-            "Sad": {
-                "mouthFrownLeft": 0.5,
-                "mouthFrownRight": 0.5,
-                "browDownLeft": 0.4,
-                "browDownRight": 0.4,
-                "eyeLookDownLeft": 0.2,
-                "eyeLookDownRight": 0.2
-            },
-            "Surprised": {
-                "eyeWideLeft": 0.6,
-                "eyeWideRight": 0.6,
-                "jawOpen": 0.1,
-                "browInnerUp": 0.6,
-                "browOuterUpLeft": 0.5,
-                "browOuterUpRight": 0.5
-            },
-            "Thinking": {
-                "browDownLeft": 0.3,
-                "browInnerUp": 0.3,
-                "mouthPucker": 0.3,
-                "eyeLookUpRight": 0.4,
-                "eyeLookUpLeft": 0.4
-            },
-            "Angry": {
-                "browDownLeft": 0.8,
-                "browDownRight": 0.8,
-                "mouthShrugLower": 0.4,
-                "eyeSquintLeft": 0.5,
-                "eyeSquintRight": 0.5
-            },
-            "Confused": {
-                "browDownLeft": 0.5,
-                "browOuterUpRight": 0.5,
-                "mouthRollLower": 0.3,
-                "eyeLookInLeft": 0.3
-            }
-        };
-
-        function initThreeJS() {
-            const canvas = document.getElementById('avatar-canvas');
-            const container = document.querySelector('.avatar-container');
-
-            // Scene
-            scene = new THREE.Scene();
-
-            // Camera - positioned for close-up face view like a video call
-            camera = new THREE.PerspectiveCamera(40, // Slightly wider field of view for better framing
-                container.clientWidth / container.clientHeight,
-                0.1,
-                1000);
-            camera.position.set(0, 0, 0.52); // Closer but not too close - video call distance
-            camera.lookAt(0, 0, 0); // Look at face level
-
-            // Renderer
-            renderer = new THREE.WebGLRenderer({
-                canvas: canvas,
-                alpha: true,
-                antialias: true
-            });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.setClearColor(0x000000, 0);
-            renderer.outputEncoding = THREE.sRGBEncoding;
-
-            // Lights
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambientLight);
-
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-            directionalLight.position.set(1, 2, 3);
-            scene.add(directionalLight);
-
-            const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            fillLight.position.set(-1, 0, -1);
-            scene.add(fillLight);
-
-            // Clock for animations
-            clock = new THREE.Clock();
-
-            // Load Avatar
-            loadAvatar();
-
-            // Animation loop
-            animate();
-
-            // Start Blinking Engine
-            startBlinking();
-
-            // VISUAL DEBUG OVERLAY REMOVED
-        }
-
-        function startBlinking() {
-            // Random blink interval between 1 and 3.5 seconds (more frequent)
-            const nextBlink = Math.random() * 2500 + 1000;
-            setTimeout(() => {
-                triggerBlink();
-                startBlinking();
-            }, nextBlink);
-        }
-
-        function triggerBlink() {
-            if (!window.facialMeshes || window.facialMeshes.length === 0) {
-                // Silent fail is bad for debugging, let's log once
-                if (!window.hasLoggedBlinkFail) {
-                    console.warn("Blinking triggered but no meshes found!");
-                    window.hasLoggedBlinkFail = true;
-                }
-                return;
-            }
-
-            // Randomize blink characteristics based on biological data (~200ms average)
-            window.blinkState.startTime = Date.now();
-            window.blinkState.duration = 170 + Math.random() * 50; // 170ms to 220ms total
-            window.blinkState.isBlinking = true;
-
-            // console.log("Blink!", window.blinkState.duration.toFixed(0) + "ms");
-        }
-
-
-
-        function loadAvatar() {
-            const loader = new THREE.GLTFLoader();
-
-            // Using a verified Ready Player Me avatar URL with ARKit support
-            const modelUrl = '/static/avatar.glb';
-
-            console.log('Starting to load 3D model from:', modelUrl);
-            statusDiv.textContent = "Loading 3D avatar...";
-
-            loader.load(modelUrl,
-                function (gltf) {
-                    console.log('Model loaded successfully!', gltf);
-                    avatar = gltf.scene;
-
-                    const box = new THREE.Box3().setFromObject(avatar);
-                    const size = new THREE.Vector3();
-                    box.getSize(size);
-
-                    avatar.scale.set(1, 1, 1);
-                    avatar.position.set(0, -size.y + 0.15, 0);
-
-                    scene.add(avatar);
-                    console.log('Avatar added to scene');
-                    statusDiv.textContent = "";
-
-                    if (gltf.animations && gltf.animations.length > 0) {
-                        mixer = new THREE.AnimationMixer(avatar);
-                    }
-
-                    // --- NEW BROADCAST LOGIC ---
-                    window.facialMeshes = []; // Store ALL meshes with facial morphs
-
-                    avatar.traverse((child) => {
-                        if (child.isBone) {
-                            const boneName = child.name.toLowerCase();
-                            if (boneName.includes('head') || boneName.includes('neck_01')) headBone = child;
-                            if (boneName.includes('jaw') || boneName.includes('chin')) jawBone = child;
-                        }
-
-                        if (child.isMesh && child.morphTargetDictionary) {
-                            const morphNames = Object.keys(child.morphTargetDictionary);
-                            // console.log(`Found Mesh: ${child.name} (${morphNames.length} targets)`);
-
-                            const meshData = {
-                                mesh: child,
-                                name: child.name,
-                                blinkIndices: [],
-                                mouthOpenIndex: -1,
-                                jawOpenIndex: -1,
-                                lipLowerIndices: [],
-                                lipUpperIndices: [],
-                                mouthFunnelIndex: -1
-                            };
-
-                            let foundSomething = false;
-
-                            for (const key in child.morphTargetDictionary) {
-                                const lowerKey = key.toLowerCase();
-                                // Check Blinks - make as permissive as possible for debugging
-                                if (lowerKey.includes('blink') ||
-                                    (lowerKey.includes('eye') && lowerKey.includes('close')) ||
-                                    lowerKey === 'eyesclosed') {
-                                    meshData.blinkIndices.push(child.morphTargetDictionary[key]);
-                                    foundSomething = true;
-                                    console.log(`  -> Found Blink target on ${child.name}: ${key}`);
-                                }
-                                // Check Mouth (Base Open)
-                                if (lowerKey.includes('mouthopen') || lowerKey.includes('mouth_open')) {
-                                    meshData.mouthOpenIndex = child.morphTargetDictionary[key];
-                                    foundSomething = true;
-                                }
-                                if (lowerKey.includes('jawopen') || lowerKey.includes('jaw_open')) {
-                                    meshData.jawOpenIndex = child.morphTargetDictionary[key];
-                                    foundSomething = true;
-                                }
-
-                                // Check Lip Retractors (To show teeth!)
-                                if (lowerKey.includes('mouthlowerdown')) {
-                                    meshData.lipLowerIndices = meshData.lipLowerIndices || [];
-                                    meshData.lipLowerIndices.push(child.morphTargetDictionary[key]);
-                                    foundSomething = true;
-                                }
-                                if (lowerKey.includes('mouthupperup')) {
-                                    meshData.lipUpperIndices = meshData.lipUpperIndices || [];
-                                    meshData.lipUpperIndices.push(child.morphTargetDictionary[key]);
-                                    foundSomething = true;
-                                }
-
-                                // Check Mouth Funnel (For "Middle" / "Relaxed" look)
-                                if (lowerKey.includes('mouthfunnel')) {
-                                    meshData.mouthFunnelIndex = child.morphTargetDictionary[key];
-                                    foundSomething = true;
-                                }
-                            }
-
-                            if (foundSomething) {
-                                window.facialMeshes.push(meshData);
-                                console.log(`✓ ADDED MESH: ${child.name} (Blinks: ${meshData.blinkIndices.length})`);
-                            } else if (morphNames.length > 0) {
-                                // Log ignored meshes that have morphs just in case
-                                // console.log(`  Ignored Mesh with matches: ${child.name}`);
-                            }
-                        }
-                    });
-                    // ---------------------------
-
-                    console.log(`Total Facial Meshes Identified: ${window.facialMeshes.length}`);
-                },
-                function (xhr) {
-                    const percentComplete = (xhr.loaded / xhr.total * 100).toFixed(0);
-                    // console.log(percentComplete + '% loaded');
-                },
-                function (error) {
-                    console.error('Error loading avatar:', error);
-                    createFallbackAvatar();
-                });
-        }
-
-        function createFallbackAvatar() {
-            // Keep fallback simple
-            avatar = new THREE.Group();
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshPhongMaterial({ color: 0xffd4b3 }));
-            head.position.y = 1.6;
-            avatar.add(head);
-            scene.add(avatar);
-        }
-
-        function animate() {
-            animationId = requestAnimationFrame(animate);
-
-            if (mixer) mixer.update(clock.getDelta());
-            const time = Date.now() * 0.001;
-
-            // --- ANIMATION CORE (BROADCAST) ---
-            if (avatar && window.facialMeshes && window.facialMeshes.length > 0) {
-
-                // Update ALL relevant meshes
-                window.facialMeshes.forEach(meshData => {
-                    const mesh = meshData.mesh;
-
-                    // 1. Reset / Decay all weights on this mesh slightly
-                    for (let i = 0; i < mesh.morphTargetInfluences.length; i++) {
-                        mesh.morphTargetInfluences[i] = THREE.MathUtils.lerp(mesh.morphTargetInfluences[i], 0, 0.1);
-                    }
-
-                    // 2. Apply Base Expression (if map exists)
-                    if (currentEmotion && expressionMap[currentEmotion]) {
-                        const targetShapes = expressionMap[currentEmotion];
-                        for (const [shapeName, targetCtx] of Object.entries(targetShapes)) {
-                            // CONFLICT RESOLUTION:
-                            // If we are speaking, suppress static mouth shapes that fight the lip sync.
-                            // e.g. 'mouthRollLower' hides teeth, 'mouthPucker' asserts closing.
-                            if (isSpeaking) {
-                                if (shapeName.includes('mouth') || shapeName.includes('jaw') || shapeName.includes('cheek')) {
-                                    // Skip or drastically reduce this static shape so talking takes over
-                                    continue;
-                                }
-                            }
-
-                            const idx = mesh.morphTargetDictionary[shapeName];
-                            if (idx !== undefined) {
-                                const current = mesh.morphTargetInfluences[idx];
-                                mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, targetCtx, 0.1);
-                            }
-                        }
-                    }
-
-                    // 3. Apply Lip Sync
-                    if (isSpeaking) {
-                        // Volume multiplier
-                        let val = Math.min(currentAudioVolume * 2.5, 1.2);
-
-                        const effectFactor = 1.0;
-
-                        // 1. Jaw Open (Structure)
-                        if (meshData.jawOpenIndex >= 0) {
-                            const current = mesh.morphTargetInfluences[meshData.jawOpenIndex];
-                            // Reduced Jaw: 0.25 (was 0.5) - Subtle structure, relying on lips for teeth
-                            mesh.morphTargetInfluences[meshData.jawOpenIndex] = THREE.MathUtils.lerp(current, val * 0.06, effectFactor);
-                        }
-
-                        // 2. Mouth Open (General)
-                        if (meshData.mouthOpenIndex >= 0) {
-                            const current = mesh.morphTargetInfluences[meshData.mouthOpenIndex];
-                            mesh.morphTargetInfluences[meshData.mouthOpenIndex] = THREE.MathUtils.lerp(current, val * 0.15, effectFactor);
-                        }
-
-                        // 3. Lip Retractors (Show Teeth!)
-                        const teethFactor = 0.5; // How much to pull lips back
-
-                        if (meshData.lipLowerIndices && meshData.lipLowerIndices.length > 0) {
-                            meshData.lipLowerIndices.forEach(idx => {
-                                const current = mesh.morphTargetInfluences[idx];
-                                mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, val * teethFactor, effectFactor);
-                            });
-                        }
-                        if (meshData.lipUpperIndices && meshData.lipUpperIndices.length > 0) {
-                            meshData.lipUpperIndices.forEach(idx => {
-                                const current = mesh.morphTargetInfluences[idx];
-                                mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, val * teethFactor * 0.0, effectFactor); // Upper moves less
-                            });
-                        }
-
-                        // 4. Mouth Funnel (The "Middle" Fix)
-                        // This pulls the corners in, making it look less "wide/strained"
-                        if (meshData.mouthFunnelIndex >= 0) {
-                            const current = mesh.morphTargetInfluences[meshData.mouthFunnelIndex];
-                            // Apply moderate funneling to round out the shape
-                            mesh.morphTargetInfluences[meshData.mouthFunnelIndex] = THREE.MathUtils.lerp(current, val * 0.4, effectFactor);
-                        }
-                    }
-
-                    // 4. Apply Blink (Natural Curve based on research)
-                    // Research: Closing (~63ms) is faster than Opening (~138ms). Total ~200ms.
-                    if (window.blinkState.isBlinking) {
-                        const elapsed = Date.now() - window.blinkState.startTime;
-                        const duration = window.blinkState.duration;
-                        const progress = elapsed / duration;
-
-                        let weight = 0;
-
-                        if (progress < 0.35) {
-                            // Phase 1: Closing (0 -> 1) - Fast (35% of time)
-                            // Use EaseInQuad (t^2) to simulate accelerating snap shut
-                            const p = progress / 0.35;
-                            weight = p * p;
-                        } else if (progress < 0.45) {
-                            // Phase 2: Hold Closed (10% of time) - Brief contact
-                            weight = 1.0;
-                        } else if (progress < 1.0) {
-                            // Phase 3: Opening (1 -> 0) - Slower (55% of time)
-                            const openProgress = (progress - 0.45) / 0.55;
-                            // Use EaseOutCubic (1 - (1-t)^3) for "Viscous Settle" behavior
-                            // Opens quickly at first, then very slowly settles for the last bit
-                            const inv = 1 - openProgress;
-                            weight = inv * inv * inv * inv; // Actually EaseOutQuart/Quint for drama
-                        } else {
-                            // Phase 4: Done
-                            window.blinkState.isBlinking = false;
-                            weight = 0;
-                        }
-
-                        // Apply calculated weight to all blink targets
-                        if (meshData.blinkIndices.length > 0) {
-                            meshData.blinkIndices.forEach(idx => {
-                                mesh.morphTargetInfluences[idx] = weight;
-                            });
-                        }
-                    }
-                });
-
-                // 5. Idle Head Movement
-                if (headBone) {
-                    headBone.rotation.y = Math.sin(time * 0.5) * 0.05;
-                    headBone.rotation.x = Math.sin(time * 0.3) * 0.02;
-                }
-            }
-
-
-            renderer.render(scene, camera);
-        }
-
-        // Start speaking animation
-        function startSpeaking() {
-            isSpeaking = true;
-        }
-
-        // Stop speaking animation
-        function stopSpeaking() {
-            isSpeaking = false;
-            currentAudioVolume = 0; // Reset volume
-
-            // Reset expression to neutral when done speaking (optional, or keep it lingering?)
-            // Let's linger on the expression for a second then fade?
-            // For now, let's keep it until next turn or reset after a delay.
-            // Actually, resetting to Neutral immediately feels robotic. Let's start a timeout to reset.
-            setTimeout(() => {
-                if (!isSpeaking) currentEmotion = "Neutral";
-            }, 2000);
-        }
-
-        // Update audio volume from analyser
-        function updateAudioVolume() {
-            if (!isSpeaking || !analyser) return;
-
-            analyser.getByteFrequencyData(dataArray);
-
-            // Calculate average volume
-            let sum = 0;
-
-            for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
-            }
-
-            const average = sum / dataArray.length;
-
-            // Normalize to 0-1 range and smooth it
-            currentAudioVolume = average / 255;
-
-            // Continue updating while speaking
-            if (isSpeaking) {
-                requestAnimationFrame(updateAudioVolume);
-            }
-        }
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            const container = document.querySelector('.avatar-container');
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
+</div>
+
+<!-- Three.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- GLTFLoader -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<!-- Three-VRM -->
+<script src="https://unpkg.com/@pixiv/three-vrm@0.6.11/lib/three-vrm.min.js"></script>
+
+<!-- Three.js Avatar Setup -->
+<script>
+    // Three.js Scene Setup
+    let scene,
+        camera,
+        renderer,
+        clock;
+
+    let currentVrm = null; // The VRM instance
+    let isSpeaking = false;
+
+    // Audio analysis
+    let audioContext;
+    let analyser;
+    let dataArray;
+    let currentAudioVolume = 0;
+    let audioElement = null; // Debug fix: Global declaration
+
+    // Blink State
+    let blinkTimer = 0;
+    let isBlinking = false;
+    let blinkClose = false; // closing vs opening
+
+    function initThreeJS() {
+        const canvas = document.getElementById('avatar-canvas');
+        const container = document.querySelector('.avatar-container');
+
+        // Scene
+        scene = new THREE.Scene();
+
+        // Camera - Standard Portrait
+        camera = new THREE.PerspectiveCamera(30, container.clientWidth / container.clientHeight, 0.1, 20.0);
+        camera.position.set(0, 1.4, 1.2);
+        camera.lookAt(0, 1.35, 0);
+
+        // Renderer
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            alpha: true,
+            antialias: true
         });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setClearColor(0x000000, 0);
+        renderer.outputEncoding = THREE.sRGBEncoding;
 
-        // Initialize Three.js when page loads
-        window.addEventListener('load', initThreeJS);
-    </script>
-    <script>
-        const startBtn = document.getElementById('startBtn');
-        const statusDiv = document.getElementById('status');
-        const transcriptDiv = document.getElementById('transcript');
+        // Lights
+        const light = new THREE.DirectionalLight(0xffffff);
+        light.position.set(1.0, 1.0, 1.0).normalize();
+        scene.add(light);
 
-        let sessionId = null;
-        let recognition;
-        let isConversationActive = false; // Flag for continuous mode
-        let isBotSpeaking = false; // Flag to prevent self-triggering
-        let isProcessing = false; // Flag to prevent restart during fetch
+        const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambient);
 
-        if ('webkitSpeechRecognition' in window) {
-            recognition = new webkitSpeechRecognition();
-            recognition.continuous = false; // We manually restart
-            recognition.interimResults = false;
-            recognition.lang = 'en-US';
+        // Clock
+        clock = new THREE.Clock();
 
-            recognition.onstart = () => {
-                statusDiv.textContent = "Listening... 🟢";
-                statusDiv.style.color = "#42d392"; // Greenish
-            }
+        // Load Avatar
+        loadAvatar();
 
-                ;
+        // Animation loop
+        animate();
+    }
 
-            recognition.onend = () => {
+    function loadAvatar() {
+        const loader = new THREE.GLTFLoader();
+        const avatarLoader = document.getElementById('avatar-loader');
 
-                // If conversation is active and we are NOT processing a result and NOT speaking
-                // Then it was just a silence timeout or no-speech event. Restart listening.
-                if (isConversationActive && !isBotSpeaking && !isProcessing) {
-                    console.log('Recognition ended (silence), restarting loop...');
+        // Standard VRM file path
+        const modelUrl = '/static/shadow.vrm';
 
-                    // Don't change status text to "Processing", keep "Listening" (or similar)
-                    // to avoid confusing the user.
-                    try {
-                        recognition.start();
-                    }
+        if (avatarLoader) {
+            avatarLoader.classList.remove('hidden');
+        }
+        console.log("Loading VRM:", modelUrl);
 
-                    catch (e) {
-                        // Ignore if already started
-                    }
-                }
+        loader.crossOrigin = 'anonymous';
+        loader.load(
+            modelUrl,
+            (gltf) => {
+                THREE.VRM.from(gltf).then((vrm) => {
+                    scene.add(vrm.scene);
+                    currentVrm = vrm;
 
-                else if (!isConversationActive) {
-                    // Only show "Processing" if we are truly stopping/done?
-                    // Actually if we are not active, we are just stopped.
-                    statusDiv.textContent = "";
-                    statusDiv.style.color = "#666";
-                }
+                    // Rotate 180 deg to face camera
+                    vrm.scene.rotation.y = Math.PI;
 
-                // If isProcessing is true, do NOTHING here. Let the fetch/speak completion handle the restart.
-            }
+                    if (avatarLoader) avatarLoader.classList.add('hidden');
 
-                ;
+                    // Adjust Camera to Face
+                    const head = vrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.Head);
+                    if (head) {
+                        const worldPos = new THREE.Vector3();
+                        head.getWorldPosition(worldPos);
 
-            recognition.onresult = async (event) => {
-                const transcript = event.results[0][0].transcript;
-                addMessage('You', transcript);
-
-                // Set processing flag to true so onend doesn't restart listing immediately
-                isProcessing = true;
-
-                // Visual feedback for processing
-                statusDiv.textContent = "Thinking... 🧠";
-                statusDiv.style.color = "#764ba2"; // Purple
-
-                try {
-                    const requestBody = {
-                        message: transcript
-                    }
-
-                        ;
-
-                    if (sessionId) {
-                        requestBody.session_id = sessionId;
-                    }
-
-                    const response = await fetch('/chat', {
-
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-
-                        ,
-                        body: JSON.stringify(requestBody)
-                    });
-
-
-                    const data = await response.json();
-                    console.log('Received data:', data);
-                    console.log('Response text:', data.response);
-
-                    if (data.session_id) {
-                        sessionId = data.session_id;
-                    }
-
-                    let botResponse = data.response;
-                    console.log('Bot response (raw):', botResponse);
-
-                    // Check for termination token
-                    let shouldEndConversation = false;
-
-                    if (botResponse.includes('[END_CONVERSATION]')) {
-                        shouldEndConversation = true;
-                        botResponse = botResponse.replace('[END_CONVERSATION]', '').trim();
-                    }
-
-                    // --- EMOTION PARSING ---
-                    // Look for [Expression: X] tag
-                    const expressionRegex = /\[Expression:\s*([a-zA-Z]+)\]/i;
-                    const match = botResponse.match(expressionRegex);
-
-                    if (match && match[1]) {
-                        // Found an emotion tag!
-                        let detectedEmotion = match[1];
-                        // Normalize case (e.g. "happy" -> "Happy")
-                        detectedEmotion = detectedEmotion.charAt(0).toUpperCase() + detectedEmotion.slice(1).toLowerCase();
-
-                        console.log("Detected Emotion:", detectedEmotion);
-
-                        if (expressionMap[detectedEmotion]) {
-                            currentEmotion = detectedEmotion;
-                        } else {
-                            console.log("Unknown emotion:", detectedEmotion, "defaulting to Neutral");
-                            currentEmotion = "Neutral";
-                        }
-
-                        // Remove tag from spoken text so we don't say "Expression Happy"
-                        botResponse = botResponse.replace(expressionRegex, '').trim();
+                        // Simple Camera Reset if head is found
+                        // Assuming scale is roughly human (meters)
+                        camera.position.set(0, worldPos.y, worldPos.z + 1.0);
+                        camera.lookAt(0, worldPos.y, 0);
                     } else {
-                        // Default fallback if no tag found (though system prompt should enforce it)
-                        currentEmotion = "Neutral";
+                        console.warn("Head bone not found, falling back to scene center.");
+                        camera.position.set(0, 1.6, 1.5);
+                        camera.lookAt(0, 1.0, 0);
                     }
-
-                    addMessage('Bot', botResponse);
-
-                    // Respond
-                    await speak(botResponse, shouldEndConversation);
-
-                    // Do NOT call stopConversationMode() here immediately.
-                    // It will be handled in speak() -> onended callback.
-
-                }
-
-                catch (error) {
-                    console.error('Error:', error);
-                    statusDiv.textContent = "Error communicating with server";
-                    isProcessing = false; // Reset if error
-
-                    // Force restart listening if error occurred
-                    if (isConversationActive) {
-                        try {
-                            recognition.start();
-                        }
-
-                        catch (e) { }
-                    }
+                });
+            },
+            (progress) => { /* console.log... */ },
+            (error) => {
+                console.error("Failed to load VRM:", error);
+                if (statusDiv) {
+                    statusDiv.textContent = "Error loading avatar.vrm";
+                    statusDiv.style.color = "red";
                 }
             }
+        );
+    }
 
-                ;
+    function animate() {
+        requestAnimationFrame(animate);
 
+        const delta = clock.getDelta();
 
-            recognition.onerror = (event) => {
-                console.error('Speech recognition error', event.error);
+        if (currentVrm) {
+            // 1. Blink Update
+            updateBlink(delta);
 
-                if (event.error === 'no-speech' && isConversationActive && !isBotSpeaking) {
-                    // Just restart if it timed out with no speech
-                    statusDiv.textContent = "Still listening...";
-                    // onend will likely handle the restart
-                }
+            // 2. Lip Sync Update
+            updateLipSync(delta);
 
-                else {
-                    statusDiv.textContent = "Error: " + event.error;
-                }
+            // 3. Update VRM
+            currentVrm.update(delta);
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    function updateBlink(delta) {
+        // Support for VRM 0.x (blendShapeProxy) vs 1.0+ (expressionManager)
+        const manager = currentVrm.blendShapeProxy || currentVrm.expressionManager;
+        if (!manager) return;
+
+        const BlinkPreset = currentVrm.blendShapeProxy
+            ? THREE.VRMSchema.BlendShapePresetName.Blink
+            : THREE.VRMSchema.ExpressionPresetName.Blink;
+
+        blinkTimer -= delta;
+        if (blinkTimer <= 0 && !isBlinking) {
+            isBlinking = true;
+            blinkClose = true;
+            blinkTimer = Math.random() * 3.0 + 2.0;
+        }
+
+        if (isBlinking) {
+            const blinkSpeed = 10.0;
+            const currentVal = manager.getValue(BlinkPreset);
+
+            if (blinkClose) {
+                const newVal = Math.min(1.0, currentVal + delta * blinkSpeed);
+                manager.setValue(BlinkPreset, newVal);
+                if (newVal >= 1.0) blinkClose = false;
+            } else {
+                const newVal = Math.max(0.0, currentVal - delta * blinkSpeed);
+                manager.setValue(BlinkPreset, newVal);
+                if (newVal <= 0.0) isBlinking = false;
             }
+        }
+    }
 
-                ;
+    function updateLipSync(delta) {
+        // Support for VRM 0.x (blendShapeProxy) vs 1.0+ (expressionManager)
+        const manager = currentVrm.blendShapeProxy || currentVrm.expressionManager;
+        if (!manager) return;
+
+        // Determine Presets based on version
+        const isV0 = !!currentVrm.blendShapeProxy;
+        const SchemaStart = isV0 ? THREE.VRMSchema.BlendShapePresetName : THREE.VRMSchema.ExpressionPresetName;
+
+        if (!isSpeaking) {
+            const vowels = ['Aa', 'Ih', 'Ou', 'Ee', 'Oh']; // Capitalized for both usually works or is mapped
+            vowels.forEach(v => {
+                const preset = SchemaStart[v] || SchemaStart[v.toLowerCase()] || SchemaStart[v.toUpperCase()];
+                if (preset) {
+                    manager.setValue(preset, 0);
+                }
+            });
+            return;
         }
 
-        else {
-            statusDiv.textContent = "Web Speech API not supported in this browser.";
-            startBtn.disabled = true;
+        // Map Audio Volume directly to "Aa" or "A"
+        const pName = SchemaStart.Aa || SchemaStart.A;
+        if (!pName) return;
+
+        const targetVal = Math.min(1.0, currentAudioVolume * 3.0);
+
+        const currentVal = manager.getValue(pName);
+        const newVal = THREE.MathUtils.lerp(currentVal, targetVal, 0.4);
+
+        manager.setValue(pName, newVal);
+    }
+
+    // --- Shared Audio Control Functions ---
+    function startSpeaking() { isSpeaking = true; }
+
+    function stopSpeaking() {
+        isSpeaking = false;
+        currentAudioVolume = 0;
+        if (currentVrm) {
+            const manager = currentVrm.blendShapeProxy || currentVrm.expressionManager;
+            if (manager) {
+                const isV0 = !!currentVrm.blendShapeProxy;
+                const SchemaStart = isV0 ? THREE.VRMSchema.BlendShapePresetName : THREE.VRMSchema.ExpressionPresetName;
+                const pName = SchemaStart.Aa || SchemaStart.A;
+                if (pName) manager.setValue(pName, 0);
+            }
         }
+    }
 
-        function startConversationMode() {
-            isConversationActive = true;
+    function updateAudioVolume() {
+        if (!isSpeaking || !analyser) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        currentAudioVolume = (sum / dataArray.length) / 255;
 
-            // UI Updates
-            startBtn.classList.add('hidden');
-            statusDiv.classList.remove('hidden'); // Show status
-            statusDiv.textContent = "Starting...";
+        if (isSpeaking) requestAnimationFrame(updateAudioVolume);
+    }
 
-            // Start listening immediately
+    window.addEventListener('resize', () => {
+        const container = document.querySelector('.avatar-container');
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    window.addEventListener('load', initThreeJS);
+
+</script>
+<script>
+    const startBtn = document.getElementById('startBtn');
+    const statusDiv = document.getElementById('status');
+    const transcriptDiv = document.getElementById('transcript');
+
+    let sessionId = null;
+    let recognition;
+    let isConversationActive = false; // Flag for continuous mode
+    let isBotSpeaking = false; // Flag to prevent self-triggering
+    let isProcessing = false; // Flag to prevent restart during fetch
+
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.continuous = false; // We manually restart
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = () => {
+            statusDiv.textContent = "Listening... 🟢";
+            statusDiv.style.color = "#42d392"; // Greenish
+        };
+
+        recognition.onend = () => {
+            // If conversation is active and we are NOT processing a result and NOT speaking
+            // Then it was just a silence timeout or no-speech event. Restart listening.
+            if (isConversationActive && !isBotSpeaking && !isProcessing) {
+                console.log('Recognition ended (silence), restarting loop...');
+
+                // Don't change status text to "Processing", keep "Listening" (or similar)
+                // to avoid confusing the user.
+                try {
+                    recognition.start();
+                } catch (e) {
+                    // Ignore if already started
+                }
+            } else if (!isConversationActive) {
+                // Only show "Processing" if we are truly stopping/done?
+                // Actually if we are not active, we are just stopped.
+                statusDiv.textContent = "";
+                statusDiv.style.color = "#666";
+            }
+            // If isProcessing is true, do NOTHING here. Let the fetch/speak completion handle the restart.
+        };
+
+        recognition.onresult = async (event) => {
+            const transcript = event.results[0][0].transcript;
+            addMessage('You', transcript);
+
+            // Set processing flag to true so onend doesn't restart listing immediately
+            isProcessing = true;
+
+            // Visual feedback for processing
+            statusDiv.textContent = "Thinking... 🧠";
+            statusDiv.style.color = "#764ba2"; // Purple
+
             try {
-                recognition.start();
-            }
+                const requestBody = {
+                    message: transcript
+                };
 
-            catch (e) {
-                console.error("Could not start recognition:", e);
-                statusDiv.textContent = "Error starting listening. Please try again.";
-            }
-        }
+                if (sessionId) {
+                    requestBody.session_id = sessionId;
+                }
 
-        function stopConversationMode() {
-            isConversationActive = false;
-
-            if (recognition) {
-                recognition.stop();
-            }
-
-            if (audioElement) {
-                audioElement.pause();
-                audioElement.currentTime = 0;
-            }
-
-            if (window.speechSynthesis) {
-                window.speechSynthesis.cancel();
-            }
-
-            stopSpeaking(); // Avatar animation stop
-
-            // UI Updates
-            startBtn.classList.remove('hidden');
-            statusDiv.textContent = "";
-            statusDiv.classList.add('hidden'); // Hide status
-        }
-
-        startBtn.addEventListener('click', startConversationMode);
-
-
-        function addMessage(sender, text) {
-            const div = document.createElement('div');
-            div.className = 'message';
-
-            div.innerHTML = `<span class="${sender.toLowerCase()}">${sender}:</span> ${text}`;
-            transcriptDiv.appendChild(div);
-            transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-        }
-
-        async function speak(text, shouldEnd = false) {
-            isBotSpeaking = true;
-
-            // Stop listening while speaking to prevent feedback loop
-            if (recognition) {
-                recognition.stop();
-            }
-
-            try {
-
-                // Call the Google TTS endpoint
-                const response = await fetch('/tts', {
-
+                const response = await fetch('/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    }
-
-                    ,
-                    body: JSON.stringify({
-                        text: text,
-                        text: text,
-                        language_code: 'en-GB',
-                        voice_name: 'en-GB-Chirp3-HD-Algenib',
-                        provider: document.getElementById('ttsProvider').value
-                    })
+                    },
+                    body: JSON.stringify(requestBody)
                 });
 
+
                 const data = await response.json();
+                console.log('Received data:', data);
+                console.log('Response text:', data.response);
 
-                // Convert base64 audio to blob and play
-                const audioBlob = base64ToBlob(data.audio, 'audio/mp3');
-                const audioUrl = URL.createObjectURL(audioBlob);
-
-                // Setup Web Audio API and audio element (only once)
-                if (!audioElement) {
-                    audioElement = new Audio();
-
-                    // Create AudioContext and analyser
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    analyser = audioContext.createAnalyser();
-                    analyser.fftSize = 256;
-                    const bufferLength = analyser.frequencyBinCount;
-                    dataArray = new Uint8Array(bufferLength);
-
-                    // Create source and connect (only once!)
-                    audioSource = audioContext.createMediaElementSource(audioElement);
-                    audioSource.connect(analyser);
-                    analyser.connect(audioContext.destination);
+                if (data.session_id) {
+                    sessionId = data.session_id;
                 }
 
-                // Set new audio source and play
-                audioElement.src = audioUrl;
+                let botResponse = data.response;
+                console.log('Bot response (raw):', botResponse);
 
-                // Start Three.js avatar animation when audio starts playing
-                audioElement.onplay = () => {
-                    startSpeaking();
-                    updateAudioVolume();
-                    statusDiv.textContent = "Speaking... 🗣️";
-                    statusDiv.style.color = "#667eea"; // Blue
+                // Check for termination token
+                let shouldEndConversation = false;
+
+                if (botResponse.includes('[END_CONVERSATION]')) {
+                    shouldEndConversation = true;
+                    botResponse = botResponse.replace('[END_CONVERSATION]', '').trim();
                 }
 
-                    ;
+                // --- EMOTION PARSING (SIMPLIFIED FOR VRM) ---
+                // VRM usually handles emotions via Presets. 
+                // We can map Emotions to VRM Presets here if desired.
+                // For now, let's just strip the tag.
+                const expressionRegex = /\[Expression:\s*([a-zA-Z]+)\]/i;
+                const match = botResponse.match(expressionRegex);
 
-                // Stop Three.js avatar animation when audio ends
-                audioElement.onended = () => {
-                    stopSpeaking();
-                    URL.revokeObjectURL(audioUrl);
+                if (match && match[1]) {
+                    let detectedEmotion = match[1];
+                    console.log("Detected Emotion (Tag):", detectedEmotion);
+                    // TODO: Map to VRM Expression if needed: currentVrm.expressionManager.setValue(detectedEmotion, 1.0);
 
-                    isBotSpeaking = false;
-                    isProcessing = false; // Done processing/speaking
-
-                    // RESTART LISTENING HERE if conversation is active AND not ending
-                    if (isConversationActive && !shouldEnd) {
-                        statusDiv.textContent = "Listening... 🟢";
-                        statusDiv.style.color = "#42d392";
-
-                        try {
-                            recognition.start();
-                        }
-
-                        catch (e) {
-                            console.log('Already started');
-                        }
-                    }
-
-                    else if (shouldEnd) {
-                        // End conversation properly AFTER audio finishes
-                        stopConversationMode();
-                    }
+                    // Remove tag from spoken text
+                    botResponse = botResponse.replace(expressionRegex, '').trim();
                 }
 
-                    ;
+                addMessage('Bot', botResponse);
 
-                await audioElement.play();
+                // Respond
+                await speak(botResponse, shouldEndConversation);
 
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = "Error communicating with server";
+                isProcessing = false; // Reset if error
+
+                // Force restart listening if error occurred
+                if (isConversationActive) {
+                    try {
+                        recognition.start();
+                    } catch (e) { }
+                }
             }
+        };
 
-            catch (error) {
-                console.error('TTS Error:', error);
 
-                // Fallback to browser speech synthesis
-                const utterance = new SpeechSynthesisUtterance(text);
+        recognition.onerror = (event) => {
+            console.error('Speech recognition error', event.error);
 
-                // Animate Three.js avatar for fallback speech too
-                utterance.onstart = () => {
-                    startSpeaking();
-                }
-
-                    ;
-
-                utterance.onend = () => {
-                    stopSpeaking();
-                    isBotSpeaking = false;
-                    isProcessing = false; // Done processing/speaking
-
-                    // RESTART LISTENING HERE (Fallback)
-                    if (isConversationActive && !shouldEnd) {
-                        statusDiv.textContent = "Listening... 🟢";
-                        statusDiv.style.color = "#42d392";
-
-                        try {
-                            recognition.start();
-                        }
-
-                        catch (e) {
-                            console.log('Already started');
-                        }
-                    }
-
-                    else if (shouldEnd) {
-                        stopConversationMode();
-                    }
-                }
-
-                    ;
-
-                window.speechSynthesis.speak(utterance);
+            if (event.error === 'no-speech' && isConversationActive && !isBotSpeaking) {
+                // Just restart if it timed out with no speech
+                statusDiv.textContent = "Still listening...";
+                // onend will likely handle the restart
+            } else {
+                statusDiv.textContent = "Error: " + event.error;
             }
+        };
+    } else {
+        statusDiv.textContent = "Web Speech API not supported in this browser.";
+        startBtn.disabled = true;
+    }
+
+    function startConversationMode() {
+        isConversationActive = true;
+
+        // UI Updates
+        startBtn.classList.add('hidden');
+        statusDiv.classList.remove('hidden'); // Show status
+        statusDiv.textContent = "Starting...";
+
+        // Start listening immediately
+        try {
+            recognition.start();
+        } catch (e) {
+            console.error("Could not start recognition:", e);
+            statusDiv.textContent = "Error starting listening. Please try again.";
+        }
+    }
+
+    function stopConversationMode() {
+        isConversationActive = false;
+
+        if (recognition) {
+            recognition.stop();
         }
 
-        function base64ToBlob(base64, mimeType) {
-            const byteCharacters = atob(base64);
-            const byteNumbers = new Array(byteCharacters.length);
+        if (audioElement) {
+            audioElement.pause();
+            audioElement.currentTime = 0;
+        }
 
-            for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); } const byteArray = new
-                Uint8Array(byteNumbers); return new Blob([byteArray], { type: mimeType });
-        } </script>
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+
+        stopSpeaking(); // Avatar animation stop
+
+        // UI Updates
+        startBtn.classList.remove('hidden');
+        statusDiv.textContent = "";
+        statusDiv.classList.add('hidden'); // Hide status
+    }
+
+    startBtn.addEventListener('click', startConversationMode);
+
+
+    function addMessage(sender, text) {
+        const div = document.createElement('div');
+        const isUser = sender === 'You';
+        div.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
+
+        // New Layout: Bubble with sender inside
+        div.innerHTML = `
+            <div class="message-bubble">
+                <div class="bubble-sender">${sender}</div>
+                <div>${text}</div>
+            </div>
+        `;
+
+        const transcriptDiv = document.getElementById('transcript'); // Ensure transcriptDiv is defined in scope or use global
+        const tDiv = document.getElementById('transcript');
+        tDiv.appendChild(div);
+        tDiv.scrollTop = tDiv.scrollHeight;
+    }
+
+    async function speak(text, shouldEnd = false) {
+        isBotSpeaking = true;
+
+        // Stop listening while speaking to prevent feedback loop
+        if (recognition) {
+            recognition.stop();
+        }
+
+        try {
+
+            // Call the Google TTS endpoint
+            const response = await fetch('/tts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: text,
+                    language_code: 'en-GB',
+                    voice_name: 'en-GB-Chirp3-HD-Algenib',
+                    provider: document.getElementById('ttsProvider').value
+                })
+            });
+
+            const data = await response.json();
+
+            // Convert base64 audio to blob and play
+            const audioBlob = base64ToBlob(data.audio, 'audio/mp3');
+            const audioUrl = URL.createObjectURL(audioBlob);
+
+            // Setup Web Audio API and audio element (only once)
+            if (!audioElement) {
+                audioElement = new Audio();
+
+                // Create AudioContext and analyser
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+
+                // Create source and connect (only once!)
+                audioSource = audioContext.createMediaElementSource(audioElement);
+                audioSource.connect(analyser);
+                analyser.connect(audioContext.destination);
+            }
+
+            // Set new audio source and play
+            audioElement.src = audioUrl;
+
+            // Start Three.js avatar animation when audio starts playing
+            audioElement.onplay = () => {
+                startSpeaking();
+                updateAudioVolume();
+                statusDiv.textContent = "Speaking... 🗣️";
+                statusDiv.style.color = "#667eea"; // Blue
+            };
+
+            // Stop Three.js avatar animation when audio ends
+            audioElement.onended = () => {
+                stopSpeaking();
+                URL.revokeObjectURL(audioUrl);
+
+                isBotSpeaking = false;
+                isProcessing = false; // Done processing/speaking
+
+                // RESTART LISTENING HERE if conversation is active AND not ending
+                if (isConversationActive && !shouldEnd) {
+                    statusDiv.textContent = "Listening... 🟢";
+                    statusDiv.style.color = "#42d392";
+
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.log('Already started');
+                    }
+                } else if (shouldEnd) {
+                    // End conversation properly AFTER audio finishes
+                    stopConversationMode();
+                }
+            };
+
+            await audioElement.play();
+
+        } catch (error) {
+            console.error('TTS Error:', error);
+
+            // Fallback to browser speech synthesis
+            const utterance = new SpeechSynthesisUtterance(text);
+
+            // Animate Three.js avatar for fallback speech too
+            utterance.onstart = () => {
+                startSpeaking();
+            };
+
+            utterance.onend = () => {
+                stopSpeaking();
+                isBotSpeaking = false;
+                isProcessing = false; // Done processing/speaking
+
+                // RESTART LISTENING HERE (Fallback)
+                if (isConversationActive && !shouldEnd) {
+                    statusDiv.textContent = "Listening... 🟢";
+                    statusDiv.style.color = "#42d392";
+
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.log('Already started');
+                    }
+                } else if (shouldEnd) {
+                    stopConversationMode();
+                }
+            };
+
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    function base64ToBlob(base64, mimeType) {
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+
+        for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); } const byteArray = new
+            Uint8Array(byteNumbers); return new Blob([byteArray], { type: mimeType });
+    } </script>
 </body>
 
 </html>
