@@ -323,11 +323,18 @@
     <div class="main-content">
         <div class="left-panel">
             <div class="controls" style="margin-bottom: 0.5rem; text-align: center;">
-                <label for="ttsProvider" style="margin-right: 0.5rem; color: #333;">Select Voice Provider:</label>
-                <select id="ttsProvider" style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc;">
+                <label for="ttsProvider" style="margin-right: 0.5rem; color: #333;">Voice:</label>
+                <select id="ttsProvider"
+                    style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc; margin-right: 1rem;">
                     <option value="google">Google Chirp</option>
                     <option value="openai" selected>OpenAI (Default)</option>
                     <option value="elevenlabs">ElevenLabs (Pro)</option>
+                </select>
+
+                <label for="avatarSelector" style="margin-right: 0.5rem; color: #333;">Avatar:</label>
+                <select id="avatarSelector" style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc;">
+                    <option value="vrm" selected>VRoid (Anime)</option>
+                    <option value="glb">Ready Player Me</option>
                 </select>
             </div>
 
@@ -367,7 +374,33 @@
         renderer,
         clock;
 
+    // AVATAR STATE
+    let currentAvatarType = 'vrm'; // 'vrm' or 'glb'
     let currentVrm = null; // The VRM instance
+    let currentGlb = null; // The GLB instance
+    let mixer = null; // For GLB Mixer (if needed, though we use manual morphs)
+    let animationId = null;
+
+    // GLB/RPM Legacy Variables
+    window.facialMeshes = [];
+    window.blinkState = {
+        isBlinking: false,
+        startTime: 0,
+        duration: 150
+    };
+
+    // Map Emotions to ARKit Blend Shapes (for GLB)
+    const expressionMap = {
+        "Neutral": {},
+        "Happy": { "mouthSmile": 0.7, "browInnerUp": 0.4, "cheekPuff": 0.2, "eyeSquintLeft": 0.3, "eyeSquintRight": 0.3 },
+        "Sad": { "mouthFrownLeft": 0.5, "mouthFrownRight": 0.5, "browDownLeft": 0.4, "browDownRight": 0.4, "eyeLookDownLeft": 0.2, "eyeLookDownRight": 0.2 },
+        "Surprised": { "eyeWideLeft": 0.6, "eyeWideRight": 0.6, "jawOpen": 0.1, "browInnerUp": 0.6, "browOuterUpLeft": 0.5, "browOuterUpRight": 0.5 },
+        "Thinking": { "browDownLeft": 0.3, "browInnerUp": 0.3, "mouthPucker": 0.3, "eyeLookUpRight": 0.4, "eyeLookUpLeft": 0.4 },
+        "Angry": { "browDownLeft": 0.8, "browDownRight": 0.8, "mouthShrugLower": 0.4, "eyeSquintLeft": 0.5, "eyeSquintRight": 0.5 },
+        "Confused": { "browDownLeft": 0.5, "browOuterUpRight": 0.5, "mouthRollLower": 0.3, "eyeLookInLeft": 0.3 }
+    };
+    let currentEmotion = "Neutral";
+
     let isSpeaking = false;
 
     // Audio analysis
@@ -375,12 +408,15 @@
     let analyser;
     let dataArray;
     let currentAudioVolume = 0;
-    let audioElement = null; // Debug fix: Global declaration
+    let audioElement = null;
 
-    // Blink State
+    // VRM Blink State
     let blinkTimer = 0;
     let isBlinking = false;
-    let blinkClose = false; // closing vs opening
+    let blinkClose = false;
+
+    const cameraYForVRM = 1.4;
+    const cameraZForVRM = 1.2;
 
     function initThreeJS() {
         const canvas = document.getElementById('avatar-canvas');
@@ -391,7 +427,7 @@
 
         // Camera - Standard Portrait
         camera = new THREE.PerspectiveCamera(30, container.clientWidth / container.clientHeight, 0.1, 20.0);
-        camera.position.set(0, 1.4, 1.2);
+        camera.position.set(0, cameraYForVRM, cameraZForVRM);
         camera.lookAt(0, 1.35, 0);
 
         // Renderer
@@ -416,20 +452,27 @@
         clock = new THREE.Clock();
 
         // Load Avatar
-        loadAvatar();
+        loadCurrentAvatar();
 
         // Animation loop
         animate();
     }
 
-    function loadAvatar() {
+    function loadCurrentAvatar() {
+        if (currentAvatarType === 'vrm') {
+            loadVRM();
+        } else {
+            loadGLB();
+        }
+    }
+
+    function loadVRM() {
         const loader = new THREE.GLTFLoader();
         const avatarLoader = document.getElementById('avatar-loader');
-
-        // Standard VRM file path
         const modelUrl = '/static/shadow.vrm';
 
         if (avatarLoader) {
+            avatarLoader.textContent = "Loading VRoid...";
             avatarLoader.classList.remove('hidden');
         }
         console.log("Loading VRM:", modelUrl);
@@ -442,37 +485,139 @@
                     scene.add(vrm.scene);
                     currentVrm = vrm;
 
+                    // Cleanup GLB if exists
+                    if (currentGlb) { scene.remove(currentGlb); currentGlb = null; }
+
                     // Rotate 180 deg to face camera
                     vrm.scene.rotation.y = Math.PI;
 
                     if (avatarLoader) avatarLoader.classList.add('hidden');
 
-                    // Adjust Camera to Face
+                    // Adjust Camera for VRM (Portrait)
                     const head = vrm.humanoid.getBoneNode(THREE.VRMSchema.HumanoidBoneName.Head);
                     if (head) {
                         const worldPos = new THREE.Vector3();
                         head.getWorldPosition(worldPos);
-
-                        // Simple Camera Reset if head is found
-                        // Assuming scale is roughly human (meters)
-                        camera.position.set(0, worldPos.y, worldPos.z + 1.0);
-                        camera.lookAt(0, worldPos.y, 0);
+                        const eyeY = worldPos.y + 0.08;
+                        camera.position.set(0, eyeY, worldPos.z + 0.65);
+                        camera.lookAt(0, eyeY, 0);
                     } else {
-                        console.warn("Head bone not found, falling back to scene center.");
-                        camera.position.set(0, 1.6, 1.5);
-                        camera.lookAt(0, 1.0, 0);
+                        camera.position.set(0, cameraYForVRM, cameraZForVRM);
+                        camera.lookAt(0, 1.35, 0);
                     }
+
+                    // Start Unified Blink Loop
+                    startBlinking();
                 });
             },
-            (progress) => { /* console.log... */ },
-            (error) => {
-                console.error("Failed to load VRM:", error);
-                if (statusDiv) {
-                    statusDiv.textContent = "Error loading avatar.vrm";
-                    statusDiv.style.color = "red";
-                }
-            }
+            (progress) => { },
+            (error) => { console.error("Failed to load VRM:", error); }
         );
+    }
+
+    let headBone = null; // Legacy GLB Head Bone
+
+    function loadGLB() {
+        const loader = new THREE.GLTFLoader();
+        const avatarLoader = document.getElementById('avatar-loader');
+        const modelUrl = '/static/avatar.glb';
+
+        if (avatarLoader) {
+            avatarLoader.textContent = "Loading RPM...";
+            avatarLoader.classList.remove('hidden');
+        }
+        console.log("Loading GLB:", modelUrl);
+
+        loader.load(modelUrl, (gltf) => {
+            currentGlb = gltf.scene;
+            scene.add(currentGlb);
+
+            // Cleanup VRM if exists
+            if (currentVrm) { scene.remove(currentVrm.scene); currentVrm = null; }
+
+            // Setup GLB structure / meshes
+            window.facialMeshes = [];
+            headBone = null; // Reset head bone
+
+            currentGlb.traverse((child) => {
+                // Legacy Bone Detection for Idle Animation
+                if (child.isBone) {
+                    const boneName = child.name.toLowerCase();
+                    if (boneName.includes('head') || boneName.includes('neck_01')) headBone = child;
+                }
+
+                if (child.isMesh && child.morphTargetDictionary) {
+                    // console.log("Found mesh:", child.name, Object.keys(child.morphTargetDictionary));
+
+                    const meshData = {
+                        mesh: child,
+                        blinkIndices: [],
+                        mouthOpenIndex: -1,
+                        jawOpenIndex: -1,
+                        mouthFunnelIndex: -1,
+                        lipLowerIndices: [],
+                        lipUpperIndices: []
+                    };
+
+                    let foundSomething = false;
+
+                    for (const key in child.morphTargetDictionary) {
+                        const lowerKey = key.toLowerCase();
+                        // 1. Blink
+                        if (lowerKey.includes('blink') || (lowerKey.includes('eye') && lowerKey.includes('close'))) {
+                            meshData.blinkIndices.push(child.morphTargetDictionary[key]);
+                            foundSomething = true;
+                        }
+                        // 2. Mouth Open / Jaw Open
+                        if (lowerKey.includes('mouthopen') || lowerKey.includes('mouth_open')) {
+                            meshData.mouthOpenIndex = child.morphTargetDictionary[key];
+                            foundSomething = true;
+                        }
+                        if (lowerKey.includes('jawopen') || lowerKey.includes('jaw_open')) {
+                            meshData.jawOpenIndex = child.morphTargetDictionary[key];
+                            foundSomething = true;
+                        }
+                        // 3. Mouth Funnel (for Ooo sound shape)
+                        if (lowerKey.includes('mouthfunnel') || lowerKey.includes('mouth_funnel')) {
+                            meshData.mouthFunnelIndex = child.morphTargetDictionary[key];
+                            foundSomething = true;
+                        }
+
+                        // 4. Lip Controls (Teeth exposure)
+                        if (lowerKey.includes('mouthlowerdown')) {
+                            meshData.lipLowerIndices.push(child.morphTargetDictionary[key]);
+                            foundSomething = true;
+                        }
+                        if (lowerKey.includes('mouthupperup')) {
+                            meshData.lipUpperIndices.push(child.morphTargetDictionary[key]);
+                            foundSomething = true;
+                        }
+                    }
+
+                    if (foundSomething) {
+                        console.log("Registered Facial Mesh:", child.name);
+                        window.facialMeshes.push(meshData);
+                    }
+                }
+            });
+            console.log("GLB Loaded. Facial meshes found:", window.facialMeshes.length);
+
+            // RPM GLB Settings
+            const box = new THREE.Box3().setFromObject(currentGlb);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            currentGlb.scale.set(1, 1, 1);
+            currentGlb.position.set(0, -size.y + 0.15, 0); // specific RPM offset
+
+            // Adjust Camera for RPM (Closer) - Legacy Settings
+            camera.position.set(0, 0, 0.67);
+            camera.lookAt(0, 0, 0);
+
+            // Start Legacy Blink Loop
+            startBlinking();
+
+            if (avatarLoader) avatarLoader.classList.add('hidden');
+        });
     }
 
     function animate() {
@@ -480,18 +625,165 @@
 
         const delta = clock.getDelta();
 
-        if (currentVrm) {
-            // 1. Blink Update
+        if (currentAvatarType === 'vrm' && currentVrm) {
             updateBlink(delta);
-
-            // 2. Lip Sync Update
             updateLipSync(delta);
-
-            // 3. Update VRM
             currentVrm.update(delta);
+        } else if (currentAvatarType === 'glb' && currentGlb) {
+            updateGLBAnimation(delta);
         }
 
         renderer.render(scene, camera);
+    }
+
+    // --- Legacy Blink Logic (Unified) ---
+    let blinkTimeout = null;
+
+    function startBlinking() {
+        // Run for BOTH avatar types
+        // Random blink interval between 1 and 3.5 seconds (more frequent)
+        const nextBlink = Math.random() * 2500 + 1000;
+        if (blinkTimeout) clearTimeout(blinkTimeout);
+        blinkTimeout = setTimeout(() => {
+            triggerBlink();
+            startBlinking();
+        }, nextBlink);
+    }
+
+    function triggerBlink() {
+        console.log("triggerBlink called. Avatar:", currentAvatarType);
+
+        // Shared State Initialization
+        if (window.blinkState) {
+            window.blinkState.startTime = Date.now();
+            window.blinkState.duration = 170 + Math.random() * 50;
+            window.blinkState.isBlinking = true;
+            console.log("Blink Triggered!", window.blinkState);
+        }
+
+        // VRM Specific Flag (Optional, but good for quick checks if needed, or remove if unused)
+        if (currentAvatarType === 'vrm' && currentVrm) {
+            isBlinking = true;
+        }
+        // GLB Blink Trigger
+        if (currentAvatarType === 'glb' && (!window.facialMeshes || window.facialMeshes.length === 0)) return;
+    }
+
+    // --- GLB/RPM Animation Logic (Legacy Restore) ---
+    function updateGLBAnimation(delta) {
+        // 1. Blink Logic
+        if (window.blinkState) {
+            const bs = window.blinkState;
+            // Trigger is handled by startBlinking() setTimeout loop now
+
+            if (bs.isBlinking) {
+                const elapsed = Date.now() - bs.startTime;
+                const progress = elapsed / bs.duration;
+                let weight = 0;
+                if (progress < 0.35) { // Close
+                    const p = progress / 0.35;
+                    weight = p * p;
+                } else if (progress < 0.45) { // Hold
+                    weight = 1;
+                } else if (progress < 1.0) { // Open
+                    const p = (progress - 0.45) / 0.55;
+                    weight = (1 - p) * (1 - p);
+                } else { // Done
+                    bs.isBlinking = false;
+                    weight = 0;
+                }
+
+                // Apply to meshes
+                if (window.facialMeshes) {
+                    window.facialMeshes.forEach(data => {
+                        if (data.blinkIndices) {
+                            data.blinkIndices.forEach(idx => {
+                                data.mesh.morphTargetInfluences[idx] = weight;
+                            });
+                        }
+                    });
+                }
+            }
+        }
+
+        // 2. Lip Sync & Expression Logic
+        if (window.facialMeshes) {
+            window.facialMeshes.forEach(meshData => {
+                const mesh = meshData.mesh;
+
+                // Reset influences slightly (decay)
+                for (let i = 0; i < mesh.morphTargetInfluences.length; i++) {
+                    mesh.morphTargetInfluences[i] = THREE.MathUtils.lerp(mesh.morphTargetInfluences[i], 0, 0.1);
+                }
+
+                // Apply Base Emotion
+                if (expressionMap[currentEmotion]) {
+                    const targetShapes = expressionMap[currentEmotion];
+                    for (const [shapeName, targetCtx] of Object.entries(targetShapes)) {
+                        // Conflict resolution logic: skip mouth shapes if speaking
+                        if (isSpeaking && (shapeName.includes('mouth') || shapeName.includes('jaw'))) continue;
+
+                        const idx = mesh.morphTargetDictionary[shapeName];
+                        if (idx !== undefined) {
+                            const current = mesh.morphTargetInfluences[idx];
+                            mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, targetCtx, 0.1);
+                        }
+                    }
+                }
+
+                // Apply Lip Sync
+                if (isSpeaking) {
+                    // Volume multiplier
+                    let val = Math.min(currentAudioVolume * 2.5, 1.2);
+
+                    const effectFactor = 1.0;
+
+                    // 1. Jaw Open (Structure)
+                    if (meshData.jawOpenIndex >= 0) {
+                        const current = mesh.morphTargetInfluences[meshData.jawOpenIndex];
+                        // Reduced Jaw: 0.25 (was 0.5) - Subtle structure, relying on lips for teeth
+                        mesh.morphTargetInfluences[meshData.jawOpenIndex] = THREE.MathUtils.lerp(current, val * 0.06, effectFactor);
+                    }
+
+                    // 2. Mouth Open (General)
+                    if (meshData.mouthOpenIndex >= 0) {
+                        const current = mesh.morphTargetInfluences[meshData.mouthOpenIndex];
+                        mesh.morphTargetInfluences[meshData.mouthOpenIndex] = THREE.MathUtils.lerp(current, val * 0.15, effectFactor);
+                    }
+
+                    // 3. Lip Retractors (Show Teeth!)
+                    const teethFactor = 0.5; // How much to pull lips back
+
+                    if (meshData.lipLowerIndices && meshData.lipLowerIndices.length > 0) {
+                        meshData.lipLowerIndices.forEach(idx => {
+                            const current = mesh.morphTargetInfluences[idx];
+                            mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, val * teethFactor, effectFactor);
+                        });
+                    }
+                    if (meshData.lipUpperIndices && meshData.lipUpperIndices.length > 0) {
+                        meshData.lipUpperIndices.forEach(idx => {
+                            const current = mesh.morphTargetInfluences[idx];
+                            mesh.morphTargetInfluences[idx] = THREE.MathUtils.lerp(current, val * teethFactor * 0.0, effectFactor); // Upper moves less
+                        });
+                    }
+
+                    // 4. Mouth Funnel (The "Middle" Fix)
+                    // This pulls the corners in, making it look less "wide/strained"
+                    if (meshData.mouthFunnelIndex >= 0) {
+                        const current = mesh.morphTargetInfluences[meshData.mouthFunnelIndex];
+                        // Apply moderate funneling to round out the shape
+                        mesh.morphTargetInfluences[meshData.mouthFunnelIndex] = THREE.MathUtils.lerp(current, val * 0.4, effectFactor);
+                    }
+                }
+            });
+        }
+
+        // 3. Idle Head Movement (Legacy)
+        const time = Date.now() * 0.001;
+        if (headBone) {
+            headBone.rotation.y = Math.sin(time * 0.5) * 0.05;
+            headBone.rotation.x = Math.sin(time * 0.3) * 0.02;
+        }
     }
 
     function updateBlink(delta) {
@@ -503,26 +795,33 @@
             ? THREE.VRMSchema.BlendShapePresetName.Blink
             : THREE.VRMSchema.ExpressionPresetName.Blink;
 
-        blinkTimer -= delta;
-        if (blinkTimer <= 0 && !isBlinking) {
-            isBlinking = true;
-            blinkClose = true;
-            blinkTimer = Math.random() * 3.0 + 2.0;
-        }
+        // Use Shared Blink State
+        if (window.blinkState && window.blinkState.isBlinking) {
+            // console.log("Updating VRM Blink...", window.blinkState.isBlinking);
+            const bs = window.blinkState;
+            const elapsed = Date.now() - bs.startTime;
+            const progress = elapsed / bs.duration;
 
-        if (isBlinking) {
-            const blinkSpeed = 10.0;
-            const currentVal = manager.getValue(BlinkPreset);
+            let weight = 0;
 
-            if (blinkClose) {
-                const newVal = Math.min(1.0, currentVal + delta * blinkSpeed);
-                manager.setValue(BlinkPreset, newVal);
-                if (newVal >= 1.0) blinkClose = false;
-            } else {
-                const newVal = Math.max(0.0, currentVal - delta * blinkSpeed);
-                manager.setValue(BlinkPreset, newVal);
-                if (newVal <= 0.0) isBlinking = false;
+            if (progress < 0.35) { // Close (Fast)
+                const p = progress / 0.35;
+                weight = p * p; // EaseIn
+            } else if (progress < 0.45) { // Hold (Closed)
+                weight = 1;
+            } else if (progress < 1.0) { // Open (Slower)
+                const p = (progress - 0.45) / 0.55;
+                weight = (1 - p) * (1 - p); // EaseOut
+            } else { // Done
+                bs.isBlinking = false;
+                // isBlinking = false; // Sync global just in case, though unused
+                weight = 0;
             }
+
+            manager.setValue(BlinkPreset, weight);
+        } else {
+            // Ensure it's closed if not blinking
+            // manager.setValue(BlinkPreset, 0);
         }
     }
 
@@ -582,6 +881,9 @@
         for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
         currentAudioVolume = (sum / dataArray.length) / 255;
 
+        // DEBUG VOLUME
+        if (Math.random() < 0.05) console.log("Audio Volume:", currentAudioVolume);
+
         if (isSpeaking) requestAnimationFrame(updateAudioVolume);
     }
 
@@ -593,6 +895,15 @@
     });
 
     window.addEventListener('load', initThreeJS);
+
+    // Avatar Selector
+    const avatarSelector = document.getElementById('avatarSelector');
+    if (avatarSelector) {
+        avatarSelector.addEventListener('change', (e) => {
+            currentAvatarType = e.target.value;
+            loadCurrentAvatar();
+        });
+    }
 
 </script>
 <script>
