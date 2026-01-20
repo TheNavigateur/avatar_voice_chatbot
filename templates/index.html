@@ -287,11 +287,14 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 80px;
-            /* Fixed height taller than button */
+            /* Height removed/auto to fit content in flow */
             width: 100%;
-            margin-top: 0;
+            margin-top: 1rem;
+            padding-bottom: 1rem;
+            /* Padding at bottom of page flow */
         }
+
+
 
         /* Responsive Design */
         @media (max-width: 768px) {
@@ -357,14 +360,12 @@
                 <canvas id="avatar-canvas"></canvas>
             </div>
 
-            <div class="interaction-container">
-                <div id="status" class="hidden"></div>
-                <button id="startBtn" class="action-btn start-btn">Start Conversation</button>
-            </div>
+
         </div>
 
         <div class="right-panel">
             <div id="transcript"></div>
+            <!-- Interaction container removed, button is now dynamic inline -->
         </div>
     </div>
 </div>
@@ -461,17 +462,17 @@
         scene.add(dirLight);
 
         // Strong frontal light from above
-        const frontLight = new THREE.DirectionalLight(0xffffff, 2.0);
+        const frontLight = new THREE.DirectionalLight(0xffffff, 2.5);
         frontLight.position.set(0, 10, 5); // Front-Top
         scene.add(frontLight);
 
         // Face Fill Light (Directly in front to light up cavities like mouth)
-        const faceLight = new THREE.PointLight(0xffffff, 0.8);
+        const faceLight = new THREE.PointLight(0xffffff, 1.5);
         faceLight.position.set(0, 1.3, 2);
         scene.add(faceLight);
 
         // Strong ambient fill to reduce shadows
-        const ambient = new THREE.AmbientLight(0xffffff, 1.2); // Slightly reduced to balance added lights
+        const ambient = new THREE.AmbientLight(0xffffff, 2.5); // Slightly reduced to balance added lights
         scene.add(ambient);
 
         // Clock
@@ -920,8 +921,23 @@
     // BUT 'startConversationMode' and others referenced in global scope or HTML events? 
     // In strict module type, functionality should be attached via JS.
 
-    const startBtn = document.getElementById('startBtn');
-    const statusDiv = document.getElementById('status');
+    // const startBtn = document.getElementById('startBtn'); // Removed static ref
+    const statusDiv = document.getElementById('status'); // This element might also be gone if we removed container?
+    // Wait, statusDiv was in interaction-container too?
+    // I previously removed interaction-container in chunk 1.
+    // statusDiv is used for "Web Speech API not supported" message.
+    // I should create statusDiv dynamically too if needed or put it back in HTML?
+    // The user request was about the BUTTON.
+    // But my chunk 1 removed the whole interaction-container which contained statusDiv.
+    // I should probably put statusDiv for global errors somewhere else or render it inline too.
+    // For now, let's assume we handle errors via setBotStatusMessage or a global alert/overlay?
+    // Or just create a simple error container in transcript?
+    // Let's create `renderGlobalError(msg)` if needed.
+    // For now, let's comment out statusDiv usage or find a place for it.
+
+    // I should check if I broke "Web Speech API not supported" check which uses statusDiv.
+    // Yes, that check runs on load. I will rewrite it to use renderStartButton or renderError.
+
     const transcriptDiv = document.getElementById('transcript');
 
     let sessionId = null;
@@ -929,16 +945,17 @@
     let isConversationActive = false;
     let isBotSpeaking = false;
     let isProcessing = false;
+    let startBtn = null; // Dynamic ref
 
-    if ('webkitSpeechRecognition' in window) {
-        recognition = new webkitSpeechRecognition();
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = 'en-US';
 
         recognition.onstart = () => {
-            statusDiv.textContent = "Listening... 🟢";
-            statusDiv.style.color = "#42d392";
+            setBotStatusMessage("Listening...", 'right');
         };
 
         recognition.onend = () => {
@@ -948,8 +965,7 @@
                     recognition.start();
                 } catch (e) { }
             } else if (!isConversationActive) {
-                statusDiv.textContent = "";
-                statusDiv.style.color = "#666";
+                clearBotStatusMessage();
             }
         };
 
@@ -957,8 +973,7 @@
             const transcript = event.results[0][0].transcript;
             addMessage('You', transcript);
             isProcessing = true;
-            statusDiv.textContent = "Thinking... 🧠";
-            statusDiv.style.color = "#764ba2";
+            setBotStatusMessage("Thinking...", 'left');
 
             try {
                 const requestBody = { message: transcript };
@@ -990,12 +1005,16 @@
                     botResponse = botResponse.replace(expressionRegex, '').trim();
                 }
 
-                // addMessage('Bot', botResponse);  <-- Moved to speak() callback
+                // Temporary status cleared inside speak() just before new message or here?
+                // Actually speak() calls addMessage which is where the real text appears.
+                // Let's clear status here before calling speak.
+
+
                 await speak(botResponse, shouldEndConversation);
 
             } catch (error) {
                 console.error('Error:', error);
-                statusDiv.textContent = "Error communicating with server";
+                setBotStatusMessage("Error communicating with server ❌");
                 isProcessing = false;
                 if (isConversationActive) {
                     try { recognition.start(); } catch (e) { }
@@ -1005,22 +1024,35 @@
 
         recognition.onerror = (event) => {
             if (event.error === 'no-speech' && isConversationActive && !isBotSpeaking) {
-                statusDiv.textContent = "Still listening...";
+                setBotStatusMessage("Still listening...", 'right');
             } else {
-                statusDiv.textContent = "Error: " + event.error;
+                setBotStatusMessage("Error: " + event.error, 'center');
             }
         };
     } else {
-        statusDiv.textContent = "Web Speech API not supported in this browser.";
-        startBtn.disabled = true;
-        // Maybe polyfill or different handling
+        // Web Speech API NOT SUPPORTED
+        // Render error in transcript instead of statusDiv
+        const tDiv = document.getElementById('transcript');
+        const errDiv = document.createElement('div');
+        errDiv.style.cssText = "text-align: center; color: #d9534f; margin-top: 2rem; font-weight: bold;";
+        errDiv.innerHTML = "Web Speech API not supported.<br>Please use <b>Chrome</b>, <b>Edge</b>, or <b>Safari</b>.";
+        tDiv.appendChild(errDiv);
+    }
+
+    // Initial Render of Start Button if supported
+    // logic moved to init/onload if supported
+    if (SpeechRecognition) {
+        renderStartButton();
     }
 
     function startConversationMode() {
         isConversationActive = true;
-        startBtn.classList.add('hidden');
-        statusDiv.classList.remove('hidden');
-        statusDiv.textContent = "Starting...";
+
+        // Remove Start Button
+        const btn = document.getElementById('dynamic-start-btn');
+        if (btn) btn.remove();
+
+        setBotStatusMessage("Starting...", 'center');
         try {
             recognition.start();
         } catch (e) {
@@ -1038,14 +1070,30 @@
         if (window.speechSynthesis) window.speechSynthesis.cancel();
         stopSpeaking();
 
-        startBtn.classList.remove('hidden');
-        statusDiv.textContent = "";
-        statusDiv.classList.add('hidden');
+        clearBotStatusMessage();
+
+        // Render Start Button again at the bottom
+        renderStartButton();
     }
 
-    // Attach Event Listeners (Module Safe)
-    if (startBtn) {
-        startBtn.addEventListener('click', startConversationMode);
+    // Helper to Render Start Button
+    function renderStartButton() {
+        // Avoid duplicates
+        if (document.getElementById('dynamic-start-btn')) return;
+
+        const btn = document.createElement('button');
+        btn.id = 'dynamic-start-btn';
+        btn.className = 'action-btn start-btn';
+        btn.textContent = 'Start Conversation';
+        btn.style.alignSelf = 'center';
+        btn.style.marginTop = '1rem';
+        btn.style.marginBottom = '1rem';
+
+        btn.onclick = startConversationMode;
+
+        const tDiv = document.getElementById('transcript');
+        tDiv.appendChild(btn);
+        tDiv.scrollTop = tDiv.scrollHeight;
     }
 
 
@@ -1062,6 +1110,37 @@
         const tDiv = document.getElementById('transcript');
         tDiv.appendChild(div);
         tDiv.scrollTop = tDiv.scrollHeight;
+    }
+
+    // Helper for Status Indicators
+    function setBotStatusMessage(text, align = 'center') {
+        let statusDiv = document.getElementById('bot-status-bubble');
+        const tDiv = document.getElementById('transcript');
+
+        // Always remove first to ensure we re-append at the bottom
+        if (statusDiv) {
+            statusDiv.remove();
+        }
+
+        const div = document.createElement('div');
+        div.id = 'bot-status-bubble';
+
+        let alignSelf = 'center';
+        if (align === 'left') alignSelf = 'flex-start';
+        if (align === 'right') alignSelf = 'flex-end';
+
+        div.style.cssText = `text-align: ${align}; align-self: ${alignSelf}; color: #888; font-style: italic; margin: 10px 0; font-size: 0.9em; opacity: 0.8; max-width: 80%;`;
+        div.textContent = text;
+
+        tDiv.appendChild(div);
+        tDiv.scrollTop = tDiv.scrollHeight;
+    }
+
+    function clearBotStatusMessage() {
+        const statusBubble = document.getElementById('bot-status-bubble');
+        if (statusBubble) {
+            statusBubble.remove();
+        }
     }
 
     async function speak(text, shouldEnd = false) {
@@ -1099,11 +1178,13 @@
             window.audioElement.src = audioUrl;
 
             window.audioElement.onplay = () => {
+                clearBotStatusMessage(); // Clear "Thinking..." now that we are speaking
                 startSpeaking();
                 addMessage('Bot', text); // Delay text display until audio starts
                 updateAudioVolumeGlobal();
-                statusDiv.textContent = "Speaking... 🗣️";
-                statusDiv.style.color = "#667eea";
+                // statusDiv.textContent = "Speaking... 🗣️"; // Disabled as requested
+                // statusDiv.style.color = "#667eea";
+                // Start Lip Sync Loop
             };
 
             window.audioElement.onended = () => {
@@ -1113,8 +1194,7 @@
                 isProcessing = false;
 
                 if (isConversationActive && !shouldEnd) {
-                    statusDiv.textContent = "Listening... 🟢";
-                    statusDiv.style.color = "#42d392";
+                    setBotStatusMessage("Listening...", 'right');
                     try { recognition.start(); } catch (e) { }
                 } else if (shouldEnd) {
                     stopConversationMode();
