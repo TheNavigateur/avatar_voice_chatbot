@@ -68,4 +68,10 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
           image: us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          env_vars: |-
+            GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+            GOOGLE_CSE_ID=${{ secrets.GOOGLE_CSE_ID }}
+            GOOGLE_CSE_API_KEY=${{ secrets.GOOGLE_CSE_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}
           flags: '--allow-unauthenticated'
