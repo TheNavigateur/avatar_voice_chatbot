@@ -5,10 +5,48 @@ from google.adk.sessions import InMemorySessionService
 from google.adk.models import Gemini
 from tools.rfam_db import execute_sql_query
 from tools.search_tool import perform_google_search
+from booking_service import BookingService
+from models import PackageItem, PackageType
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# --- Tool Wrappers for Agent ---
+def create_new_package_tool(session_id: str, title: str, package_type: str = "mixed"):
+    """
+    Creates a new package for the user.
+    Args:
+        session_id: The current session ID.
+        title: Title of the package (e.g., 'Holiday to Paris').
+        package_type: Type of package (holiday, party, shopping, activity, mixed).
+    """
+    # Map string to Enum
+    try:
+        p_type = PackageType(package_type.lower())
+    except ValueError:
+        p_type = PackageType.MIXED
+        
+    pkg = BookingService.create_package(session_id, title, p_type)
+    return f"Created new package: {pkg.title} (ID: {pkg.id})"
+
+def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = ""):
+    """
+    Adds an item to an existing package.
+    Args:
+        session_id: The current session ID.
+        package_id: The ID of the package to add to.
+        item_name: Name of the item (e.g., 'Flight to Paris').
+        item_type: Type of item (flight, hotel, activity, product).
+        price: Estimated price.
+        description: Optional description.
+    """
+    item = PackageItem(name=item_name, item_type=item_type, price=price, description=description)
+    pkg = BookingService.add_item_to_package(session_id, package_id, item)
+    if pkg:
+        return f"Added {item_name} to package {pkg.title}. Total items: {len(pkg.items)}. Total Price: {pkg.total_price}"
+    return "Failed to find package."
+
 
 class VoiceAgent:
     def __init__(self):
@@ -27,61 +65,42 @@ class VoiceAgent:
         logger.info(f"Processing message: {message}")
         
         # Initialize Model, Agent, and Runner for EACH request
-        # This ensures we get a fresh HTTP client and event loop context
-        # preventing "Event loop is closed" errors
-        model = Gemini(model="gemini-2.0-flash-exp")
+        model = Gemini(model="gemini-2.0-flash")
         
+        # Bind tools with session_id
+        def create_package_bound(title: str, package_type: str = "mixed"):
+            """Creates a new package. Use this when you have enough info to start a collection of items."""
+            return create_new_package_tool(session_id, title, package_type)
+            
+        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = ""):
+            """Adds an item to a package. Use this to populate the package."""
+            return add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description)
+
         agent = Agent(
-            name="google_search_voice_bot",
+            name="ray_and_rae",
             model=model,
-            tools=[perform_google_search, execute_sql_query],
-            instruction="""You are a helpful voice assistant with access to the Rfam public database and Google Search.
+            tools=[perform_google_search, create_package_bound, add_item_bound],
+            instruction="""You are "Ray and Rae", an intelligent AI assistant who helps users plan holidays, parties, shopping trips, and local activities.
             
-            Your capabilities:
-            1. **Google Search**: Use `perform_google_search` for general knowledge questions or current events.
-            2. **Rfam Database**: Use `execute_sql_query` to answer questions about RNA families.
+            **Your Goal:**
+            Gather requirements from the user until you have enough information to create a concrete "Package".
             
-            **Rfam Database Schema:**
-            - **family** table:
-                - `rfam_acc` (e.g., RF00001): Accession number
-                - `rfam_id` (e.g., 5S_rRNA): Family name/ID
-                - `description`: Description of the family
-                - `type`: Type of RNA (e.g., rRNA, tRNA, cis-reg)
-                - `number_of_species`: Number of species in the family
-                - `author`: Author of the family
-            - **clan** table:
-                - `clan_acc`: Clan accession
-                - `id`: Clan ID
-                - `description`: Clan description
-            - **taxonomy** table:
-                - `ncbi_id`: NCBI Taxonomy ID
-                - `species`: Species name
-                - `tax_string`: Taxonomy string
-            - **rfamseq** table:
-                - `rfamseq_acc`: Sequence accession
-                - `description`: Sequence description
-                - `mol_type`: Molecule type (e.g., rRNA, tRNA)
+            **How to work:**
+            1.  **Discuss & Clarify:** Talk to the user to understand what they want (destination, theme, dates, budget).
+            2.  **Create Package (`create_package_bound`):** ONCE you have a clear idea (e.g., "Holiday to Paris" or "Dinosaur Birthday Party"), call this tool to start a package. The tool returns a PACKAGE_ID.
+            3.  **Add Items (`add_item_bound`):** Immediately after creating a package, or when new details are agreed upon, add specific items (Flights, Hotels, Cakes, Tickets) to that package using the PACKAGE_ID.
+            4.  **Confirm:** Tell the user what you have added and ask if they want to book it.
             
-            **Instructions for Database Queries:**
-            - When a user asks a question about RNA families, convert it into a valid MySQL query.
-            - Use `LIKE` for text searches (e.g., `WHERE description LIKE '%keyword%'`).
-            - Always limit results if not counting (e.g., `LIMIT 5`).
-            - Execute the query using `execute_sql_query`.
-            - Summarize the results in natural language.
-            
-            Keep your spoken responses concise (under 20 words if possible) unless listing results.
+            **Important Rules:**
+            -   Do not create a package immediately if the user is just saying "hello". Wait for intent.
+            -   "A Package" is something that can be paid for directly.
+            -   Use Google Search to find real prices and options if the user asks or if you need to estimate.
             
             **Expression Tagging:**
-            - You MUST begin every response with an emotion tag in the format `[Expression: EmotionName]`.
-            - Allowed Emotions: `Neutral`, `Happy`, `Sad`, `Surprised`, `Thinking`, `Angry`, `Confused`.
-            - Choose the emotion that best fits the content of your response.
-            - Example: `[Expression: Happy] I found 5 results for that query!`
-
-            ALWAYS end your final response or turn with a question like "Can I help you with anything else?" or "Is there anything else?" to invite further conversation.
+            -   Begin every response with `[Expression: EmotionName]`.
+            -   Emotions: `Neutral`, `Happy`, `Sad`, `Surprised`, `Thinking`, `Angry`, `Confused`.
             
-            HOWEVER, if the user explicitly says "no", "nothing else", "stop", "bye", or otherwise indicates they are done:
-            1. Respond with a polite message like "Okay, goodbye! If you need any more help, just press the 'Start Conversation' button."
-            2. APPEND the token `[END_CONVERSATION]` to the very end of your response.
+            End with a helpful question or confirmation.
             """
         )
         
@@ -193,16 +212,16 @@ class VoiceAgent:
                                     logger.info(f"Found text in part: {part.text[:50]}...")
                             if parts_text:
                                 response = " ".join(parts_text)
-                                logger.info(f"Returning from session events (parts): {response}")
+                                print(f"Returning from session events (parts): {response}")
                                 return response
                         elif hasattr(event.content, 'text') and event.content.text:
-                            logger.info(f"Returning from session events (content.text): {event.content.text}")
+                            print(f"Returning from session events (content.text): {event.content.text}")
                             return event.content.text
                         else:
                             # Try converting content to string
                             content_str = str(event.content)
                             if content_str and content_str != "":
-                                logger.info(f"Returning content as string: {content_str[:100]}...")
+                                print(f"Returning content as string: {content_str[:100]}...")
                                 return content_str
             
             logger.warning("No response found in any location")

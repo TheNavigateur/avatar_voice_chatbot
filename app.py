@@ -13,6 +13,9 @@ from openai import OpenAI
 
 app = FastAPI()
 
+from models import Package, PackageItem, BookingStatus
+from booking_service import BookingService
+
 # Mount static files if needed (we'll just use templates for now)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -48,6 +51,20 @@ async def chat(request: ChatRequest):
         "response": response_text,
         "session_id": session_id
     })
+
+@app.get("/api/session/{session_id}/packages")
+async def get_packages(session_id: str):
+    packages = BookingService.get_packages(session_id)
+    return [p.dict() for p in packages]
+
+@app.post("/api/packages/{session_id}/{package_id}/book")
+async def book_package(session_id: str, package_id: str):
+    package = BookingService.get_package(session_id, package_id)
+    if not package:
+        raise HTTPException(status_code=404, detail="Package not found")
+    
+    result = await BookingService.execute_booking(package)
+    return result
 
 @app.post("/tts")
 async def text_to_speech(request: TTSRequest):
@@ -110,7 +127,12 @@ async def generate_openai_tts(request: TTSRequest):
         "fable": "fable",
         "onyx": "onyx",
         "nova": "nova",
-        "shimmer": "shimmer"
+        "shimmer": "shimmer",
+        "ash": "ash",
+        "coral": "coral",
+        "sage": "sage",
+        "ballad": "ballad",
+        "verse": "verse"
     }
     
     # Default to 'alloy' if voice not found or if it's a Google voice name
@@ -136,9 +158,10 @@ async def generate_elevenlabs_tts(request: TTSRequest):
     if not api_key:
          raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not set")
 
-    # Use a default voice ID if a specific one isn't provided or needed
-    # Custom voice ID: 8fcyCHOzlKDlxh1InJSf
-    voice_id = "8fcyCHOzlKDlxh1InJSf" 
+    # Use the requested voice ID, or fallback to default if it matches the Google default or is empty
+    voice_id = request.voice_name
+    if not voice_id or voice_id == "en-GB-Chirp3-HD-Algenib":
+        voice_id = "8fcyCHOzlKDlxh1InJSf"  
     
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     

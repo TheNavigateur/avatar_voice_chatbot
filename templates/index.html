@@ -328,15 +328,14 @@
 </head>
 
 <div class="container">
-    <h1>Ask Jack about the RFAM database</h1>
-    <p class="subtitle">By Naveen Chawla. Work in progress - natural language voice conversation with custom 3D
-        avatars with an SQL database, Google Search capable, integrated with prominent text-to-speech voice AI
-        model systems</p>
+    <h1>Ray and Rae</h1>
+    <p class="subtitle">Tell Ray and Rae about the kinds of holidays, birthday parties, local activities and items you
+        want.</p>
 
     <div class="main-content">
         <div class="left-panel">
             <div class="controls" style="margin-bottom: 0.5rem; text-align: center;">
-                <label for="ttsProvider" style="margin-right: 0.5rem; color: #333;">Voice:</label>
+                <label for="ttsProvider" style="margin-right: 0.5rem; color: #333;">Provider:</label>
                 <select id="ttsProvider"
                     style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc; margin-right: 1rem;">
                     <option value="google">Google Chirp</option>
@@ -344,11 +343,15 @@
                     <option value="elevenlabs">ElevenLabs (Pro)</option>
                 </select>
 
+
+
                 <label for="avatarSelector" style="margin-right: 0.5rem; color: #333;">Avatar:</label>
                 <select id="avatarSelector" style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc;">
                     <option value="vrm_shadow">Shadow (Anime)</option>
                     <option value="vrm_jack">Jack (Anime 1.0)</option>
-                    <option value="glb" selected>Ready Player Me</option>
+                    <option value="glb_avatar" selected>Jack</option>
+                    <option value="glb_jackie">Jackie</option>
+                    <option value="glb_cole">Cole</option>
                 </select>
             </div>
 
@@ -364,8 +367,15 @@
         </div>
 
         <div class="right-panel">
+            <div id="packages-container"
+                style="background: white; padding: 1rem; border-radius: 15px; margin-bottom: 1rem; width: 100%; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 200px; display: none;">
+                <h3 style="margin-top: 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem;">
+                    Your Packages</h3>
+                <div id="packages-list">
+                    <p style="color: #999; font-style: italic;">No packages created yet. Chat to start planning!</p>
+                </div>
+            </div>
             <div id="transcript"></div>
-            <!-- Interaction container removed, button is now dynamic inline -->
         </div>
     </div>
 </div>
@@ -487,15 +497,26 @@
 
     function loadCurrentAvatar() {
         const selector = document.getElementById('avatarSelector');
-        const selectedValue = selector ? selector.value : 'glb';
+        // Default to glb_avatar if nothing selected, or handle legacy 'glb' if it exists in cache? 
+        // Better to just grab value.
+        let selectedValue = selector ? selector.value : 'glb_avatar';
 
         if (selectedValue.startsWith('vrm')) {
             currentAvatarType = 'vrm';
-            const file = selectedValue === 'vrm_jack' ? '/static/jack.vrm' : '/static/shadow.vrm';
+            const file = selectedValue === 'vrm_jack' ? '/static/jack3.vrm' : '/static/shadow.vrm';
             loadVRM(file);
         } else {
             currentAvatarType = 'glb';
-            loadGLB();
+            // Map keys to files
+            let file = '/static/avatar.glb'; // Default
+            if (selectedValue === 'glb_jackie') file = '/static/jackie.glb';
+            if (selectedValue === 'glb_cole') file = '/static/cole.glb';
+            if (selectedValue === 'glb_avatar') file = '/static/avatar.glb';
+
+            // If it was the old 'glb' value, default to avatar or previous behavior? 
+            // The HTML options changed, so 'glb' shouldn't happen unless cached/old DOM.
+
+            loadGLB(file);
         }
     }
 
@@ -539,7 +560,7 @@
                 // Rotate if VRM 0.0 (old behavior often needed rotation)
                 // VRM 1.0 (Jack) usually faces +Z, and our camera looks -Z?
                 // Actually, if Jack faces away with Math.PI, he needs 0.
-                if (modelUrl.includes('jack.vrm')) {
+                if (modelUrl.includes('jack3.vrm')) {
                     vrm.scene.rotation.y = 0;
                 } else {
                     // Shadow (VRM 0.0) likely needs rotation
@@ -576,10 +597,11 @@
 
     let headBone = null; // Legacy GLB Head Bone
 
-    function loadGLB() {
+    function loadGLB(url) {
         const loader = new GLTFLoader();
         const avatarLoader = document.getElementById('avatar-loader');
-        const modelUrl = '/static/avatar.glb';
+        // Use passed URL or fallback
+        const modelUrl = url || '/static/avatar.glb';
 
         if (avatarLoader) {
             avatarLoader.textContent = "Loading RPM...";
@@ -912,6 +934,8 @@
         });
     }
 
+
+
 </script>
 <script type="module">
     // Main App Logic (Module Scope)
@@ -992,6 +1016,9 @@
 
                 let botResponse = data.response;
                 let shouldEndConversation = false;
+
+                // Poll for packages after receiving response
+                updatePackages();
 
                 if (botResponse.includes('[END_CONVERSATION]')) {
                     shouldEndConversation = true;
@@ -1148,14 +1175,33 @@
         if (recognition) recognition.stop();
 
         try {
+            const provider = document.getElementById('ttsProvider').value;
+            const avatar = document.getElementById('avatarSelector').value;
+
+            let voiceName = 'en-GB-Chirp3-HD-Algenib'; // Default for Google
+
+            if (provider === 'openai') {
+                if (avatar === 'glb_jackie') {
+                    voiceName = 'nova';
+                } else {
+                    voiceName = 'alloy';
+                }
+            } else if (provider === 'elevenlabs') {
+                if (avatar === 'glb_jackie') {
+                    voiceName = 'hDCQ0elACClokHYB6RkC';
+                } else {
+                    voiceName = '8fcyCHOzlKDlxh1InJSf';
+                }
+            }
+
             const response = await fetch('/tts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     text: text,
                     language_code: 'en-GB',
-                    voice_name: 'en-GB-Chirp3-HD-Algenib',
-                    provider: document.getElementById('ttsProvider').value
+                    voice_name: voiceName,
+                    provider: provider
                 })
             });
 
@@ -1234,6 +1280,94 @@
         const byteArray = new Uint8Array(byteNumbers);
         return new Blob([byteArray], { type: mimeType });
     }
+
+    async function updatePackages() {
+        if (!sessionId) return;
+        try {
+            const res = await fetch(`/api/session/${sessionId}/packages`);
+            const packages = await res.json();
+
+            const container = document.getElementById('packages-container');
+            const list = document.getElementById('packages-list');
+
+            if (packages.length > 0) {
+                container.style.display = 'block';
+                list.innerHTML = ''; // Clear current
+
+                packages.forEach(pkg => {
+                    const pkgDiv = document.createElement('div');
+                    pkgDiv.style.cssText = "border: 1px solid #eee; border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #fdfdfd;";
+
+                    let itemsHtml = '';
+                    if (pkg.items && pkg.items.length > 0) {
+                        itemsHtml = '<ul style="padding-left: 20px; margin: 5px 0;">';
+                        pkg.items.forEach(item => {
+                            const statusColor = item.status === 'booked' ? 'green' : (item.status === 'failed' ? 'red' : '#555');
+                            itemsHtml += `<li>
+                                <strong>${item.name}</strong> (${item.item_type}) - $${item.price} 
+                                <span style="font-size:0.8em; color:${statusColor}">[${item.status}]</span>
+                            </li>`;
+                        });
+                        itemsHtml += '</ul>';
+                    } else {
+                        itemsHtml = '<p style="font-size:0.9em; color:#888;">No items yet.</p>';
+                    }
+
+                    let actionButton = '';
+                    if (pkg.status === 'draft' && pkg.items.length > 0) {
+                        actionButton = `<button onclick="bookPackage('${pkg.id}')" style="background: #28a745; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer; margin-top: 5px;">Book Package ($${pkg.total_price})</button>`;
+                    } else if (pkg.status === 'booked') {
+                        actionButton = `<span style="color: green; font-weight: bold;">✅ Booked!</span>`;
+                    } else if (pkg.status === 'failed') {
+                        actionButton = `<span style="color: red; font-weight: bold;">❌ Failed</span>`;
+                    }
+
+                    pkgDiv.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="margin:0; color:#333;">${pkg.title}</h4>
+                            <span style="font-size:0.8em; background:#eee; padding:2px 6px; border-radius:4px;">${pkg.type}</span>
+                        </div>
+                        ${itemsHtml}
+                        <div style="text-align:right; margin-top:5px;">
+                            ${actionButton}
+                        </div>
+                    `;
+                    list.appendChild(pkgDiv);
+                });
+            } else {
+                container.style.display = 'none';
+            }
+        } catch (e) {
+            console.error("Failed to fetch packages", e);
+        }
+    }
+
+    // Expose bookPackage to window
+    window.bookPackage = async function (pkgId) {
+        if (!sessionId) return;
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Booking...";
+
+        try {
+            const res = await fetch(`/api/packages/${sessionId}/${pkgId}/book`, { method: 'POST' });
+            const result = await res.json();
+
+            if (result.status === 'success') {
+                alert("Booking Successful!");
+            } else {
+                alert("Booking Failed: " + result.message);
+            }
+            // Refresh
+            updatePackages();
+        } catch (e) {
+            alert("Error booking package");
+            console.error(e);
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    };
 </script>
 
 </body>
