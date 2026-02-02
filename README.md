@@ -1,14 +1,21 @@
-# Google ADK Voice Chatbot
+# Ray and Rae: AI Package Assistant
 
-This project implements a voice chatbot using **Google's Agent Development Kit (ADK)**.
-It uses the **Google Search Tool** to answer queries and provides a web-based voice interface.
+**Ray and Rae** is an intelligent AI assistant designed to create and book packages for holidays, parties, shopping, and local activities.
+
+Built on the **Google Agent Development Kit (ADK)** and **Gemini 2.0 Flash**, it features:
+*   **Natural Voice Interface**: Talk to Ray and Rae to plan your trip or event.
+*   **Dynamic Packaging**: The agent intelligently groups items (flights, hotels, tickets) into "Packages".
+*   **One-Click Booking**: Simulate booking entire packages with automatic rollback handling for failures.
+*   **3D Avatars**: Interact with 3D avatars (GLB/VRM) for a more immersive experience.
 
 ## Prerequisites
 
 1.  **Python 3.10+**
-2.  **Google Cloud Project** with:
-    *   **Gemini API** (Vertex AI or AI Studio)
-    *   **Custom Search API**
+2.  **API Keys**:
+    *   **GOOGLE_API_KEY**: Gemini Model access.
+    *   **GOOGLE_CSE_ID** & **GOOGLE_CSE_API_KEY**: For real-time search capabilities.
+    *   **(Optional) OPENAI_API_KEY**: For OpenAI TTS voices.
+    *   **(Optional) ELEVENLABS_API_KEY**: For ElevenLabs TTS voices.
 
 ## Setup
 
@@ -17,24 +24,31 @@ It uses the **Google Search Tool** to answer queries and provides a web-based vo
     pip install -r requirements.txt
     ```
 
-2.  **Get API Keys**:
-    *   **GOOGLE_API_KEY**: Get from [Google AI Studio](https://aistudio.google.com/).
-    *   **GOOGLE_CSE_ID**: Create a search engine at [Programmable Search Engine](https://programmablesearchengine.google.com/).
-    *   **GOOGLE_CSE_API_KEY**: Get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
-
-3.  **Set Environment Variables**:
+2.  **Configure Environment**:
+    Create a `secrets.sh` file (ignored by git) or set variables directly:
     ```bash
-    export GOOGLE_API_KEY="your_gemini_key"
+    export GOOGLE_API_KEY="your_key"
     export GOOGLE_CSE_ID="your_cse_id"
     export GOOGLE_CSE_API_KEY="your_cse_key"
+    export OPENAI_API_KEY="your_openai_key" # Optional
     ```
 
 ## Running
 
-Run the application:
+Start the server:
 ```bash
-sh run.sh
+source secrets.sh && python3 app.py
 ```
 
-Open your browser to `http://localhost:8000`.
-Click the microphone button and ask a question!
+1.  Open **`http://localhost:8001`**.
+2.  **Speak** to Ray and Rae: *"I want to plan a dinosaur-themed birthday party."*
+3.  **Watch** as packages appear in the right-hand panel.
+4.  **Click "Book Package"** to complete the simulated transaction.
+
+## Features
+
+*   **Session Management**: Remembers context during your conversation.
+*   **Package API**:
+    *   `GET /api/session/{id}/packages`: Retrieve current packages.
+    *   `POST /api/packages/{id}/book`: Execute booking transaction.
+*   **Mock Booking Service**: Simulates API calls with success/failure probability for testing rollback logic.
