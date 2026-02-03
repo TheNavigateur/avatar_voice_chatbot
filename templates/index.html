@@ -296,6 +296,42 @@
 
 
 
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            justify-content: flex-start;
+            padding: 0 20px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .nav-tab {
+            background: none;
+            border: none;
+            padding: 10px 15px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 3px solid transparent;
+        }
+
+        .nav-tab.active {
+            color: #4285f4;
+            border-bottom: 3px solid #4285f4;
+        }
+
+        .nav-tab:hover {
+            color: #333;
+        }
+
+        /* Panel Content */
+        .panel-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .main-content {
@@ -367,14 +403,38 @@
         </div>
 
         <div class="right-panel">
+            <!-- Navigation Tabs -->
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="switchTab('packages')">Packages</button>
+                <button class="nav-tab" onclick="switchTab('aboutme')">About Me</button>
+            </div>
+
             <div id="packages-container"
                 style="background: white; padding: 1rem; border-radius: 15px; margin-bottom: 1rem; width: 100%; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 200px; display: none;">
-                <h3 style="margin-top: 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem;">
+                <h3 id="panel-heading"
+                    style="margin-top: 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem;">
                     Your Packages</h3>
                 <div id="packages-list">
                     <p style="color: #999; font-style: italic;">No packages created yet. Chat to start planning!</p>
                 </div>
             </div>
+
+            <div id="aboutme-container"
+                style="background: white; padding: 1rem; border-radius: 15px; margin-bottom: 1rem; width: 100%; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 200px; display: none;">
+                <h3 style="margin-top: 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem;">
+                    About Me</h3>
+                <div style="display: flex; flex-direction: column; height: 100%;">
+                    <p style="font-size: 0.8rem; color: #666; margin-bottom: 5px;">Edit your profile (Markdown
+                        supported)</p>
+                    <textarea id="profile-editor"
+                        style="width: 100%; min-height: 150px; font-family: monospace; padding: 10px; border-radius: 8px; border: 1px solid #ccc; resize: vertical; box-sizing: border-box;"></textarea>
+                    <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                        <button class="action-btn" onclick="saveProfile()" style="font-size: 0.9rem;">Save
+                            Profile</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="transcript"></div>
         </div>
     </div>
@@ -1368,6 +1428,82 @@
             btn.textContent = originalText;
         }
     };
+
+    // --- Tab & Profile Logic ---
+    let currentTab = 'packages';
+
+    function switchTab(tab) {
+        currentTab = tab;
+
+        // Update Buttons
+        document.querySelectorAll('.nav-tab').forEach(b => {
+            if (b.innerText.toLowerCase().replace(' ', '') === tab) { // simple match
+                b.classList.add('active');
+            } else {
+                b.classList.remove('active');
+            }
+            // Better match based on onclick attr or index? 
+            // Let's just assume order or use event if passed.
+        });
+        // Actually, easier to toggle classes based on clicked element if passed, 
+        // but since I used inline onclick="switchTab('packages')", I don't have 'this' easily unless passed.
+        // Let's rely on re-querying.
+
+        const tabs = document.querySelectorAll('.nav-tab');
+        if (tab === 'packages') {
+            tabs[0].classList.add('active');
+            tabs[1].classList.remove('active');
+
+            document.getElementById('packages-container').style.display = 'block';
+            document.getElementById('aboutme-container').style.display = 'none';
+            // document.getElementById('panel-heading').textContent = "Your Packages"; // Heading is inside containers now
+            updatePackages();
+        } else {
+            tabs[0].classList.remove('active');
+            tabs[1].classList.add('active');
+
+            document.getElementById('packages-container').style.display = 'none';
+            document.getElementById('aboutme-container').style.display = 'block';
+            loadProfile();
+        }
+    }
+
+    async function loadProfile() {
+        try {
+            const res = await fetch(`/api/profile/web_user`);
+            const data = await res.json();
+            document.getElementById('profile-editor').value = data.content;
+        } catch (e) {
+            console.error("Failed to load profile", e);
+        }
+    }
+
+    async function saveProfile() {
+        const content = document.getElementById('profile-editor').value;
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = "Saving...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`/api/profile/web_user`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content })
+            });
+            // alert("Profile Saved!");
+            btn.textContent = "Saved!";
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 2000);
+        } catch (e) {
+            console.error("Failed to save profile", e);
+            alert("Error saving profile");
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    }
 </script>
 
 </body>

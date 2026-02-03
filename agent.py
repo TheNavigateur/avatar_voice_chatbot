@@ -12,6 +12,8 @@ from models import PackageItem, PackageType
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from profile_service import ProfileService
+
 # --- Tool Wrappers for Agent ---
 def create_new_package_tool(session_id: str, title: str, package_type: str = "mixed"):
     """
@@ -47,6 +49,16 @@ def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, i
         return f"Added {item_name} to package {pkg.title}. Total items: {len(pkg.items)}. Total Price: {pkg.total_price}"
     return "Failed to find package."
 
+def update_profile_memory_tool(user_id: str, fact: str):
+    """
+    Saves a persistent fact about the user to their profile.
+    Args:
+        user_id: The user's ID.
+        fact: The fact to save (e.g., 'User is vegan', 'User likes easy hiking').
+    """
+    new_content = ProfileService.append_to_profile(user_id, fact)
+    return f"Saved to profile: {fact}"
+
 
 class VoiceAgent:
     def __init__(self):
@@ -64,6 +76,9 @@ class VoiceAgent:
         """
         logger.info(f"Processing message: {message}")
         
+        # Get User Profile Context
+        user_profile = ProfileService.get_profile(user_id)
+        
         # Initialize Model, Agent, and Runner for EACH request
         model = Gemini(model="gemini-2.0-flash")
         
@@ -76,25 +91,33 @@ class VoiceAgent:
             """Adds an item to a package. Use this to populate the package."""
             return add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description)
 
+        def save_user_info_bound(fact: str):
+            """Saves a permanent fact or preference about the user to their 'About Me' profile."""
+            return update_profile_memory_tool(user_id, fact)
+
         agent = Agent(
             name="ray_and_rae",
             model=model,
-            tools=[perform_google_search, create_package_bound, add_item_bound],
-            instruction="""You are "Ray and Rae", an intelligent AI assistant who helps users plan holidays, parties, shopping trips, and local activities.
+            tools=[perform_google_search, create_package_bound, add_item_bound, save_user_info_bound],
+            instruction=f"""You are "Ray and Rae", an intelligent AI assistant who helps users plan holidays, parties, shopping trips, and local activities.
+            
+            **User Profile (Read-Only Context):**
+            {user_profile}
             
             **Your Goal:**
             Gather requirements from the user until you have enough information to create a concrete "Package".
             
             **How to work:**
-            1.  **Discuss & Clarify:** Talk to the user to understand what they want (destination, theme, dates, budget).
-            2.  **Create Package (`create_package_bound`):** ONCE you have a clear idea (e.g., "Holiday to Paris" or "Dinosaur Birthday Party"), call this tool to start a package. The tool returns a PACKAGE_ID.
-            3.  **Add Items (`add_item_bound`):** Immediately after creating a package, or when new details are agreed upon, add specific items (Flights, Hotels, Cakes, Tickets) to that package using the PACKAGE_ID.
-            4.  **Confirm:** Tell the user what you have added and ask if they want to book it.
+            1.  **Check Profile:** Always use the user's profile context (above) to personalize suggestions.
+            2.  **Discuss & Clarify:** Talk to the user.
+            3.  **Update Profile (`save_user_info_bound`):** If the user tells you a PERMANENT preference (e.g., "I am vegan", "I have 2 kids"), SAVE IT immediately.
+            4.  **Create Package (`create_package_bound`):** Start a package when appropriate.
+            5.  **Add Items (`add_item_bound`):** Populate the package.
             
             **Important Rules:**
-            -   Do not create a package immediately if the user is just saying "hello". Wait for intent.
             -   "A Package" is something that can be paid for directly.
-            -   Use Google Search to find real prices and options if the user asks or if you need to estimate.
+            -   Use Google Search for real prices/options.
+            -   **Memory:** If you learn something new and enduring about the user, use `save_user_info_bound`.
             
             **Expression Tagging:**
             -   Begin every response with `[Expression: EmotionName]`.

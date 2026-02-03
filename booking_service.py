@@ -2,44 +2,131 @@ import uuid
 from typing import List, Optional, Dict
 from models import Package, PackageItem, BookingStatus, PackageType
 import logging
+from database import get_db_connection
+import json
 
 logger = logging.getLogger(__name__)
 
-# In-memory storage for prototype
-# Map session_id -> List[Package]
-package_store: Dict[str, List[Package]] = {}
-
 class BookingService:
-    
     @staticmethod
     def get_packages(session_id: str) -> List[Package]:
-        return package_store.get(session_id, [])
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM packages WHERE session_id = ?", (session_id,))
+        rows = c.fetchall()
+        
+        packages = []
+        for row in rows:
+            pkg_id = row['id']
+            # Get items for this package
+            c.execute("SELECT * FROM package_items WHERE package_id = ?", (pkg_id,))
+            item_rows = c.fetchall()
+            items = []
+            for item in item_rows:
+                items.append(PackageItem(
+                    id=item['id'],
+                    name=item['name'],
+                    item_type=item['item_type'],
+                    price=item['price'],
+                    status=BookingStatus(item['status']),
+                    description=item['description']
+                ))
+            
+            packages.append(Package(
+                id=pkg_id,
+                session_id=row['session_id'],
+                title=row['title'],
+                type=PackageType(row['type']),
+                status=BookingStatus(row['status']),
+                total_price=row['total_price'],
+                items=items
+            ))
+        conn.close()
+        return packages
 
     @staticmethod
     def get_package(session_id: str, package_id: str) -> Optional[Package]:
-        packages = package_store.get(session_id, [])
-        for p in packages:
-            if p.id == package_id:
-                return p
-        return None
+        # Reuse get_packages logic but filter? Or direct query.
+        # Direct query is better.
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM packages WHERE id = ? AND session_id = ?", (package_id, session_id))
+        row = c.fetchone()
+        
+        if not row:
+            conn.close()
+            return None
+        
+        pkg_id = row['id']
+        c.execute("SELECT * FROM package_items WHERE package_id = ?", (pkg_id,))
+        item_rows = c.fetchall()
+        items = []
+        for item in item_rows:
+            items.append(PackageItem(
+                id=item['id'],
+                name=item['name'],
+                item_type=item['item_type'],
+                price=item['price'],
+                status=BookingStatus(item['status']),
+                description=item['description']
+            ))
+        
+        conn.close()
+        return Package(
+            id=pkg_id,
+            session_id=row['session_id'],
+            title=row['title'],
+            type=PackageType(row['type']),
+            status=BookingStatus(row['status']),
+            total_price=row['total_price'],
+            items=items
+        )
 
     @staticmethod
     def create_package(session_id: str, title: str, type: PackageType = PackageType.MIXED) -> Package:
-        if session_id not in package_store:
-            package_store[session_id] = []
+        conn = get_db_connection()
+        c = conn.cursor()
         
-        new_package = Package(session_id=session_id, title=title, type=type)
-        package_store[session_id].append(new_package)
-        return new_package
+        new_id = str(uuid.uuid4())
+        c.execute("""
+            INSERT INTO packages (id, session_id, title, type, status, total_price)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (new_id, session_id, title, type, BookingStatus.DRAFT, 0.0))
+        
+        conn.commit()
+        conn.close()
+        
+        # Return object
+        return Package(id=new_id, session_id=session_id, title=title, type=type)
 
     @staticmethod
     def add_item_to_package(session_id: str, package_id: str, item: PackageItem) -> Optional[Package]:
-        package = BookingService.get_package(session_id, package_id)
-        if package:
-            package.items.append(item)
-            package.calculate_total()
-            return package
-        return None
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # Verify package exists
+        c.execute("SELECT id FROM packages WHERE id = ? AND session_id = ?", (package_id, session_id))
+        if not c.fetchone():
+            conn.close()
+            return None
+            
+        c.execute("""
+            INSERT INTO package_items (id, package_id, name, item_type, price, status, description, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (item.id, package_id, item.name, item.item_type, item.price, item.status, item.description, json.dumps(item.metadata)))
+        
+        # Update total price of package
+        # Simplified: sum query
+        c.execute("SELECT sum(price) as total FROM package_items WHERE package_id = ?", (package_id,))
+        res = c.fetchone()
+        new_total = res['total'] if res['total'] else 0.0
+        
+        c.execute("UPDATE packages SET total_price = ? WHERE id = ?", (new_total, package_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return BookingService.get_package(session_id, package_id)
 
     @staticmethod
     async def execute_booking(package: Package) -> Dict:
@@ -47,8 +134,14 @@ class BookingService:
         Simulates booking all items in a package.
         Returns result dict.
         """
+        conn = get_db_connection()
+        c = conn.cursor()
+        
         success_items = []
         failed_items = []
+        
+        # Re-fetch items from DB to be safe
+        # Or just use package.items provided
         
         for item in package.items:
             try:
@@ -59,25 +152,41 @@ class BookingService:
                 if "fail" in item.name.lower():
                     raise Exception("Mock booking failure")
                 
+                # Update DB status
+                c.execute("UPDATE package_items SET status = ? WHERE id = ?", (BookingStatus.BOOKED, item.id))
                 item.status = BookingStatus.BOOKED
                 success_items.append(item)
                 
             except Exception as e:
                 logger.error(f"Failed to book {item.name}: {e}")
+                # Update DB status
+                c.execute("UPDATE package_items SET status = ? WHERE id = ?", (BookingStatus.FAILED, item.id))
                 item.status = BookingStatus.FAILED
                 failed_items.append(item)
         
+        conn.commit() # Commit partial progress
+        conn.close()
+        
         if failed_items:
-            # Critical failure logic could go here
-            # For now, if ANY fail, we might want to flag the package as PARTIAL or perform ROLLBACK
-            # The prompt requested: "rollback it all back upon any critical failure"
-            
-            # Let's assume generic failures are critical for now unless specified
             logger.info("Critical failure detected. Rolling back...")
             await BookingService.rollback_booking(package, success_items)
+            
+            # Update Package Status
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("UPDATE packages SET status = ? WHERE id = ?", (BookingStatus.FAILED, package.id))
+            conn.commit()
+            conn.close()
+            
             package.status = BookingStatus.FAILED
             return {"status": "failed", "message": "Booking failed. Transaction rolled back.", "failed_items": [i.name for i in failed_items]}
         else:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("UPDATE packages SET status = ? WHERE id = ?", (BookingStatus.BOOKED, package.id))
+            conn.commit()
+            conn.close()
+            
             package.status = BookingStatus.BOOKED
             return {"status": "success", "message": "All items booked successfully!"}
 
@@ -86,9 +195,13 @@ class BookingService:
         """
         Reverses bookings for items that were successful.
         """
+        conn = get_db_connection()
+        c = conn.cursor()
         for item in booked_items:
             logger.info(f"Rolling back item: {item.name}")
-            item.status = BookingStatus.DRAFT # Reset to draft or cancelled
-            # In real life, call refund API
-            
+            c.execute("UPDATE package_items SET status = ? WHERE id = ?", (BookingStatus.DRAFT, item.id))
+            item.status = BookingStatus.DRAFT
+        conn.commit()
+        conn.close()
+        
         package.status = BookingStatus.FAILED

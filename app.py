@@ -15,6 +15,12 @@ app = FastAPI()
 
 from models import Package, PackageItem, BookingStatus
 from booking_service import BookingService
+from profile_service import ProfileService
+from database import init_db
+from pydantic import BaseModel
+
+# Initialize DB
+init_db()
 
 # Mount static files if needed (we'll just use templates for now)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -33,13 +39,25 @@ class TTSRequest(BaseModel):
     voice_name: str = "en-GB-Chirp3-HD-Algenib"
     provider: str = "google" # google, openai, elevenlabs
 
+class ProfileUpdateRequest(BaseModel):
+    content: str
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+@app.get("/api/profile/{user_id}")
+async def get_profile(user_id: str):
+    return {"content": ProfileService.get_profile(user_id)}
+
+@app.post("/api/profile/{user_id}")
+async def update_profile(user_id: str, request: ProfileUpdateRequest):
+    ProfileService.update_profile(user_id, request.content)
+    return {"status": "success"}
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    user_id = "web_user"
+    user_id = "web_user" # Hardcoded for now, could be dynamic session_id if we want unique profiles per session
     session_id = request.session_id or str(uuid.uuid4())
     
     if not request.message:
