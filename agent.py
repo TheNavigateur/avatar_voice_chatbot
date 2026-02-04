@@ -13,6 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from profile_service import ProfileService
+from memory_agent import MemoryAgent
 
 # --- Tool Wrappers for Agent ---
 def create_new_package_tool(session_id: str, title: str, package_type: str = "mixed"):
@@ -69,6 +70,7 @@ class VoiceAgent:
         # Initialize Session Service (no app_name argument)
         # We keep this global to persist sessions across requests
         self.session_service = InMemorySessionService()
+        self.memory_agent = MemoryAgent()
 
     def process_message(self, user_id: str, session_id: str, message: str) -> str:
         """
@@ -76,7 +78,51 @@ class VoiceAgent:
         """
         logger.info(f"Processing message: {message}")
         
-        # Get User Profile Context
+        # --- ACTIVE MEMORY: Structured Rewrite ---
+        try:
+            # 1. Get current profile
+            current_profile = ProfileService.get_profile(user_id)
+            
+            # 2. Get context (Last Bot Message) from Session Service
+            last_bot_message = "None (Start of conversation)"
+            
+            # We need to fetch the session blindly first to get history
+            # This is a bit chicken-and-egg as runner creates session if missing, 
+            # but we can try to peek.
+            try:
+                 session = self.session_service.get_session_sync(app_name="voice_bot_app", user_id=user_id, session_id=session_id)
+                 if session and session.events:
+                     # Find last model message
+                     for i in range(len(session.events) - 1, -1, -1):
+                         event = session.events[i]
+                         # Check for model text content
+                         if getattr(event, 'author', '') == 'model' or getattr(event, 'role', '') == 'model':
+                             # Extract text (simplified extraction logic similar to bottom of file)
+                             text = ""
+                             if hasattr(event, 'text') and event.text: text = event.text
+                             elif hasattr(event, 'content'):
+                                 if hasattr(event.content, 'parts'):
+                                     text = " ".join([p.text for p in event.content.parts if hasattr(p, 'text') and p.text])
+                                 elif hasattr(event.content, 'text'):
+                                     text = event.content.text
+                             
+                             if text:
+                                 last_bot_message = text
+                                 break
+            except Exception as e:
+                logger.warning(f"Could not fetch session history for memory context: {e}")
+
+            # 3. Rewrite Profile
+            logger.info(f"Updating profile with context: User='{message}', Bot='{last_bot_message[:50]}...'")
+            new_profile = self.memory_agent.update_structured_profile(current_profile, last_bot_message, message)
+            
+            # 4. Save
+            ProfileService.update_profile(user_id, new_profile)
+            
+        except Exception as e:
+            logger.error(f"Failed to execute Active Memory update: {e}")
+
+        # Re-fetch updated profile for the Main Agent context
         user_profile = ProfileService.get_profile(user_id)
         
         # Initialize Model, Agent, and Runner for EACH request

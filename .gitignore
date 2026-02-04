@@ -33,3 +33,4 @@ gcp_sa_key.json
 *.json
 docker.env
 *.env
+app.db
