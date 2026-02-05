@@ -1358,37 +1358,63 @@
                     const pkgDiv = document.createElement('div');
                     pkgDiv.style.cssText = "border: 1px solid #eee; border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #fdfdfd;";
 
-                    let itemsHtml = '';
-                    if (pkg.items && pkg.items.length > 0) {
-                        itemsHtml = '<ul style="padding-left: 20px; margin: 5px 0;">';
-                        pkg.items.forEach(item => {
+                    // Filter items
+                    const travelItems = pkg.items.filter(i => ['flight', 'hotel', 'activity'].includes(i.item_type));
+                    const productItems = pkg.items.filter(i => i.item_type === 'product');
+
+                    const travelTotal = travelItems.reduce((sum, i) => sum + i.price, 0);
+                    const productTotal = productItems.reduce((sum, i) => sum + i.price, 0);
+
+                    // --- Render Travel Section ---
+                    let travelHtml = '';
+                    if (travelItems.length > 0) {
+                        travelHtml += `<div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
+                            <h5 style="margin:0 0 5px 0; color:#555;">✈️ Travel & Activities</h5>
+                            <ul style="padding-left: 20px; margin: 5px 0;">`;
+                        travelItems.forEach(item => {
                             const statusColor = item.status === 'booked' ? 'green' : (item.status === 'failed' ? 'red' : '#555');
-                            itemsHtml += `<li>
-                                <strong>${item.name}</strong> (${item.item_type}) - $${item.price} 
-                                <span style="font-size:0.8em; color:${statusColor}">[${item.status}]</span>
-                            </li>`;
+                            travelHtml += `<li><strong>${item.name}</strong> - £${item.price} <span style="font-size:0.8em; color:${statusColor}">[${item.status}]</span></li>`;
                         });
-                        itemsHtml += '</ul>';
-                    } else {
-                        itemsHtml = '<p style="font-size:0.9em; color:#888;">No items yet.</p>';
+                        travelHtml += `</ul>
+                            <div style="text-align:right; font-weight:bold; margin-top:5px;">Subtotal: £${travelTotal}</div>
+                        </div>`;
                     }
 
+                    // --- Render Product Section ---
+                    let productHtml = '';
+                    if (productItems.length > 0) {
+                        productHtml += `<div>
+                            <h5 style="margin:0 0 5px 0; color:#555;">🛍️ Shopping List</h5>
+                            <ul style="padding-left: 20px; margin: 5px 0;">`;
+                        productItems.forEach(item => {
+                            // Create Amazon Search Link
+                            const amzLink = `https://www.amazon.co.uk/s?k=${encodeURIComponent(item.name)}&tag=rayandrae-21`;
+                            productHtml += `<li>
+                                <strong>${item.name}</strong> - ~£${item.price} 
+                                <a href="${amzLink}" target="_blank" style="font-size:0.9em; color:#ff9900; text-decoration:none; margin-left:5px;">[Buy on Amazon ↗]</a>
+                             </li>`;
+                        });
+                        productHtml += `</ul>
+                            <div style="text-align:right; font-weight:bold; margin-top:5px;">Est. Cost: £${productTotal}</div>
+                        </div>`;
+                    }
+
+                    // --- Action Buttons ---
                     let actionButton = '';
-                    if (pkg.status === 'draft' && pkg.items.length > 0) {
-                        actionButton = `<button onclick="bookPackage('${pkg.id}')" style="background: #28a745; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer; margin-top: 5px;">Book Package ($${pkg.total_price})</button>`;
+                    if (pkg.status === 'draft' && travelItems.length > 0) {
+                        actionButton = `<button onclick="bookPackage('${pkg.id}')" style="background: #28a745; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer; margin-top: 5px;">Pay Agent for Travel (£${travelTotal})</button>`;
                     } else if (pkg.status === 'booked') {
-                        actionButton = `<span style="color: green; font-weight: bold;">✅ Booked!</span>`;
-                    } else if (pkg.status === 'failed') {
-                        actionButton = `<span style="color: red; font-weight: bold;">❌ Failed</span>`;
+                        actionButton = `<span style="color: green; font-weight: bold;">✅ Travel Booked!</span>`;
                     }
 
                     pkgDiv.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                             <h4 style="margin:0; color:#333;">${pkg.title}</h4>
                             <span style="font-size:0.8em; background:#eee; padding:2px 6px; border-radius:4px;">${pkg.type}</span>
                         </div>
-                        ${itemsHtml}
-                        <div style="text-align:right; margin-top:5px;">
+                        ${travelHtml}
+                        ${productHtml}
+                        <div style="text-align:right; margin-top:10px; border-top: 2px solid #eee; padding-top:10px;">
                             ${actionButton}
                         </div>
                     `;
