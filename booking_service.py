@@ -23,13 +23,19 @@ class BookingService:
             item_rows = c.fetchall()
             items = []
             for item in item_rows:
+                try:
+                    meta = json.loads(item['metadata']) if item['metadata'] else {}
+                except:
+                    meta = {}
+
                 items.append(PackageItem(
                     id=item['id'],
                     name=item['name'],
                     item_type=item['item_type'],
                     price=item['price'],
                     status=BookingStatus(item['status']),
-                    description=item['description']
+                    description=item['description'],
+                    metadata=meta
                 ))
             
             packages.append(Package(
@@ -62,13 +68,19 @@ class BookingService:
         item_rows = c.fetchall()
         items = []
         for item in item_rows:
+            try:
+                meta = json.loads(item['metadata']) if item['metadata'] else {}
+            except:
+                meta = {}
+
             items.append(PackageItem(
                 id=item['id'],
                 name=item['name'],
                 item_type=item['item_type'],
                 price=item['price'],
                 status=BookingStatus(item['status']),
-                description=item['description']
+                description=item['description'],
+                metadata=meta
             ))
         
         conn.close()

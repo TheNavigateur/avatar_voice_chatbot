@@ -32,6 +32,7 @@ from typing import Optional
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
+    region: str = "UK" # Default to UK
 
 class TTSRequest(BaseModel):
     text: str
@@ -63,7 +64,7 @@ async def chat(request: ChatRequest):
     if not request.message:
         raise HTTPException(status_code=400, detail="Message is empty")
 
-    response_text = voice_agent.process_message(user_id, session_id, request.message)
+    response_text = voice_agent.process_message(user_id, session_id, request.message, region=request.region)
     
     return JSONResponse(content={
         "response": response_text,

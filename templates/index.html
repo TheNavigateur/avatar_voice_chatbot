@@ -987,7 +987,94 @@
     window.addEventListener('load', initThreeJS);
 
     // Avatar Selector
+    // --- Region Config ---
+    window.REGION_CONFIG = {
+        'UK': {
+            currency: '£',
+            tld: 'co.uk',
+            tag: 'rayandrae-21',
+            label: '🇬🇧 UK'
+        },
+        'IN': {
+            currency: '₹',
+            tld: 'in',
+            tag: 'rayandrae-21',
+            label: '🇮🇳 India'
+        },
+        'US': {
+            currency: '$',
+            tld: 'com',
+            tag: 'rayandrae-21',
+            label: '🇺🇸 USA'
+        },
+        'CA': {
+            currency: 'C$',
+            tld: 'ca',
+            tag: 'rayandrae-21',
+            label: '🇨🇦 Canada'
+        },
+        'AU': {
+            currency: 'A$',
+            tld: 'com.au',
+            tag: 'rayandrae-21',
+            label: '🇦🇺 Australia'
+        }
+    };
+    window.currentRegion = localStorage.getItem('user_region') || 'US'; // Default global to US
+
     const avatarSelector = document.getElementById('avatarSelector');
+    // Inject Region Selector dynamically if not present
+    if (avatarSelector && !document.getElementById('regionSelector')) {
+        const regionSel = document.createElement('select');
+        regionSel.id = 'regionSelector';
+        regionSel.className = 'avatar-selector';
+        regionSel.style.marginRight = '10px';
+        regionSel.innerHTML = `
+            <option value="US">🇺🇸 USA ($)</option>
+            <option value="UK">🇬🇧 UK (£)</option>
+            <option value="IN">🇮🇳 India (₹)</option>
+            <option value="CA">🇨🇦 Canada (C$)</option>
+            <option value="AU">🇦🇺 Australia (A$)</option>
+            <option value="OTHER">🌍 Other (USA Prices)</option>
+        `;
+        regionSel.value = window.currentRegion;
+        regionSel.onchange = (e) => {
+            window.currentRegion = e.target.value;
+            localStorage.setItem('user_region', window.currentRegion);
+            if (window.updatePackages) window.updatePackages();
+        };
+        avatarSelector.parentNode.insertBefore(regionSel, avatarSelector);
+    }
+
+    // Automatic Region Detection (if not set)
+    if (!localStorage.getItem('user_region')) {
+        fetch('https://ipapi.co/json/')
+            .then(res => res.json())
+            .then(data => {
+                const country = data.country_code; // e.g. "GB", "IN"
+                let detectedRegion = 'US'; // Default Global
+
+                if (['GB', 'IM', 'JE', 'GG'].includes(country)) detectedRegion = 'UK';
+                else if (country === 'IN') detectedRegion = 'IN';
+                else if (country === 'CA') detectedRegion = 'CA';
+                else if (country === 'AU') detectedRegion = 'AU';
+                else if (country === 'US') detectedRegion = 'US';
+                else detectedRegion = 'OTHER';
+
+                console.log(`🌍 Detected Region: ${detectedRegion} (from ${country})`);
+                window.currentRegion = detectedRegion;
+                localStorage.setItem('user_region', detectedRegion);
+
+                // Update Selector UI
+                const sel = document.getElementById('regionSelector');
+                if (sel) sel.value = detectedRegion;
+
+                // Refresh Packages
+                if (window.updatePackages) window.updatePackages();
+            })
+            .catch(err => console.warn("Region detection failed:", err));
+    }
+
     if (avatarSelector) {
         avatarSelector.addEventListener('change', (e) => {
             loadCurrentAvatar();
@@ -1060,7 +1147,11 @@
             setBotStatusMessage("Thinking...", 'left');
 
             try {
-                const requestBody = { message: transcript };
+                // Pass REGION to backend
+                const requestBody = {
+                    message: transcript,
+                    region: currentRegion
+                };
                 if (sessionId) requestBody.session_id = sessionId;
 
                 const response = await fetch('/chat', {
@@ -1350,6 +1441,27 @@
             const container = document.getElementById('packages-container');
             const list = document.getElementById('packages-list');
 
+            // Get Config for Current Region
+            const currentR = window.currentRegion || 'US';
+            let config;
+            if (currentR === 'OTHER') {
+                config = window.REGION_CONFIG ? window.REGION_CONFIG['US'] : null; // Fallback to US
+                if (config) {
+                    config = { ...config, label: '🇺🇸 USA (Reference only)' }; // Override label
+                }
+            } else {
+                config = window.REGION_CONFIG ? window.REGION_CONFIG[currentR] : null;
+            }
+
+            // Fallback defaults if config missing
+            const sym = config ? config.currency : '$';
+            const tld = config ? config.tld : 'com';
+            const tag = config ? config.tag : 'rayandrae-21';
+            const regionLabel = config ? config.label : 'USA';
+
+            // If OTHER, we might want to hide the "Add All" button or show a warning
+            const isSupportedRegion = currentR !== 'OTHER';
+
             if (packages.length > 0) {
                 container.style.display = 'block';
                 list.innerHTML = ''; // Clear current
@@ -1360,7 +1472,8 @@
 
                     // Filter items
                     const travelItems = pkg.items.filter(i => ['flight', 'hotel', 'activity'].includes(i.item_type));
-                    const productItems = pkg.items.filter(i => i.item_type === 'product');
+                    // Relaxed filter for shopping items
+                    const productItems = pkg.items.filter(i => !['flight', 'hotel', 'activity'].includes(i.item_type));
 
                     const travelTotal = travelItems.reduce((sum, i) => sum + i.price, 0);
                     const productTotal = productItems.reduce((sum, i) => sum + i.price, 0);
@@ -1373,29 +1486,79 @@
                             <ul style="padding-left: 20px; margin: 5px 0;">`;
                         travelItems.forEach(item => {
                             const statusColor = item.status === 'booked' ? 'green' : (item.status === 'failed' ? 'red' : '#555');
-                            travelHtml += `<li><strong>${item.name}</strong> - £${item.price} <span style="font-size:0.8em; color:${statusColor}">[${item.status}]</span></li>`;
+                            travelHtml += `<li><strong>${item.name}</strong> - ${sym}${item.price} <span style="font-size:0.8em; color:${statusColor}">[${item.status}]</span></li>`;
                         });
                         travelHtml += `</ul>
-                            <div style="text-align:right; font-weight:bold; margin-top:5px;">Subtotal: £${travelTotal}</div>
+                            <div style="text-align:right; font-weight:bold; margin-top:5px;">Subtotal: ${sym}${travelTotal}</div>
                         </div>`;
                     }
 
                     // --- Render Product Section ---
                     let productHtml = '';
                     if (productItems.length > 0) {
+                        // 1. Collect ASINs for the "Add All to Basket" button
+                        let asinParams = '';
+                        let asinCount = 0;
+                        let totalItems = 0;
+
+                        productItems.forEach((item, index) => {
+                            totalItems++;
+                            const pUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : '';
+                            let asinMatch = pUrl.match(/(?:\/dp\/|\/gp\/product\/|\/d\/)([A-Z0-9]{10})/);
+                            if (!asinMatch) asinMatch = pUrl.match(/[?&]ASIN=([A-Z0-9]{10})/);
+
+                            if (asinMatch) {
+                                asinCount++;
+                                const asin = asinMatch[1];
+                                asinParams += `&ASIN.${asinCount}=${asin}&Quantity.${asinCount}=1`;
+                            }
+                        });
+
+
+                        let actionBtnHtml = '';
+                        if (asinCount > 0 && isSupportedRegion) {
+                            // Use TLD from Config
+                            const addAllUrl = `https://www.amazon.${tld}/gp/aws/cart/add.html?AssociateTag=${tag}${asinParams}`;
+                            const btnText = (asinCount === totalItems)
+                                ? `Add All ${asinCount} to Cart 🛒`
+                                : `Add ${asinCount}/${totalItems} to Cart 🛒`;
+
+                            actionBtnHtml = `<a href="${addAllUrl}" target="_blank" style="font-size:0.75rem; background:#f0c14b; color:#111; border:1px solid #a88734; padding:4px 10px; border-radius:3px; text-decoration:none; cursor:pointer; font-weight:bold;">${btnText}</a>`;
+                        } else if (!isSupportedRegion) {
+                            actionBtnHtml = `<span style="font-size:0.7rem; color:#888;">(Local cart not supported)</span>`;
+                        } else {
+                            actionBtnHtml = `<button onclick="openAllAmazonLinks('${pkg.id}')" style="font-size:0.75rem; background:#eee; color:#333; border:1px solid #ccc; padding:2px 8px; border-radius:4px; cursor:pointer;">Open All Tabs ↗</button>`;
+                        }
+
                         productHtml += `<div>
-                            <h5 style="margin:0 0 5px 0; color:#555;">🛍️ Shopping List</h5>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <h5 style="margin:0 0 5px 0; color:#555;">🛍️ Shopping List (${regionLabel})</h5>
+                                ${actionBtnHtml}
+                            </div>
                             <ul style="padding-left: 20px; margin: 5px 0;">`;
+
                         productItems.forEach(item => {
-                            // Create Amazon Search Link
-                            const amzLink = `https://www.amazon.co.uk/s?k=${encodeURIComponent(item.name)}&tag=rayandrae-21`;
-                            productHtml += `<li>
-                                <strong>${item.name}</strong> - ~£${item.price} 
-                                <a href="${amzLink}" target="_blank" style="font-size:0.9em; color:#ff9900; text-decoration:none; margin-left:5px;">[Buy on Amazon ↗]</a>
+                            // Use specific Product URL if available, else generic search
+                            const imageUrl = (item.metadata && item.metadata.image_url) ? item.metadata.image_url : null;
+                            const directUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : null;
+                            const amzLink = directUrl || `https://www.amazon.${tld}/s?k=${encodeURIComponent(item.name)}&tag=${tag}`;
+
+                            let imgHtml = '';
+                            if (imageUrl) {
+                                imgHtml = `<img src="${imageUrl}" style="width:50px; height:50px; object-fit:contain; border:1px solid #ddd; border-radius:4px; margin-right:10px; vertical-align:middle;">`;
+                            }
+
+                            // Store link in data attribute for "Buy All"
+                            productHtml += `<li style="display:flex; align-items:center; margin-bottom: 5px;">
+                                ${imgHtml}
+                                <span>
+                                    <strong>${item.name}</strong> - ~${sym}${item.price} 
+                                    <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="font-size:0.9em; color:#ff9900; text-decoration:none; margin-left:5px;">[Buy on Amazon ↗]</a>
+                                </span>
                              </li>`;
                         });
                         productHtml += `</ul>
-                            <div style="text-align:right; font-weight:bold; margin-top:5px;">Est. Cost: £${productTotal}</div>
+                            <div style="text-align:right; font-weight:bold; margin-top:5px;">Est. Cost: ${sym}${productTotal}</div>
                         </div>`;
                     }
 
@@ -1427,6 +1590,9 @@
             console.error("Failed to fetch packages", e);
         }
     }
+
+    // Expose updatePackages to window for Region Selector
+    window.updatePackages = updatePackages;
 
     // Expose bookPackage to window
     window.bookPackage = async function (pkgId) {
@@ -1535,6 +1701,17 @@
     window.switchTab = switchTab;
     window.saveProfile = saveProfile;
     window.loadProfile = loadProfile;
+
+    window.openAllAmazonLinks = function (pkgId) {
+        const links = document.querySelectorAll(`.amz-link-${pkgId}`);
+        if (links.length === 0) return;
+
+        if (confirm(`Open ${links.length} Amazon tabs? (Ensure popups are allowed)`)) {
+            links.forEach(link => {
+                window.open(link.href, '_blank');
+            });
+        }
+    };
 
 </script>
 

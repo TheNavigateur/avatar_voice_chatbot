@@ -7,8 +7,43 @@ import base64
 logger = logging.getLogger(__name__)
 
 # DataForSEO Credentials
+# DataForSEO Credentials
 DATAFORSEO_LOGIN = os.environ.get("DATAFORSEO_LOGIN")
 DATAFORSEO_PASSWORD = os.environ.get("DATAFORSEO_PASSWORD")
+
+AMAZON_REGIONS = {
+    "UK": {
+        "location_code": 2826, # United Kingdom
+        "tld": "co.uk",
+        "currency_symbol": "£",
+        "name": "United Kingdom"
+    },
+    "IN": {
+        "location_code": 2356, # India
+        "tld": "in",
+        "currency_symbol": "₹",
+        "name": "India"
+    },
+    "US": {
+        "location_code": 2840, # United States
+        "tld": "com",
+        "currency_symbol": "$",
+        "name": "United States"
+    },
+    "CA": {
+        "location_code": 2124, # Canada
+        "tld": "ca",
+        "currency_symbol": "C$", # or $
+        "name": "Canada"
+    },
+    "AU": {
+        "location_code": 2036, # Australia
+        "tld": "com.au",
+        "currency_symbol": "A$", # or $
+        "name": "Australia"
+    }
+}
+DEFAULT_REGION = "UK"
 
 BASE_URL = "https://api.dataforseo.com/v3/serp/google"
 
@@ -19,13 +54,12 @@ def _get_auth_header():
     token = base64.b64encode(credentials.encode()).decode()
     return {"Authorization": f"Basic {token}", "Content-Type": "application/json"}
 
-def _search_organic_live(query: str):
+def _search_organic_live(query: str, location_code: int = 2840):
     """Generic helper to call Organic Live Advanced"""
     endpoint = f"{BASE_URL}/organic/live/advanced"
     payload = [{
         "keyword": query,
-        "location_code": 2840, # Default US (DataForSEO creates separate engines per location)
-        # Maybe we should let user specify? For now hardcoded or global.
+        "location_code": location_code, 
         "language_code": "en",
         "device": "desktop",
         "os": "windows"
@@ -144,12 +178,14 @@ def search_hotels(location: str, check_in: str, check_out: str, requirements: st
             
     return summary
 
-def search_products(query: str) -> str:
+def search_products(query: str, region: str = "UK") -> str:
     """
     Search for products via Organic SERP (Shopping Results).
     """
+    config = AMAZON_REGIONS.get(region, AMAZON_REGIONS["UK"])
+    
     query_str = f"buy {query}"
-    items, error = _search_organic_live(query_str)
+    items, error = _search_organic_live(query_str, location_code=config["location_code"])
     
     if error: return error
     if not items: return "No product results found."
@@ -178,7 +214,7 @@ def search_products(query: str) -> str:
         link = item.get("url", "#")
         
         # If no explicit price, try to find text
-        if not price and "£" in item.get("description", ""):
+        if not price and config["currency_symbol"] in (item.get("description") or ""):
             # simple extract
             desc = item.get("description", "")
             # (Very basic extraction logic here, agent will have to interpret)
@@ -189,3 +225,315 @@ def search_products(query: str) -> str:
         if count >= 5: break
         
     return summary
+
+def _fetch_amazon_candidates(query: str, region: str = "UK") -> list:
+    """
+    Internal helper to fetch Amazon product candidates from DataForSEO.
+    Applies strict availability filtering.
+    """
+    
+    # 1. Credentials
+    if not DATAFORSEO_LOGIN or not DATAFORSEO_PASSWORD:
+        return []
+
+    config = AMAZON_REGIONS.get(region, AMAZON_REGIONS["UK"])
+    
+    credentials = f"{DATAFORSEO_LOGIN}:{DATAFORSEO_PASSWORD}"
+    token = base64.b64encode(credentials.encode()).decode()
+    headers = {"Authorization": f"Basic {token}", "Content-Type": "application/json"}
+    
+    # 2. Query construction
+    # Use "site:amazon.{tld}" to bias results
+    full_query = f"{query} site:amazon.{config['tld']}".strip()
+    
+    # 3. Endpoint: Google Organic Live
+    url = "https://api.dataforseo.com/v3/serp/google/organic/live/advanced"
+    payload = [{
+        "keyword": full_query,
+        "location_code": config["location_code"], 
+        "language_code": "en",
+        "depth": 50
+    }]
+    
+    try:
+        res = requests.post(url, headers=headers, json=payload)
+        data = res.json()
+        
+        if data.get("status_code") != 20000:
+             logger.error(f"DataForSEO Error: {data.get('status_message')}")
+             return []
+             
+        tasks = data.get("tasks", [])
+        if not tasks: return []
+        
+        result_items = tasks[0].get("result", [])
+        if not result_items: return []
+        
+        items = result_items[0].get("items", [])
+        
+        candidates = []
+        
+        for item in items:
+            # Look for structured shopping blocks
+            if item.get("type") == "popular_products":
+                for sub_item in item.get("items", []):
+                    candidates.append(sub_item)
+            elif item.get("type") == "shopping":
+                candidates.append(item)
+            elif item.get("type") == "organic":
+                candidates.append(item)
+                
+        # Filter and Prioritize
+        valid_candidates = []
+        
+        for cand in candidates:
+            # url = (cand.get("product_url") or cand.get("link") or cand.get("url") or "").lower()
+            # title = (cand.get("title") or "").lower()
+            snippet = (cand.get("description") or cand.get("snippet") or "").lower()
+            
+            # --- STRICT AVAILABILITY CHECK ---
+            # DataForSEO sometimes provides 'availability' or 'stock_status'
+            # We also check for negative keywords in snippet
+            
+            is_unavailable = False
+            
+            # 1. Check explicit fields if present
+            if cand.get("stock_status") == "OutOfStock": is_unavailable = True
+            if cand.get("availability") == "OutOfStock": is_unavailable = True
+            
+            # 2. Check snippet text overrides
+            if "currently unavailable" in snippet: is_unavailable = True
+            if "out of stock" in snippet: is_unavailable = True
+            if "temporarily out of stock" in snippet: is_unavailable = True
+            
+            # 3. STRICT PRICE CHECK:
+            # If there is NO price object and NO price in snippet, it's likely a dead link/out of stock.
+            price_obj = cand.get("price")
+            has_price_obj = price_obj and (price_obj.get("current") or price_obj.get("value") or price_obj.get("displayed_price"))
+            
+            import re
+            sym = re.escape(config["currency_symbol"])
+            has_price_text = re.search(fr'{sym}(\d+\.?\d*)', snippet) is not None
+            
+            if not has_price_obj and not has_price_text:
+                # Logically, if Amazon doesn't show a price on the SERP, it's usually OOS.
+                is_unavailable = True
+            
+            if is_unavailable:
+                continue
+
+            # If it passes availability, we keep it as a potential candidate
+            valid_candidates.append(cand)
+            
+        return valid_candidates
+        
+    except Exception as e:
+        logger.error(f"Error in _fetch_amazon_candidates: {e}")
+        return []
+
+def search_amazon(query: str, region: str = "UK") -> str:
+    """
+    Searches Amazon for available products matching the query.
+    Use this to 'browse' options before selecting one.
+    Returns a summary of top 5 available items.
+    """
+    candidates = _fetch_amazon_candidates(query, region=region)
+    config = AMAZON_REGIONS.get(region, AMAZON_REGIONS["UK"])
+    
+    if not candidates:
+        return f"No available Amazon products found for '{query}' in {config['name']}."
+        
+    # We want to present a diverse list of identifiable Amazon items
+    # Filter for Amazon links primarily for the 'browsing' view
+    amazon_candidates = []
+    seen_titles = set()
+    
+    for cand in candidates:
+        url = (cand.get("product_url") or cand.get("link") or cand.get("url") or "").lower()
+        title = cand.get("title", "Unknown")
+        
+        if title in seen_titles: continue
+        
+        # We prefer actual product pages for the summary
+        if "amazon" in url or "amazon" in title.lower():
+             amazon_candidates.append(cand)
+             seen_titles.add(title)
+             
+    if not amazon_candidates:
+        # Fallback to any valid candidate if strictly amazon links aren't found
+        # (e.g. Google Shopping result pointing to Amazon but url is googleadservices...)
+        amazon_candidates = candidates[:5]
+        
+    summary = f"📦 **Amazon {config['name']} Search Results for '{query}':**\n"
+    
+    count = 0
+    for item in amazon_candidates:
+        title = item.get("title", "Unknown")
+        
+        # Price
+        price_obj = item.get("price") or {}
+        price = price_obj.get("value") or price_obj.get("current") or price_obj.get("displayed_price")
+        if not price:
+            # Try snippet extraction
+            import re
+            snippet = item.get("description") or item.get("snippet") or ""
+            sym = re.escape(config["currency_symbol"])
+            p_match = re.search(fr'{sym}(\d+\.?\d*)', snippet)
+            if p_match: price = f"{config['currency_symbol']}{p_match.group(1)}"
+            else: price = "Price Check Required"
+        else:
+            if str(price).replace('.','',1).isdigit():
+                price = f"{config['currency_symbol']}{price}"
+                
+        rating_obj = item.get("rating") or {}
+        rating = rating_obj.get("value", "N/A")
+        
+        summary += f"- **{title}**\n  Price: {price} | Rating: {rating}⭐\n"
+        count += 1
+        if count >= 5: break
+        
+    return summary
+
+def check_amazon_stock(product_name: str, variant_details: str, region: str = "UK") -> str:
+    """
+    Checks stock availability/price for a specific product by querying Google Shopping Graph via Organic SERP.
+    
+    Args:
+        product_name: General name (e.g. "Hiking Boots")
+        variant_details: Specifics (e.g. "Size 10, Red")
+        region: "UK" or "IN"
+    """
+    query = f"{product_name} {variant_details}"
+    candidates = _fetch_amazon_candidates(query, region=region)
+    config = AMAZON_REGIONS.get(region, AMAZON_REGIONS["UK"])
+    
+    if not candidates:
+        return f"⚠️ Stock Check Failed: No available items found for '{query}' in {config['name']}."
+        
+    # Filter for Amazon-specific or highly relevant matches
+    product_matches = []
+    search_matches = []
+    other_matches = []
+    
+    for cand in candidates:
+        url = (cand.get("product_url") or cand.get("link") or cand.get("url") or "").lower()
+        title = (cand.get("title") or "").lower()
+        
+        # Helper to detect if it's likely an Amazon product page
+        is_amazon_url = "amazon" in url
+        is_product_page = "/dp/" in url or "/gp/product/" in url
+        
+        if is_amazon_url:
+            if is_product_page:
+                product_matches.append(cand)
+            elif "/s?k=" in url or "/b?" in url:
+                search_matches.append(cand)
+            else:
+                other_matches.append(cand)
+        elif "amazon" in title: 
+                other_matches.append(cand)
+
+    valid_candidates = product_matches + other_matches + search_matches
+    if not valid_candidates and candidates:
+            # Fallback
+            valid_candidates = candidates
+
+    best_match = None
+    
+    if valid_candidates:
+        scored_candidates = []
+        for cand in valid_candidates:
+            # 1. Extract Rating (Default to 0.0)
+            try:
+                rating_data = cand.get("rating") or {}
+                rating_val = rating_data.get("value")
+                if not rating_val:
+                    rating_val = 0.0
+                else:
+                    rating_val = float(rating_val)
+            except (ValueError, TypeError):
+                rating_val = 0.0
+            
+            # 2. Extract Delivery/Prime Status from Snippet/Title
+            snippet = (cand.get("description") or cand.get("snippet") or "").lower()
+            title = (cand.get("title") or "").lower()
+            
+            delivery_bonus = 0.0
+            if "prime" in snippet or "prime" in title:
+                delivery_bonus += 0.3 # Boost for Prime
+            if "tomorrow" in snippet or "next day" in snippet:
+                delivery_bonus += 0.2 # Boost for speed
+            if "free delivery" in snippet:
+                delivery_bonus += 0.1 # Small boost
+            
+            # 3. Calculate Final Score
+            score = rating_val + delivery_bonus
+            
+            scored_candidates.append({
+                "candidate": cand,
+                "score": score,
+                "rating": rating_val,
+                "delivery_bonus": delivery_bonus
+            })
+        
+        # Sort by Score Descending
+        scored_candidates.sort(key=lambda x: x["score"], reverse=True)
+        
+        # Pick top
+        best_match = scored_candidates[0]["candidate"]
+        
+    if best_match:
+        title = best_match.get("title", "Unknown Product")
+        
+        # Price Extraction
+        price_obj = best_match.get("price") or {}
+        current_price = price_obj.get('current')
+        price_str = price_obj.get("displayed_price")
+        
+        symbol = config["currency_symbol"]
+
+        if not price_str and current_price:
+            price_str = f"{symbol}{current_price}"
+        
+        # Fallback for organic items which store description/snippet
+        snippet = best_match.get("description") or best_match.get("snippet") or ""
+        
+        # If still no price, try to regex it from snippet or set as estimate
+        if not price_str:
+            import re
+            sym = re.escape(symbol)
+            # Simple regex for £XX.XX or ₹XX.XX
+            p_match = re.search(fr'{sym}(\d+\.?\d*)', snippet)
+            if p_match:
+                price_str = f"{symbol}{p_match.group(1)}"
+            else:
+                price_str = "See Link (Est. Price)"
+
+        seller_name = best_match.get("seller") or best_match.get("source") or "Amazon"
+        
+        # Extract Image and URL
+        image_url = best_match.get("thumbnail") or best_match.get("image_url") or ""
+        # product_url = best_match.get("product_url") or best_match.get("link") or best_match.get("url") or ""
+        product_url = best_match.get("product_url") or best_match.get("link") or best_match.get("url") or ""
+        
+        rating_obj = best_match.get("rating") or {}
+        rating = rating_obj.get("value")
+        rating_str = f"Rating: {rating}⭐" if rating else ""
+        
+        # Add delivery info to output if detected
+        delivery_info = ""
+        if "prime" in snippet.lower():
+            delivery_info = " (Prime Delivery 🚚)"
+        
+        return (f"✅ **In Stock ({config['name']})**\n"
+                f"Item: {title}\n"
+                f"Price: {price_str} (via {seller_name})\n"
+                f"{rating_str}{delivery_info}\n"
+                f"Full Details:\n"
+                f"- Image URL: {image_url}\n"
+                f"- Product URL: {product_url}\n"
+                f"Match: Found via {(best_match.get('type','unknown')).title()}.")
+    else:
+            return (f"⚠️ **Check Required**\n"
+                    f"Status: Could not verify exact stock via API.\n"
+                    f"Recommendation: High likelihood of availability on Amazon {config['name']}, but exact price unavailable.")
