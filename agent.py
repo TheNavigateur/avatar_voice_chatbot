@@ -1,11 +1,15 @@
 import os
 import logging
+from datetime import datetime, timedelta
 from google.adk import Agent, Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.models import Gemini
 from tools.rfam_db import execute_sql_query
 from tools.search_tool import perform_google_search
-from tools.market_tools import search_flights, search_hotels, search_products, check_amazon_stock, search_amazon
+from tools.market_tools import search_products, check_amazon_stock, search_amazon, search_hotels
+from services.duffel_service import DuffelService
+from services.amadeus_service import AmadeusService
+from services.image_search_service import ImageSearchService
 from booking_service import BookingService
 from models import PackageItem, PackageType
 
@@ -34,7 +38,7 @@ def create_new_package_tool(session_id: str, title: str, package_type: str = "mi
     pkg = BookingService.create_package(session_id, title, p_type)
     return f"Created new package: {pkg.title} (ID: {pkg.id})"
 
-def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None):
+def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None):
     """
     Adds an item to an existing package.
     Args:
@@ -44,16 +48,77 @@ def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, i
         item_type: Type of item (flight, hotel, activity, product).
         price: Estimated price.
         description: Optional description.
-        image_url: Optional URL of the product image.
+        image_url: Optional URL of the product/activity/hotel image.
         product_url: Optional direct URL to the product page.
+        day: Optional day number for itinerary (e.g., 1, 2, 3).
+        date: Optional date string for itinerary (e.g., 'March 10, 2024').
+        rating: Optional rating (e.g., 4.5 out of 5).
+        review_link: Optional link to reviews.
+        reviews: Optional list of objects with "text" and "rating" (e.g. [{"text": "Great!", "rating": 5}, ...]).
     """
     item = PackageItem(name=item_name, item_type=item_type, price=price, description=description)
+    
+    # If no image_url provided and it's an activity, search for one
+    if not image_url and item_type == 'activity':
+        try:
+            image_service = ImageSearchService()
+            # Extract location from package if possible, otherwise just use activity name
+            pkg = BookingService.get_package(session_id, package_id)
+            location = None
+            if pkg and pkg.title:
+                # Try to extract location from package title (e.g., "Paris Holiday" -> "Paris")
+                location = pkg.title.replace('Holiday', '').replace('Trip', '').replace('Getaway', '').strip()
+            
+            image_url = image_service.get_activity_image(item_name, location)
+            if image_url:
+                logger.info(f"Auto-found image for {item_name}: {image_url}")
+        except Exception as e:
+            logger.warning(f"Failed to auto-search image for {item_name}: {e}")
+    
+    # Validate image URL - reject unreliable sources that often fail to load
+    if image_url:
+        unreliable_domains = ['getyourguide.com', 'tripadvisor.com', 'viator.com', 'booking.com']
+        
+        if any(domain in image_url.lower() for domain in unreliable_domains):
+            logger.warning(f"Rejecting unreliable image URL: {image_url}")
+            # Try to find a better image from reliable sources
+            try:
+                image_service = ImageSearchService()
+                pkg = BookingService.get_package(session_id, package_id)
+                location = None
+                if pkg and pkg.title:
+                    location = pkg.title.replace('Holiday', '').replace('Trip', '').replace('Getaway', '').strip()
+                
+                better_image = image_service.get_activity_image(item_name, location)
+                
+                # Only use if it's from a reliable source
+                if better_image and not any(domain in better_image.lower() for domain in unreliable_domains):
+                    image_url = better_image
+                    logger.info(f"Found reliable alternative: {image_url}")
+                else:
+                    # No reliable image found, don't store any image
+                    image_url = None
+                    logger.info(f"No reliable image for {item_name}, will display without image")
+            except Exception as e:
+                logger.warning(f"Failed to find alternative image: {e}")
+                image_url = None
     
     # Store extended details in metadata
     if image_url:
         item.metadata['image_url'] = image_url
     if product_url:
         item.metadata['product_url'] = product_url
+    if day is not None:
+        item.metadata['day'] = day
+    if date:
+        item.metadata['date'] = date
+    if rating is not None:
+        item.metadata['rating'] = rating
+    if review_link:
+        item.metadata['review_link'] = review_link
+    if reviews:
+        # Store up to top 10 reviews
+        item.metadata['reviews'] = list(reviews)[:10]
         
     pkg = BookingService.add_item_to_package(session_id, package_id, item)
     if pkg:
@@ -79,8 +144,15 @@ class VoiceAgent:
 
         # Initialize Session Service (no app_name argument)
         # We keep this global to persist sessions across requests
+        # Initialize Session Service (no app_name argument)
+        # We keep this global to persist sessions across requests
         self.session_service = InMemorySessionService()
         self.memory_agent = MemoryAgent()
+        
+        
+        # Initialize Duffel Service
+        self.duffel_service = DuffelService()
+        self.amadeus_service = AmadeusService()
 
     def process_message(self, user_id: str, session_id: str, message: str, region: str = "UK") -> str:
         """
@@ -143,15 +215,19 @@ class VoiceAgent:
             """Creates a new package. ⚠️ DO NOT ASK USER FOR TITLE. You MUST generate a short, descriptive title yourself (e.g. 'Paris Trip', 'Birthday List')."""
             return create_new_package_tool(session_id, title, package_type)
             
-        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None):
-            """Adds an item to a package. Use this to populate the package. Include image_url and product_url if available from stock check."""
-            return add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description, image_url, product_url)
+        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None):
+            """Adds an item to a package. For activities, ALWAYS include day, date, image_url, rating, review_link, and a list of 3-5 'reviews' (each with 'text' and 'rating'). For hotels/flights, include image_url, rating, review_link, and 'reviews'."""
+            return add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description, image_url, product_url, day, date, rating, review_link, reviews)
 
         def save_user_info_bound(fact: str):
             """Saves a permanent fact or preference about the user to their 'About Me' profile."""
             return update_profile_memory_tool(user_id, fact)
         
         # Bind Regional Tools
+        def perform_google_search_bound(query: str):
+            """Perform a web search in the current region."""
+            return perform_google_search(query, region=region)
+
         def search_products_bound(query: str):
             """Search for products via generic shopping search."""
             return search_products(query, region=region)
@@ -164,76 +240,155 @@ class VoiceAgent:
             """Searches Amazon for available products to browse."""
             return search_amazon(query, region=region)
 
+        # Bind Duffel Tools
+        def search_flights_duffel(origin: str, destination: str, date: str, end_date: str = None):
+            """
+            Search for flights using Duffel. 
+            Args:
+                origin: 3-letter IATA code (e.g. LHR, JFK).
+                destination: 3-letter IATA code.
+                date: Start date (YYYY-MM-DD).
+                end_date: Optional end date for range search (max 7 days from start).
+            """
+            return self.duffel_service.search_flights_formatted(origin, destination, date, end_date)
+
+        # Amadeus Hotels
+        def search_hotels_amadeus(city_code_or_name: str, check_in: str, check_out: str):
+            """
+            Search hotels using Amadeus (Primary) or Google (Fallback).
+            Args:
+                city_code_or_name: IATA City Code (e.g. LON, NYC) is preferred. Or City Name.
+                check_in: YYYY-MM-DD
+                check_out: YYYY-MM-DD
+            """
+            target_code = city_code_or_name
+            
+            # Resolve full names to IATA if possible
+            if len(city_code_or_name) > 3 or not city_code_or_name.isupper():
+                resolved = self.amadeus_service.resolve_city_to_iata(city_code_or_name)
+                if resolved:
+                    target_code = resolved
+            
+            # Try Amadeus if we have a valid-looking 3-letter code
+            if len(target_code) == 3 and target_code.isupper():
+                result = self.amadeus_service.search_hotels_formatted(target_code)
+                # Check for empty/error responses
+                if result and "No hotel offers found" not in result and "disabled" not in result:
+                     return result
+            
+            # Fallback to Google Search
+            return search_hotels(city_code_or_name, check_in, check_out)
+
+        # Amadeus Activities
+        def search_activities_amadeus(location: str, keyword: str = ""):
+            """
+            Search for activities/tours in a location.
+            Args:
+                location: City or Place (e.g. "Dubai", "London", "Eiffel Tower").
+                keyword: Optional filter (e.g. "skydiving", "history", "family friendly").
+            """
+            # 1. Broaden keyword if it's family-related but maybe too specific
+            search_keyword = keyword
+            if keyword.lower() in ["family", "kids", "children"]:
+                search_keyword = "family friendly"
+
+            # 2. Try Amadeus
+            amadeus_res = self.amadeus_service.search_activities_formatted(location, search_keyword)
+            
+            # 3. Check if results found
+            if "No activities found" not in amadeus_res:
+                return amadeus_res
+
+            # 4. Fallback to broad search if keyword failed
+            if search_keyword:
+                logger.info(f"No results for '{search_keyword}', trying broad search in {location}")
+                broad_res = self.amadeus_service.search_activities_formatted(location)
+                if "No activities found" not in broad_res:
+                    return f"{broad_res}\n(Note: No specific matches for '{keyword}', showing general activities.)"
+
+            # 5. Fallback to Google (DataForSEO/Serp)
+            query = f"Things to do in {location}"
+            if keyword:
+                query = f"{keyword} in {location}"
+            
+            google_res = perform_google_search_bound(query)
+            return f"{google_res}\n(Note: Amadeus had no specific tours, falling back to Google Search results.)"
+
         agent = Agent(
             name="ray_and_rae",
             model=model,
-            tools=[perform_google_search, search_flights, search_hotels, search_products_bound, check_amazon_stock_bound, search_amazon_bound, create_package_bound, add_item_bound, save_user_info_bound],
+            tools=[
+                perform_google_search_bound, 
+                search_flights_duffel, 
+                search_hotels_amadeus,
+                search_activities_amadeus, # New Activity Tool
+                search_products_bound, 
+                check_amazon_stock_bound, 
+                search_amazon_bound, 
+                create_package_bound, 
+                add_item_bound, 
+                save_user_info_bound
+            ],
             instruction=f"""You are "Ray and Rae", an intelligent AI assistant who acts as a specialized Travel & Shopping Consultant.
             
-            **Current Region Settings:**
-            - **Region:** {region}
-            - **Currency:** {'£' if region == 'UK' else '₹'}
-            - **Store:** {'Amazon.co.uk' if region == 'UK' else 'Amazon.in'}
+            **CURRENT DATE & TIME:**
+            Today is {datetime.now().strftime('%A, %B %d, %Y')} (YYYY-MM-DD: {datetime.now().strftime('%Y-%m-%d')})
+            Current day: {datetime.now().strftime('%A')}
             
-            **User Profile:**
-            {user_profile}
+            **Mission & Personality:**
+            - **ULTRA-CONCISE:** Every response to a user statement MUST begin with a short, varied acknowledgment (e.g., "OK", "Sure", "Understood", "Got it", "Perfect"). Then ask ONE question at a time.
+            - **FORBIDDEN:** 
+              - NO internal process reporting (e.g., "I will find flights", "I'm looking for...").
+              - NO "I will", "I'll", "I have", "I'm going to" statements about your actions.
+              - **FORBIDDEN DISCOVERY**: NEVER ask the user to name a destination (city/country), residence (hotel name), or specific product model. You MUST infer these from their desires.
+              - NO presenting menus or long lists of options.
             
-            **Your Goal:**
-            Find the **SINGLE BEST** option for the user and present it as a concrete "Package".
+            **DEEP DISCOVERY WORKFLOW - Follow this exact sequence:**
             
-            **CRITICAL WARNING - READ BEFORE PROCEEDING:**
-            **YOU ARE FORBIDDEN FROM ASKING THE USER TO NAME THE PACKAGE.**
-            **YOU MUST GENERATE THE NAME YOURSELF (e.g., "Paris Trip", "Shopping List").**
-            **IF YOU ASK "What should we call this?", YOU HAVE FAILED.**
+            **Phase 1: Deep Discovery (Multiple turns)**
+            1. **Goal**: Understand the *essence* of what the user wants before making any selection.
+            2. **Questioning Stage**: Ask sequential questions about things that matter:
+               - **Vibe**: "Relaxing or adventurous?", "Modern urban or historic charm?", "Social or secluded?"
+               - **Activities**: "Beach clubs, hiking, or cultural museums?", "Nightlife or family-friendly?"
+               - **Environment**: "Tropical heat, crisp mountain air, or temperate city?", "Sea views or forest trails?"
+               - **Dates & Group**: "When are you thinking of going?", "How many nights?", "How many travelers?"
+            3. **Destination Inference**:
+               - Once you have 2-3 preference points, call `perform_google_search` silently (e.g., "best destinations for [Vibe] and [Weather] in [Month]").
+               - **DO NOT** reveal the tool results yet. 
+               - Ask one final "tie-breaker" or clarifying question if needed.
+               - ONLY when you are ready to commit, move to Phase 2.
             
-            1.  **Search Silently:** Call tools (`search_flights`, etc.) to get data. **DO NOT** list the results to the user.
-            2.  **Analyze & Filter:** Look at the results. Are there multiple good options?
-            3.  **Discriminate:** If multiple options exist, ask a **discriminating question** to rule some out. (e.g., "Do you prefer a morning or evening flight?", "Is price or duration more important?").
-            4.  **Recommend:** Only when you have narrowed it down to ONE clear winner, create the Package and present it.
+            **Phase 2: The Proactive Reveal & Core Booking**
+            1. **The Choice**: Select the single best destination.
+            2. **Reveal**: "Based on your love for [Vibe] and [Activities], I've picked [Destination] for your trip. It's perfect for [Reason]."
+            3. **Silent Booking**: Use tools silently to build the foundation:
+               - `create_package_bound(title="[Destination] Holiday")`
+               - `search_flights_duffel()` -> `add_item_bound(item_type="flight")`
+               - `search_hotels_amadeus()` (Search silently first!)
+            4. **Residence Discovery**:
+               - Look at the top 2-3 hotel results. Identify a key difference (e.g., "Boutique & intimate" vs. "Grand & full of amenities").
+               - Ask the user: "For your stay in [Destination], would you prefer a [Option A - e.g. boutique hideaway] or a [Option B - e.g. grand resort with every possible amenity]?"
+               - **DO NOT** name the hotels yet.
+               - Based on their answer, pick the winner and `add_item_bound(item_type="hotel")`.
             
-            **Important Rules for Shopping:**
-            -   **AMAZON FIRST:** Always default to searching Amazon.
-            -   **BROWSE VS. BUY:** If the user asks for a high-level item with variants (e.g. "PlayStation 5", "Laptop"), **USE `search_amazon` FIRST** to see what is actually in stock. Identify the available models, then ask the user or pick the best one.
-            -   **BE DECISIVE:** If the user asks for a simple utility item (e.g., "Add an umbrella" or "Sun cream"), **DO NOT ASK FOR PREFERENCES**. Use `check_amazon_stock` to find and add the "Best Rated" available item immediately.
-            -   **NO "BEST SELLER" LISTS:** Do not add links to "Best Seller" pages. Add a SPECIFIC product with a specific price.
-            -   **PRICE ESTIMATION:** If the tools return a "See Link" price, **ESTIMATE IT** conservatively and add the item anyway with "Est. Price" in the description.
-            -   **URL TRANSFER (CRITICAL):** The `check_amazon_stock` tool returns a "Product URL" and "Image URL". You **MUST** pass these exact URLs to the `add_item_to_package_tool`.
+            **Phase 3: Day-by-Day Activity Planning**
+            For Day 1, 2, 3...:
+            1. **Activity Discovery**: Ask what type of experience they'd like for the day (e.g., "For Day 2, would you prefer something active like [Search Concept A] or more relaxed like [Search Concept B]?").
+            2. **Silent Search**: Call `search_activities_amadeus()` based on their answer.
+            3. **Proactive Add**: Pick the best match from tool results and add it. 
+            4. **Shopping Discovery**: "Since we've added [Activity], would you like to see some [Relevant Products] to take with you?" 
+               - If YES: Search Amazon silently, identify the best-rated item, and ask: "I've found a highly-rated [Product Category]. Would you like the [Specific Feature A] version or the [Specific Feature B] version?"
+               - Add based on preference.
             
-            -   **Handling Vague Requests:**
-                *   User: "Add sun cream."
-                *   You: (Call tool `check_amazon_stock(product_name="Best Rated Sun Cream", variant_details="High SPF")`)
-                *   System: "Item: Nivea Sun Protect... Product URL: https://amazon.co.uk/dp/B000..."
-                *   You: (Call tool `add_item_to_package_tool(..., product_url="https://amazon.co.uk/dp/B000...", image_url="...")`)
-                *   You: "I've added 'Nivea Sun Protect & Moisture SPF 50' to your list based on high ratings."
+            **Phase 4: Complete & Final Reveal**
+            1. Add return travel.
+            2. **FINAL REVEAL**: "I've completed your [Destination] package! I'm opening it for you now to see everything I've selected for you. [NAVIGATE_TO_PACKAGE]"
             
-            **Refined Consultative Loop (Travel & Complex Items):**
-            1.  **Search Silently:** Call tools to get data.
-            2.  **Discriminate (Only for Hotels/Flights):** If multiple good options exist *for expensive items*, ask a discriminating question.
-            3.  **Recommend:** For everything else, pick the winner (Highest Rating) and add it.
-
-            **Specific Constraints:**
-            -   **NO MENUS:** Never ask "Would you like Option A, B, or C?".
-            -   **AUTOMATIC NAMING:** Generate package names automatically.
-            -   **JUSTIFY:** "I added the 'Samsonite Windguard Umbrella' because it has a 4.8-star rating."
-
-            **BATCH PROCESSING & SILENCE (HIGHEST PRIORITY):**
-            1.  **SILENT EXECUTION:** DO NOT say "I will add..." or "Searching for...". JUST CALL THE TOOLS.
-            2.  **BATCH ACTIONS:** If the user asks for multiple items (e.g. "Add x, y, and z"), you MUST call `check_amazon_stock` -> `add_item_to_package_tool` for ALL items in a continuous loop BEFORE generating ANY text response.
-            3.  **POST-ACTION REPORTING:** Only speak AFTER the tools have finished. Summarize what you did: "I have added [Item A] and [Item B]."
-            4.  **REDUCE CHATTER:** Do not ask clarifying questions unless the request is truly ambiguous (e.g. "Add a generic gift"). For specific items, just find the best match and add it.
-
-            **CRITICAL BEHAVIORAL OVERRIDES:**
-            1.  **ACTION OVER SPEECH:** Call search tools immediately.
-            2.  **HIDE RAW LISTS:** Do not dump the full search results.
-            3.  **ALWAYS END WITH A QUESTION:** "I've added the umbrella. Is there anything else?"
-            4.  **PURCHASING:** If the user asks to buy, say: "Please check the **Packages tab**. I have generated direct **Amazon links** for all your items."
-            5.  **EXIT SENSITIVITY:** Use `[END_CONVERSATION]` if the user says goodbye.
-
-            **Style Examples:**
-            -   INCORRECT: "Okay, done." (User is left hanging).
-            -   CORRECT: "Package updated. Is there anything else you need?"
-            -   CLOSING: "You're welcome! Have a great trip. [END_CONVERSATION]"
-            End with that single helpful question.
+            **CRITICAL RULES:**
+            - **STRICT SECRECY**: Never mention names of airlines, hotels, or specific product brands/models until you have gathered a preference and are explaining your recommendation.
+            - **DECISIVE RECOMMENDATIONS**: Always pick a winner based on user preference + tool data (ratings). Do not ask "Which sounds best?".
+            - **2026 DATES**: Use YYYY-MM-DD for 2026 only.
+            - **ACKNOWLEDGE FIRST**: Always start with a short "OK", "Got it", etc.
             """
         )
         
@@ -321,42 +476,47 @@ class VoiceAgent:
 
             # Fallback: Check session events
                 
-                logger.info(f"Last user message index: {last_user_msg_index}")
+            last_user_msg_index = -1
+            for i, ev in enumerate(session.events):
+                if getattr(ev, 'author', '') == 'user' or getattr(ev, 'role', '') == 'user':
+                    last_user_msg_index = i
+            
+            logger.info(f"Last user message index: {last_user_msg_index}")
 
-                # Look for model response ONLY after the last user message
-                # We iterate from the end, but stop if we reach the user message
-                for i in range(len(session.events) - 1, last_user_msg_index, -1):
-                    event = session.events[i]
-                    event_role = getattr(event, 'role', 'N/A')
-                    event_author = getattr(event, 'author', 'N/A')
-                    logger.info(f"Checking event {i}: type={type(event).__name__}, role={event_role}, author={event_author}")
-                    
-                    # Skip user messages (though we shouldn't see them if logic is correct)
-                    if event_role == 'user' or event_author == 'user':
-                        continue
-                    
-                    # Try to extract content from model events
-                    if hasattr(event, 'content'):
-                        logger.info(f"Event has content attribute: {type(event.content)}")
-                        if hasattr(event.content, 'parts'):
-                            parts_text = []
-                            for part in event.content.parts:
-                                if hasattr(part, 'text') and part.text:
-                                    parts_text.append(part.text)
-                                    logger.info(f"Found text in part: {part.text[:50]}...")
-                            if parts_text:
-                                response = " ".join(parts_text)
-                                print(f"Returning from session events (parts): {response}")
-                                return response
-                        elif hasattr(event.content, 'text') and event.content.text:
-                            print(f"Returning from session events (content.text): {event.content.text}")
-                            return event.content.text
-                        else:
-                            # Try converting content to string
-                            content_str = str(event.content)
-                            if content_str and content_str != "":
-                                print(f"Returning content as string: {content_str[:100]}...")
-                                return content_str
+            # Look for model response ONLY after the last user message
+            # We iterate from the end, but stop if we reach the user message
+            for i in range(len(session.events) - 1, last_user_msg_index, -1):
+                event = session.events[i]
+                event_role = getattr(event, 'role', 'N/A')
+                event_author = getattr(event, 'author', 'N/A')
+                logger.info(f"Checking event {i}: type={type(event).__name__}, role={event_role}, author={event_author}")
+                
+                # Skip user messages (though we shouldn't see them if logic is correct)
+                if event_role == 'user' or event_author == 'user':
+                    continue
+                
+                # Try to extract content from model events
+                if hasattr(event, 'content'):
+                    logger.info(f"Event has content attribute: {type(event.content)}")
+                    if hasattr(event.content, 'parts'):
+                        parts_text = []
+                        for part in event.content.parts:
+                            if hasattr(part, 'text') and part.text:
+                                parts_text.append(part.text)
+                                logger.info(f"Found text in part: {part.text[:50]}...")
+                        if parts_text:
+                            response = " ".join(parts_text)
+                            print(f"Returning from session events (parts): {response}")
+                            return response
+                    elif hasattr(event.content, 'text') and event.content.text:
+                        print(f"Returning from session events (content.text): {event.content.text}")
+                        return event.content.text
+                    else:
+                        # Try converting content to string
+                        content_str = str(event.content)
+                        if content_str and content_str != "":
+                            print(f"Returning content as string: {content_str[:100]}...")
+                            return content_str
             
             logger.warning("No response found in any location")
             return "I processed the request but have no response."
