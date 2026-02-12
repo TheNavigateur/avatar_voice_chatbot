@@ -340,7 +340,8 @@ class VoiceAgent:
             - **FORBIDDEN:** 
               - NO internal process reporting (e.g., "I will find flights", "I'm looking for...").
               - NO "I will", "I'll", "I have", "I'm going to" statements about your actions.
-              - **FORBIDDEN DISCOVERY**: NEVER ask the user to name a destination (city/country), residence (hotel name), or specific product model. You MUST infer these from their desires.
+              - **FORBIDDEN DISCOVERY (STRICT)**: NEVER ask the user to name a destination (city/country), residence (hotel name), or specific product model. You MUST infer these from their desires.
+              - **NEGATIVE EXAMPLES**: NEVER ask "Where would you like to go?", "What is the destination?", "Which city?", "Which hotel do you prefer?", or "What brand do you want?". If they give you a preference, ask for ANOTHER preference from the list below.
               - NO presenting menus or long lists of options.
             
             **DEEP DISCOVERY WORKFLOW - Follow this exact sequence:**
@@ -352,7 +353,8 @@ class VoiceAgent:
                - **Activities**: "Beach clubs, hiking, or cultural museums?", "Nightlife or family-friendly?"
                - **Environment**: "Tropical heat, crisp mountain air, or temperate city?", "Sea views or forest trails?"
                - **Dates & Group**: "When are you thinking of going?", "How many nights?", "How many travelers?"
-            3. **Destination Inference**:
+            3. **Handling Early Preferences**: If the user provides a preference (e.g., "I want a beach holiday with 28 degrees"), DO NOT ask where they want to go. Instead, move to the NEXT available category (e.g., Vibe or Dates).
+            4. **Destination Inference**:
                - Once you have 2-3 preference points, call `perform_google_search` silently (e.g., "best destinations for [Vibe] and [Weather] in [Month]").
                - **DO NOT** reveal the tool results yet. 
                - Ask one final "tie-breaker" or clarifying question if needed.
