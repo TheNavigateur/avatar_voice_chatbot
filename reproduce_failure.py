@@ -9,20 +9,25 @@ def reproduce_discovery_failure():
     resp1 = voice_agent.process_message(user_id, session_id, "Hi")
     print(f"Agent: {resp1}")
     
-    # Check if resp1 is neutral (not asking about trip vibe)
-    if "relaxing" in resp1.lower() or "adventurous" in resp1.lower():
-        print("\n❌ FAIL: Agent jumped into trip discovery prematurely.")
+    # Check if resp1 starts with "Hi! I'm Ray."
+    if "i'm ray" in resp1.lower() and "thinking about a holiday" in resp1.lower():
+        print("\n✅ SUCCESS: Agent introduced itself and asked about a holiday (New User).")
     else:
-        print("\n✅ SUCCESS: Agent provided a neutral response to 'Hi'.")
+        print("\n❌ FAIL: Agent greeting was not correct for a new user.")
 
-    print("\nUser: I want to plan a holiday.")
-    resp2 = voice_agent.process_message(user_id, session_id, "I want to plan a holiday.")
-    print(f"Agent: {resp2}")
+    # Test returning user with profile
+    user_id_profile = f"test_user_profile_{uuid.uuid4().hex[:6]}"
+    from profile_service import ProfileService
+    ProfileService.update_profile(user_id_profile, "User loves Italian food, history, and quiet boutique hotels. They enjoy visiting museums and ancient ruins.")
     
-    if "relaxing" in resp2.lower() or "adventurous" in resp2.lower():
-        print("\n✅ SUCCESS: Agent correctly triggered discovery flow for trip intent.")
+    print(f"\nUser (with context): Hi")
+    resp3 = voice_agent.process_message(user_id_profile, str(uuid.uuid4()), "Hi")
+    print(f"Agent: {resp3}")
+    
+    if "i'm ray" in resp3.lower() and ("italy" in resp3.lower() or "history" in resp3.lower() or "museum" in resp3.lower() or "ancient" in resp3.lower() or "boutique" in resp3.lower()):
+        print("\n✅ SUCCESS: Agent provided a contextual greeting based on profile.")
     else:
-        print("\n❌ FAIL: Agent did not trigger discovery flow for trip intent.")
+        print("\n❌ FAIL: Agent did not provide a contextual greeting.")
 
 if __name__ == "__main__":
     reproduce_discovery_failure()

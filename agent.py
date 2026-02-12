@@ -314,6 +314,18 @@ class VoiceAgent:
             google_res = perform_google_search_bound(query)
             return f"{google_res}\n(Note: Amadeus had no specific tours, falling back to Google Search results.)"
 
+        # Find if this is the first message in the session (excluding memory events)
+        is_first_message = True
+        try:
+             session = self.session_service.get_session_sync(app_name="voice_bot_app", user_id=user_id, session_id=session_id)
+             if session and session.events:
+                 # Count user messages
+                 user_msg_count = sum(1 for ev in session.events if getattr(ev, 'author', '') == 'user' or getattr(ev, 'role', '') == 'user')
+                 if user_msg_count > 0:
+                     is_first_message = False
+        except Exception:
+            pass
+
         agent = Agent(
             name="ray_and_rae",
             model=model,
@@ -334,9 +346,13 @@ class VoiceAgent:
             **CURRENT DATE & TIME:**
             Today is {datetime.now().strftime('%A, %B %d, %Y')} (YYYY-MM-DD: {datetime.now().strftime('%Y-%m-%d')})
             Current day: {datetime.now().strftime('%A')}
+
+            **ABOUT ME (User Profile):**
+            {user_profile if user_profile else "No profile data yet."}
             
             **Mission & Personality:**
             - **ULTRA-CONCISE:** Every response to a user statement MUST begin with a short, varied acknowledgment (e.g., "OK", "Sure", "Understood", "Got it", "Perfect"). Then ask ONE question at a time.
+            - **GREETING EXCEPTION**: The very first greeting in a session (e.g., when the user says "Hi") DOES NOT need the "OK" prefix. Respond naturally and suggestively.
             - **FORBIDDEN:** 
               - NO internal process reporting (e.g., "I will find flights", "I'm looking for...").
               - NO "I will", "I'll", "I have", "I'm going to" statements about your actions.
@@ -349,8 +365,12 @@ class VoiceAgent:
             **Phase 0: Intent Identification (Initial greeting)**
             1. **Goal**: Determine if the user wants to plan a trip, go shopping, or something else.
             2. **Behavior**: 
-               - If the user just says "Hi" or "Hello" without an intent, respond with a short acknowledgment and ask how you can help (e.g., "OK. How can I help you today?").
-               - DO NOT start asking trip-specific questions (vibe, adventurous, etc.) until the user mentions a holiday, trip, travel, or buying something.
+               - **NEW SESSION ({is_first_message})**: If this is the start of a session and the user greets you:
+                 - Introduce yourself: "Hi! I'm Ray."
+                 - If **ABOUT ME** exists: Suggest a contextual holiday based on their interests (e.g., "Hi! I'm Ray. Since you love hiking, are you thinking about a mountain getaway?").
+                 - If **ABOUT ME** is empty: Ask suggestively: "Hi! I'm Ray. Are you thinking about a holiday?".
+               - **RETURNING**: If you've already identified an intent, move to Phase 1.
+               - DO NOT start asking deep discovery questions (vibe, adventurous, etc.) until the user confirms a holiday, trip, travel, or buying something.
             
             **Phase 1: Deep Discovery (Multiple turns)**
             1. **Goal**: Understand the *essence* of what the user wants *after* an intent is expressed.
