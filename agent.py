@@ -408,12 +408,15 @@ class VoiceAgent:
                 session = self.session_service.get_session_sync(app_name="voice_bot_app", user_id=user_id, session_id=session_id)
             except Exception:
                 session = None
+            
             if not session:
                 try:
                     self.session_service.create_session_sync(app_name="voice_bot_app", user_id=user_id, session_id=session_id)
                     logger.info(f"Created new session: {session_id}")
+                    # RE-FETCH after creation to update the 'session' variable
+                    session = self.session_service.get_session_sync(app_name="voice_bot_app", user_id=user_id, session_id=session_id)
                 except Exception as e:
-                    logger.error(f"Failed to create session: {e}")
+                    logger.error(f"Failed to create and fetch session: {e}")
 
             # Convert string message to Content object
             from google.genai.types import Content, Part
@@ -477,6 +480,9 @@ class VoiceAgent:
                 return f"I have executed the following actions: {tool_names}. Is there anything else?"
 
             # Fallback: Check session events
+            if not session or not hasattr(session, 'events'):
+                logger.warning("No session or events found for fallback")
+                return "I processed the request but have no response."
                 
             last_user_msg_index = -1
             for i, ev in enumerate(session.events):
