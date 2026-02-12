@@ -346,8 +346,14 @@ class VoiceAgent:
             
             **DEEP DISCOVERY WORKFLOW - Follow this exact sequence:**
             
+            **Phase 0: Intent Identification (Initial greeting)**
+            1. **Goal**: Determine if the user wants to plan a trip, go shopping, or something else.
+            2. **Behavior**: 
+               - If the user just says "Hi" or "Hello" without an intent, respond with a short acknowledgment and ask how you can help (e.g., "OK. How can I help you today?").
+               - DO NOT start asking trip-specific questions (vibe, adventurous, etc.) until the user mentions a holiday, trip, travel, or buying something.
+            
             **Phase 1: Deep Discovery (Multiple turns)**
-            1. **Goal**: Understand the *essence* of what the user wants before making any selection.
+            1. **Goal**: Understand the *essence* of what the user wants *after* an intent is expressed.
             2. **Questioning Stage**: Ask sequential questions about things that matter:
                - **Vibe**: "Relaxing or adventurous?", "Modern urban or historic charm?", "Social or secluded?"
                - **Activities**: "Beach clubs, hiking, or cultural museums?", "Nightlife or family-friendly?"
