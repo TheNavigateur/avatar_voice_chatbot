@@ -29,12 +29,19 @@ def init_db():
         CREATE TABLE IF NOT EXISTS packages (
             id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
+            user_id TEXT,
             title TEXT,
             type TEXT,
             status TEXT,
             total_price REAL
         )
     ''')
+    
+    # Simple migration: add user_id if it doesn't exist
+    try:
+        c.execute("ALTER TABLE packages ADD COLUMN user_id TEXT")
+    except Exception:
+        pass # Already exists
     
     # Package Items Table
     c.execute('''

@@ -28,12 +28,15 @@ class BookingService:
                 except:
                     meta = {}
 
+                # Handle potentially missing status
+                item_status = item['status'] if item['status'] else 'draft'
+
                 items.append(PackageItem(
-                    id=item['id'],
+                    id=item['id'] if item['id'] else str(uuid.uuid4()),
                     name=item['name'],
                     item_type=item['item_type'],
                     price=item['price'],
-                    status=BookingStatus(item['status']),
+                    status=BookingStatus(item_status),
                     description=item['description'],
                     metadata=meta
                 ))
@@ -41,6 +44,7 @@ class BookingService:
             packages.append(Package(
                 id=pkg_id,
                 session_id=row['session_id'],
+                user_id=row['user_id'] if 'user_id' in row.keys() else "web_user",
                 title=row['title'],
                 type=PackageType(row['type']),
                 status=BookingStatus(row['status']),
@@ -52,8 +56,6 @@ class BookingService:
 
     @staticmethod
     def get_package(session_id: str, package_id: str) -> Optional[Package]:
-        # Reuse get_packages logic but filter? Or direct query.
-        # Direct query is better.
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("SELECT * FROM packages WHERE id = ? AND session_id = ?", (package_id, session_id))
@@ -73,51 +75,72 @@ class BookingService:
             except:
                 meta = {}
 
+            # Handle potentially missing status
+            item_status = item['status'] if item['status'] else 'draft'
+
             items.append(PackageItem(
-                id=item['id'],
+                id=item['id'] if item['id'] else str(uuid.uuid4()),
                 name=item['name'],
                 item_type=item['item_type'],
                 price=item['price'],
-                status=BookingStatus(item['status']),
+                status=BookingStatus(item_status),
                 description=item['description'],
                 metadata=meta
             ))
         
-        conn.close()
-        return Package(
+        pkg = Package(
             id=pkg_id,
             session_id=row['session_id'],
+            user_id=row['user_id'] if 'user_id' in row.keys() else "web_user",
             title=row['title'],
             type=PackageType(row['type']),
             status=BookingStatus(row['status']),
             total_price=row['total_price'],
             items=items
         )
+        conn.close()
+        return pkg
 
     @staticmethod
-    def create_package(session_id: str, title: str, type: PackageType = PackageType.MIXED) -> Package:
+    def get_latest_user_package(user_id: str) -> Optional[Package]:
+        """Retrieves the most recently modified draft package for a user."""
+        conn = get_db_connection()
+        c = conn.cursor()
+        # In SQLite, we don't have rowids by default that are sorted by insertion if we use UUIDs, 
+        # but packages are usually created in order. For better reliability, we use the rowid if we haven't added a created_at.
+        # However, for now, we'll just take the last one added to the DB for that user.
+        c.execute("SELECT id, session_id FROM packages WHERE user_id = ? AND status = ? ORDER BY rowid DESC LIMIT 1", (user_id, BookingStatus.DRAFT.value))
+        row = c.fetchone()
+        conn.close()
+        
+        if row:
+            return BookingService.get_package(row['session_id'], row['id'])
+        return None
+
+    @staticmethod
+    def create_package(session_id: str, title: str, type: PackageType = PackageType.MIXED, user_id: str = "web_user") -> Package:
         conn = get_db_connection()
         c = conn.cursor()
         
         new_id = str(uuid.uuid4())
         c.execute("""
-            INSERT INTO packages (id, session_id, title, type, status, total_price)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (new_id, session_id, title, type, BookingStatus.DRAFT, 0.0))
+            INSERT INTO packages (id, session_id, user_id, title, type, status, total_price)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (new_id, session_id, user_id, title, type.value, BookingStatus.DRAFT.value, 0.0))
         
         conn.commit()
         conn.close()
         
         # Return object
-        return Package(id=new_id, session_id=session_id, title=title, type=type)
+        return Package(id=new_id, session_id=session_id, user_id=user_id, title=title, type=type)
 
     @staticmethod
     def add_item_to_package(session_id: str, package_id: str, item: PackageItem) -> Optional[Package]:
         conn = get_db_connection()
         c = conn.cursor()
         
-        # Verify package exists
-        c.execute("SELECT id FROM packages WHERE id = ? AND session_id = ?", (package_id, session_id))
+        # Verify package exists (using package_id which is unique)
+        c.execute("SELECT id FROM packages WHERE id = ?", (package_id,))
         if not c.fetchone():
             conn.close()
             return None
@@ -138,7 +161,15 @@ class BookingService:
         conn.commit()
         conn.close()
         
-        return BookingService.get_package(session_id, package_id)
+        # Note: We still return based on the NEW session_id if we want, but get_package uses session_id for filtering.
+        # So we should probably find the actual session_id of the package to return it.
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT session_id FROM packages WHERE id = ?", (package_id,))
+        actual_session_id = c.fetchone()['session_id']
+        conn.close()
+        
+        return BookingService.get_package(actual_session_id, package_id)
 
     @staticmethod
     async def execute_booking(package: Package) -> Dict:

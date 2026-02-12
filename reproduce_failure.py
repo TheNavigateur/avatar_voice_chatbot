@@ -1,7 +1,11 @@
 from agent import voice_agent
 import uuid
+from database import init_db
 
 def reproduce_discovery_failure():
+    # Initialize database for migrations
+    init_db()
+    
     user_id = f"test_user_failure_{uuid.uuid4().hex[:6]}"
     session_id = f"test_session_failure_{uuid.uuid4().hex[:6]}"
     
@@ -24,10 +28,19 @@ def reproduce_discovery_failure():
     resp3 = voice_agent.process_message(user_id_profile, str(uuid.uuid4()), "Hi")
     print(f"Agent: {resp3}")
     
-    if "i'm ray" in resp3.lower() and ("italy" in resp3.lower() or "history" in resp3.lower() or "museum" in resp3.lower() or "ancient" in resp3.lower() or "boutique" in resp3.lower()):
-        print("\n✅ SUCCESS: Agent provided a contextual greeting based on profile.")
+    # Check for contextual keywords but FORBID location/assumption keywords
+    contains_experience = any(word in resp3.lower() for word in ["food", "history", "museum", "ancient", "boutique"])
+    contains_location = any(word in resp3.lower() for word in ["italy", "maldives", "rome", "athens"])
+    contains_assumption = any(word in resp3.lower() for word in ["another", "again", "returning", "back to"])
+    
+    if "i'm ray" in resp3.lower() and contains_experience and not contains_location and not contains_assumption:
+        print("\n✅ SUCCESS: Agent provided a contextual greeting based on EXPERIENCE, not location.")
+    elif contains_location:
+        print("\n❌ FAIL: Agent mentioned a location (e.g., 'Italy') in the greeting.")
+    elif contains_assumption:
+        print("\n❌ FAIL: Agent assumed past history.")
     else:
-        print("\n❌ FAIL: Agent did not provide a contextual greeting.")
+        print("\n❌ FAIL: Agent did not provide a correct contextual greeting.")
 
 if __name__ == "__main__":
     reproduce_discovery_failure()

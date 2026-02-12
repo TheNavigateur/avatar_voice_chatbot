@@ -21,11 +21,12 @@ from profile_service import ProfileService
 from memory_agent import MemoryAgent
 
 # --- Tool Wrappers for Agent ---
-def create_new_package_tool(session_id: str, title: str, package_type: str = "mixed"):
+def create_new_package_tool(session_id: str, user_id: str, title: str, package_type: str = "mixed"):
     """
     Creates a new package for the user.
     Args:
         session_id: The current session ID.
+        user_id: The current user ID.
         title: Title of the package (e.g., 'Holiday to Paris').
         package_type: Type of package (holiday, party, shopping, activity, mixed).
     """
@@ -35,7 +36,7 @@ def create_new_package_tool(session_id: str, title: str, package_type: str = "mi
     except ValueError:
         p_type = PackageType.MIXED
         
-    pkg = BookingService.create_package(session_id, title, p_type)
+    pkg = BookingService.create_package(session_id, title, p_type, user_id=user_id)
     return f"Created new package: {pkg.title} (ID: {pkg.id})"
 
 def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None):
@@ -213,7 +214,7 @@ class VoiceAgent:
         # Bind tools with session_id
         def create_package_bound(title: str, package_type: str = "mixed"):
             """Creates a new package. ⚠️ DO NOT ASK USER FOR TITLE. You MUST generate a short, descriptive title yourself (e.g. 'Paris Trip', 'Birthday List')."""
-            return create_new_package_tool(session_id, title, package_type)
+            return create_new_package_tool(session_id, user_id, title, package_type)
             
         def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None):
             """Adds an item to a package. For activities, ALWAYS include day, date, image_url, rating, review_link, and a list of 3-5 'reviews' (each with 'text' and 'rating'). For hotels/flights, include image_url, rating, review_link, and 'reviews'."""
@@ -314,17 +315,23 @@ class VoiceAgent:
             google_res = perform_google_search_bound(query)
             return f"{google_res}\n(Note: Amadeus had no specific tours, falling back to Google Search results.)"
 
-        # Find if this is the first message in the session (excluding memory events)
+        # Find if this is the first user message in the session
         is_first_message = True
         try:
              session = self.session_service.get_session_sync(app_name="voice_bot_app", user_id=user_id, session_id=session_id)
              if session and session.events:
-                 # Count user messages
                  user_msg_count = sum(1 for ev in session.events if getattr(ev, 'author', '') == 'user' or getattr(ev, 'role', '') == 'user')
                  if user_msg_count > 0:
                      is_first_message = False
         except Exception:
             pass
+
+        # Fetch the latest draft package for this user
+        latest_package = BookingService.get_latest_user_package(user_id)
+        package_context = "No active draft package."
+        if latest_package:
+            items_desc = ", ".join([f"{i.item_type}: {i.name}" for i in latest_package.items])
+            package_context = f"Active Package: '{latest_package.title}' (ID: {latest_package.id}). Items already added: {items_desc if items_desc else 'None yet'}."
 
         agent = Agent(
             name="ray_and_rae",
@@ -349,6 +356,9 @@ class VoiceAgent:
 
             **ABOUT ME (User Profile):**
             {user_profile if user_profile else "No profile data yet."}
+
+            **CURRENT PACKAGE CONTEXT:**
+            {package_context}
             
             **Mission & Personality:**
             - **ULTRA-CONCISE:** Every response to a user statement MUST begin with a short, varied acknowledgment (e.g., "OK", "Sure", "Understood", "Got it", "Perfect"). Then ask ONE question at a time.
@@ -356,21 +366,29 @@ class VoiceAgent:
             - **FORBIDDEN:** 
               - NO internal process reporting (e.g., "I will find flights", "I'm looking for...").
               - NO "I will", "I'll", "I have", "I'm going to" statements about your actions.
-              - **FORBIDDEN DISCOVERY (STRICT)**: NEVER ask the user to name a destination (city/country), residence (hotel name), or specific product model. You MUST infer these from their desires.
-              - **NEGATIVE EXAMPLES**: NEVER ask "Where would you like to go?", "What is the destination?", "Which city?", "Which hotel do you prefer?", or "What brand do you want?". If they give you a preference, ask for ANOTHER preference from the list below.
-              - NO presenting menus or long lists of options.
+              - **FORBIDDEN DISCOVERY (STRICT)**: NEVER ask the user to name a destination (city, country), residence (hotel name), or specific product model/brand. You MUST infer these from their desires.
+              - **NEGATIVE EXAMPLES**: NEVER ask "Where would you like to go?", "What is the destination?", "Which hotel do you prefer?", or "What brand do you want?". 
+              - **SECRET SELECTION**: You must use tools (Search, Hotels, Flights, Amazon) silently and only reveal the chosen "WINNER" during the reveal phase. Do not name items you are "considering".
+            - **EXCEPTIONS (REVEALED ITEMS)**: You MAY mention destinations, hotels, or products that are ALREADY in the **CURRENT PACKAGE CONTEXT**. You should refer to them in a way the user would recognize.
             
             **DEEP DISCOVERY WORKFLOW - Follow this exact sequence:**
             
             **Phase 0: Intent Identification (Initial greeting)**
-            1. **Goal**: Determine if the user wants to plan a trip, go shopping, or something else.
+            1. **Goal**: Determine if the user wants to plan a trip, go shopping, or continue an existing package.
             2. **Behavior**: 
                - **NEW SESSION ({is_first_message})**: If this is the start of a session and the user greets you:
                  - Introduce yourself: "Hi! I'm Ray."
-                 - If **ABOUT ME** exists: Suggest a contextual holiday based on their interests (e.g., "Hi! I'm Ray. Since you love hiking, are you thinking about a mountain getaway?").
-                 - If **ABOUT ME** is empty: Ask suggestively: "Hi! I'm Ray. Are you thinking about a holiday?".
+                 - **GREETING RULE (STRICT)**: EVEN if the **ABOUT ME** mentions a specific location (e.g., "Italy", "Maldives"), you MUST NOT name it in your greeting. Use the *type* of experience instead.
+                 - **CONTINUE PACKAGE**: If an **Active Package** exists in the context, ask if they want to continue building it (e.g., "Hi! I'm Ray. Would you like to continue building your {latest_package.title if latest_package else 'holiday'}?").
+                 - **SUGGEST NEW**: If no active package or if they want something new:
+                   - If **ABOUT ME** contains actual interests/preferences (beyond "new user"): Suggest a contextual holiday as a *possibility* based on their interests (e.g., "Hi! I'm Ray. Since you love hiking and mountain air, are you thinking about a trek in the peaks?"). 
+                   - **EXAMPLES**:
+                     - *Incorrect*: "Since you love Italy..." or "Since you like beach holidays in the Maldives..."
+                     - *Correct*: "Since you love historic sites and cultural tours..." or "Since you love relaxing beach escapes..."
+                   - If **ABOUT ME** is empty or just says "new user": Ask suggestively: "Hi! I'm Ray. Are you thinking about a holiday?".
+                 - **STRICT NO-ASSUMPTION RULE**: NEVER assume the user has visited a place before. DO NOT use terms like "another trip", "returning", "again", or "back to" unless the **ABOUT ME** clearly states it.
                - **RETURNING**: If you've already identified an intent, move to Phase 1.
-               - DO NOT start asking deep discovery questions (vibe, adventurous, etc.) until the user confirms a holiday, trip, travel, or buying something.
+               - DO NOT start asking deep discovery questions (vibe, adventurous, etc.) until the user confirms they want to plan or continue something.
             
             **Phase 1: Deep Discovery (Multiple turns)**
             1. **Goal**: Understand the *essence* of what the user wants *after* an intent is expressed.
