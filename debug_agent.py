@@ -1,53 +1,51 @@
-import os
+from agent import VoiceAgent
 import logging
 import sys
-from google.adk import Agent, Runner
-from google.adk.sessions import InMemorySessionService
-from google.adk.models import Gemini
-from google.adk.tools import google_search
 
-# Setup logging to console
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+# Configure logging to console
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
-# Ensure keys are set (they should be in env from run.sh, but we'll check)
-if "GOOGLE_API_KEY" not in os.environ:
-    print("ERROR: GOOGLE_API_KEY not set")
-    sys.exit(1)
-
-from google.genai.types import Content, Part
-
-def debug_run():
-    print("Initializing Agent...")
-    model = Gemini(model="gemini-1.5-flash")
-    agent = Agent(name="debug_bot", model=model, tools=[google_search])
-    session_service = InMemorySessionService()
-    runner = Runner(agent=agent, app_name="debug_app", session_service=session_service)
-
-    print("Running Agent...")
+def test_agent():
+    agent = VoiceAgent()
+    user_id = "test_user_debug"
+    session_id = "test_session_debug"
+    
+    # 1. First message to warm up
+    print("\n--- Sending Message 1 ---")
+    tool_calls_made = []
+    # Assuming process_message returns an iterable of events, and the final response is the last event or accumulated
+    response_events = agent.process_message(user_id, session_id, "Hello")
+    final_response_1 = ""
+    for event in response_events:
+        if hasattr(event, 'tool_calls') and event.tool_calls:
+            logger.info(f"Tool calls: {event.tool_calls}")
+            # Extract tool names and arguments
+            for tc in event.tool_calls:
+                if hasattr(tc, 'name'):
+                    args = getattr(tc, 'args', {})
+                    print(f"\n[DEBUG] Tool Call: {tc.name}")
+                    print(f"[DEBUG] Arguments: {args}\n")
+                    tool_calls_made.append(tc.name)
+        # Assuming the event itself might contain the response or parts of it
+        # This part might need adjustment based on the actual structure of 'event'
+        if hasattr(event, 'response_text'): # Example: if event has a response_text attribute
+            final_response_1 += event.response_text
+        elif isinstance(event, str): # Example: if events are just strings
+            final_response_1 += event
+        # If process_message returns a single response object directly, the loop is not needed.
+        # For this change, we'll assume it's an iterable of events.
+    
+    print(f"Response 1: {final_response_1}")
+    
+    # 2. problematic message
+    print("\n--- Sending Message 2 (The problematic one) ---")
     try:
-        # Create session
-        session = session_service.create_session(app_name="debug_app", user_id="debug_user", session_id="debug_session")
-        print(f"Session created: {session.session_id}")
-
-        # Run with a simple query
-        msg = Content(role="user", parts=[Part(text="Who is the CEO of Google?")])
-        for event in runner.run(user_id="debug_user", session_id="debug_session", new_message=msg):
-            print(f"\n--- Event Type: {type(event)} ---")
-            print(f"Dir: {dir(event)}")
-            
-            # Try to print interesting attributes
-            if hasattr(event, 'text'):
-                print(f"Text: {event.text}")
-            if hasattr(event, 'content'):
-                print(f"Content: {event.content}")
-            if hasattr(event, 'tool_calls'):
-                print(f"Tool Calls: {event.tool_calls}")
-            if hasattr(event, 'tool_outputs'):
-                print(f"Tool Outputs: {event.tool_outputs}")
-                
+        # This call remains as is, assuming the debug logging is only for the first message as per instruction placement
+        response = agent.process_message(user_id, session_id, "can you add an umbrella and sun cream please")
+        print(f"Response 2: {response}")
     except Exception as e:
-        print(f"Exception: {e}")
+        print(f"CRASH: {e}")
 
 if __name__ == "__main__":
-    debug_run()
+    test_agent()

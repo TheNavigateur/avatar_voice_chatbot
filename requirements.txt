@@ -13,3 +13,4 @@ pytest
 httpx
 mysql-connector-python
 duckduckgo-search
+duffel-api

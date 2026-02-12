@@ -118,6 +118,32 @@ class BookingService:
         return None
 
     @staticmethod
+    def get_latest_session_package(session_id: str) -> Optional[Package]:
+        """Retrieves the most recently modified draft package for a specific session."""
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id FROM packages WHERE session_id = ? AND status = ? ORDER BY rowid DESC LIMIT 1", (session_id, BookingStatus.DRAFT.value))
+        row = c.fetchone()
+        conn.close()
+        
+        if row:
+            return BookingService.get_package(session_id, row['id'])
+        return None
+
+    @staticmethod
+    def get_latest_booked_package(user_id: str) -> Optional[Package]:
+        """Retrieves the most recently booked package for a user."""
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT id, session_id FROM packages WHERE user_id = ? AND status = ? ORDER BY rowid DESC LIMIT 1", (user_id, BookingStatus.BOOKED.value))
+        row = c.fetchone()
+        conn.close()
+        
+        if row:
+            return BookingService.get_package(row['session_id'], row['id'])
+        return None
+
+    @staticmethod
     def create_package(session_id: str, title: str, type: PackageType = PackageType.MIXED, user_id: str = "web_user") -> Package:
         conn = get_db_connection()
         c = conn.cursor()

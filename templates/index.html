@@ -4,140 +4,567 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Google ADK Voice Chatbot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #4f46e5;
+            --bg-color: #f8fafc;
+            --sidebar-width: 250px;
+            --sidebar-bg: #ffffff;
+            --text-color: #1e293b;
+            --bot-bubble-bg: #f1f5f9;
+            --user-bubble-bg: #6366f1;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-color);
             margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-color);
         }
 
-        .container {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 2rem;
-            border-radius: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(10px);
-            text-align: center;
-            max-width: 1000px;
-            width: 90%;
+        /* --- Sidebar --- */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            border-right: 1px solid #e0e0e0;
             display: flex;
             flex-direction: column;
-            max-height: 90vh;
-            transition: all 0.3s ease;
+            padding: 1rem;
+            box-sizing: border-box;
+            transition: transform 0.3s ease;
+            z-index: 100;
         }
 
-        .main-content {
+        .sidebar-header h2 {
+            margin: 0 0 2rem 0;
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-nav {
             display: flex;
-            gap: 2rem;
-            align-items: flex-start;
-            flex: 1;
-            min-height: 0;
-            width: 100%;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        .left-panel {
+        .nav-item {
+            background: none;
+            border: none;
+            text-align: left;
+            padding: 12px 15px;
+            font-size: 1rem;
+            color: var(--text-color);
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+
+        .nav-item:hover {
+            background: #f0f2f5;
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            color: var(--primary-color);
+        }
+
+        .nav-item .icon {
+            font-size: 1.2rem;
+        }
+
+        /* --- Main Content Area --- */
+        #main-view {
             flex: 1;
+            padding: 1rem;
+            /* reduced padding */
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            /* width removed to rely on flex: 1 */
+        }
+
+        .view-section {
+            display: none;
+            /* Exclusive display handled by JS */
+            height: 100%;
+            flex-direction: column;
+            animation: fadeInView 0.3s ease;
+        }
+
+        .view-section.active {
+            display: flex;
+        }
+
+        @keyframes fadeInView {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .view-header {
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .view-header h2 {
+            margin: 0;
+            color: #444;
+        }
+
+        /* --- Chat View Layout --- */
+        .chat-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            gap: 1rem;
+        }
+
+        /* Avatar Area Top */
+        .avatar-area {
+            flex: 0 0 320px;
+            /* Fixed height for avatar */
+            position: relative;
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100%;
         }
 
-        .right-panel {
-            flex: 1;
+        .controls-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            /* Aligned left */
+            z-index: 10;
             display: flex;
-            flex-direction: column;
-            height: 100%;
-            min-width: 300px;
+            gap: 5px;
         }
 
-        h1 {
-            color: #667eea;
-            margin-bottom: 0;
-            font-size: 2rem;
+        .controls-overlay select {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 4px;
+            font-size: 0.8rem;
+            backdrop-filter: blur(4px);
         }
 
-        /* Three.js Avatar Container */
         .avatar-container {
-            position: relative;
-            width: 300px;
-            height: 300px;
-            margin: 0 auto 0 auto;
+            width: 100%;
+            height: 100%;
+            /* Canvas fills this */
         }
 
         #avatar-canvas {
             width: 100%;
             height: 100%;
-            border-radius: 20px;
-            background: transparent;
+        }
+
+        #avatar-loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #888;
+            font-size: 1rem;
+            font-weight: 500;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 8px;
+            backdrop-filter: blur(2px);
         }
 
         #status {
-            margin-bottom: 1rem;
-            color: #666;
-            font-style: italic;
-            min-height: 1.5em;
-            font-size: 0.95rem;
+            position: absolute;
+            bottom: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #555;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
-        .mic-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        /* Conversation Area Bottom */
+        .conversation-area {
+            flex: 1;
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* Contains scroll */
+            padding: 1rem;
+        }
+
+        #transcript {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-right: 5px;
+        }
+
+
+
+        /* --- Packages View --- */
+        #packages-container {
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        #package-details-overlay {
+            /* Positioned relative to parent flex container now */
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            padding: 2rem;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            /* Ensure it fills height if visible */
+            height: 100%;
+        }
+
+        #package-details-overlay.hidden {
+            display: none;
+        }
+
+        .back-btn {
+            align-self: flex-start;
+            background: none;
             border: none;
-            border-radius: 50%;
-            width: 80px;
-            height: 80px;
-            font-size: 32px;
+            color: var(--primary-color);
+            font-size: 1rem;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 1rem;
+            padding: 0;
+        }
+
+        /* --- Profile View --- */
+        #view-profile {
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .markdown-body {
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .markdown-body h1,
+        .markdown-body h2 {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.3em;
+        }
+
+        /* --- Responsive Package Items --- */
+        .package-item-responsive {
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+            gap: 15px;
+        }
+
+        @media (min-width: 768px) {
+            .package-item-responsive {
+                flex-direction: row;
+                align-items: stretch;
+            }
+
+            .package-item-responsive img {
+                width: 250px !important;
+                height: auto !important;
+                min-height: 100%;
+                margin-bottom: 0 !important;
+                flex-shrink: 0;
+                object-fit: cover;
+                border-radius: 8px 0 0 8px;
+            }
+
+            .package-item-details {
+                flex: 1;
+            }
+        }
+
+        /* --- Review Carousel --- */
+        .reviews-carousel {
+            background: #f0f2f5;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .carousel-content {
+            position: relative;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+        }
+
+        .review-slide {
+            display: none;
+            width: 100%;
+            animation: fadeIn 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .review-slide.active {
+            display: block;
+        }
+
+        .carousel-nav {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            gap: 10px;
+        }
+
+        .carousel-btn {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .mic-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-        }
-
-        .mic-btn.listening {
-            animation: pulse 1.5s infinite;
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5253 100%);
-            box-shadow: 0 4px 15px rgba(238, 82, 83, 0.4);
-        }
-
-        .action-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 30px;
-            padding: 12px 30px;
-            font-size: 1rem;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-            margin: 10px;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .carousel-btn:hover {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+
+        .carousel-indicator {
+            font-size: 0.75rem;
+            color: #888;
             font-weight: 600;
         }
 
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        .action-btn:disabled {
+        #profile-editor {
+            width: 100%;
+            height: 400px;
+            padding: 1rem;
+            font-family: monospace;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+            font-size: 0.9rem;
+        }
+
+        .edit-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 1rem;
+        }
+
+        /* --- Components --- */
+
+
+        .action-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .action-btn.secondary {
             background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
+            color: #333;
+        }
+
+        .action-btn.small {
+            padding: 4px 10px;
+            font-size: 0.85rem;
+        }
+
+        /* Bubbles */
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 85%;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            position: relative;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .bubble-sender {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            opacity: 0.7;
+            letter-spacing: 0.05em;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .bot-message {
+            align-self: flex-start;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .user-message .message-bubble {
+            background: var(--user-bubble-bg);
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+
+        .bot-message .message-bubble {
+            background: var(--bot-bubble-bg);
+            color: var(--text-color);
+            border-bottom-left-radius: 2px;
+        }
+
+        .message {
+            margin-bottom: 4px;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        /* --- Mobile --- */
+        .mobile-header {
+            display: none;
+            background: #fff;
+            padding: 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            z-index: 200;
+        }
+
+        .hamburger {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #333;
+        }
+
+        .mobile-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                position: fixed;
+                left: -260px;
+                /* Hide off-screen */
+                top: 0;
+                bottom: 0;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+            }
+
+            .sidebar.open {
+                transform: translateX(260px);
+            }
+
+            .mobile-header {
+                display: flex;
+            }
+
+            #main-view {
+                width: 100%;
+                padding: 10px;
+                padding-top: 0;
+                /* Header takes space */
+                flex: 1;
+            }
+
+            .chat-layout {
+                gap: 0.5rem;
+            }
+
+            .avatar-area {
+                flex: 0 0 280px;
+            }
         }
 
         @keyframes pulse {
@@ -157,198 +584,66 @@
             }
         }
 
-        /* Chat Layout */
-        #transcript {
-            margin-top: 0;
-            padding: 1rem;
-            border-radius: 15px;
-            background: #f8f9fa;
-            min-height: 200px;
-            max-height: 500px;
-            overflow-y: auto;
-            /* Flex layout for bubbles */
+        /* Chat Input Styles */
+        .chat-input-container {
             display: flex;
-            flex-direction: column;
             gap: 10px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 16px;
+            border-bottom-right-radius: 16px;
+        }
 
-            text-align: left;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        #chat-input {
             flex: 1;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        .message {
-            display: flex;
-            flex-direction: column;
-            max-width: 80%;
-            animation: fadeIn 0.3s ease;
-        }
-
-        .user-message {
-            align-self: flex-end;
-            align-items: flex-end;
-        }
-
-        .bot-message {
-            align-self: flex-start;
-            align-items: flex-start;
-        }
-
-        .message-bubble {
-            padding: 10px 15px;
-            border-radius: 18px;
-            position: relative;
-            font-size: 0.95rem;
-            line-height: 1.5;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        }
-
-        .user-message .message-bubble {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 12px 16px;
+            border-radius: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.1);
             color: white;
-            border-bottom-right-radius: 4px;
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s;
         }
 
-        .bot-message .message-bubble {
-            background: #e4e6eb;
-            color: #050505;
-            border-bottom-left-radius: 4px;
+        #chat-input:focus {
+            border-color: var(--primary-color);
+            background: rgba(255, 255, 255, 0.15);
         }
 
-        .sender-name {
-            font-size: 0.75rem;
-            margin-bottom: 4px;
-            opacity: 0.8;
-            margin-left: 10px;
-            /* Slight indent */
+        #send-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0 20px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .user-message .sender-name {
-            margin-right: 10px;
-            margin-left: 0;
-            color: #667eea;
-            text-align: right;
-            display: none;
-            /* Hide 'You' label for cleaner look, or set to block if preferred */
+        #send-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+            box-shadow: 0 4px 12px rgba(238, 82, 83, 0.3);
         }
 
-        .bot-message .sender-name {
-            color: #666;
-            /* display: block; */
-            display: none;
-            /* Let's hide both for now for pure bubble look, unless user wants them. Code below puts them inside bubble? No, separate. */
-        }
-
-        /* Let's actually put the name INSIDE the bubble for "similar layout" request if we want */
-        /* Re-reading request: "Layout 'You' and 'Bot' in a similar way" */
-        /* I'll use a structure where name is bold inside the bubble for now, to replicate old feel but better */
-
-        .message-content-inner {
+        .conversation-area {
             display: flex;
             flex-direction: column;
+            justify-content: space-between;
         }
 
-        .bubble-sender {
-            font-weight: bold;
-            font-size: 0.8em;
-            margin-bottom: 2px;
-            opacity: 0.9;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        #transcript {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 10px;
         }
 
         .hidden {
             display: none !important;
-        }
-
-        .subtitle {
-            color: #666;
-            margin-bottom: 2rem;
-            font-size: 0.9rem;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.6;
-        }
-
-        .interaction-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            /* Height removed/auto to fit content in flow */
-            width: 100%;
-            margin-top: 1rem;
-            padding-bottom: 1rem;
-            /* Padding at bottom of page flow */
-        }
-
-
-
-        /* Navigation Tabs */
-        .nav-tabs {
-            display: flex;
-            justify-content: flex-start;
-            padding: 0 20px;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .nav-tab {
-            background: none;
-            border: none;
-            padding: 10px 15px;
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            color: #666;
-            border-bottom: 3px solid transparent;
-        }
-
-        .nav-tab.active {
-            color: #4285f4;
-            border-bottom: 3px solid #4285f4;
-        }
-
-        .nav-tab:hover {
-            color: #333;
-        }
-
-        /* Panel Content */
-        .panel-content {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .main-content {
-                flex-direction: column;
-            }
-
-            .right-panel {
-                width: 100%;
-                min-width: auto;
-                min-height: 300px;
-            }
-
-            .container {
-                padding: 1.5rem;
-                height: auto;
-                max-height: none;
-            }
         }
     </style>
     <!-- Import Maps -->
@@ -363,81 +658,113 @@
     </script>
 </head>
 
-<div class="container">
-    <h1>Ray and Rae</h1>
-    <p class="subtitle">Tell Ray and Rae about the kinds of holidays, birthday parties, local activities and items you
-        want.</p>
-
-    <div class="main-content">
-        <div class="left-panel">
-            <div class="controls" style="margin-bottom: 0.5rem; text-align: center;">
-                <label for="ttsProvider" style="margin-right: 0.5rem; color: #333;">Provider:</label>
-                <select id="ttsProvider"
-                    style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc; margin-right: 1rem;">
-                    <option value="google">Google Chirp</option>
-                    <option value="openai" selected>OpenAI (Default)</option>
-                    <option value="elevenlabs">ElevenLabs (Pro)</option>
-                </select>
-
-
-
-                <label for="avatarSelector" style="margin-right: 0.5rem; color: #333;">Avatar:</label>
-                <select id="avatarSelector" style="padding: 0.5rem; border-radius: 8px; border: 1px solid #ccc;">
-                    <option value="vrm_shadow">Shadow (Anime)</option>
-                    <option value="vrm_jack">Jack (Anime 1.0)</option>
-                    <option value="glb_avatar" selected>Jack</option>
-                    <option value="glb_jackie">Jackie</option>
-                    <option value="glb_cole">Cole</option>
-                </select>
-            </div>
-
-            <!-- Three.js 3D Avatar -->
-            <div class="avatar-container">
-                <div id="avatar-loader"
-                    style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #667eea; font-weight: bold; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 8px; pointer-events: none;">
-                    Loading Avatar...</div>
-                <canvas id="avatar-canvas"></canvas>
-            </div>
-
-
-        </div>
-
-        <div class="right-panel">
-            <!-- Navigation Tabs -->
-            <div class="nav-tabs">
-                <button class="nav-tab active" onclick="switchTab('packages')">Packages</button>
-                <button class="nav-tab" onclick="switchTab('aboutme')">About Me</button>
-            </div>
-
-            <div id="packages-container"
-                style="background: white; padding: 1rem; border-radius: 15px; margin-bottom: 1rem; width: 100%; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 200px; display: none;">
-                <h3 id="panel-heading"
-                    style="margin-top: 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem;">
-                    Your Packages</h3>
-                <div id="packages-list">
-                    <p style="color: #999; font-style: italic;">No packages created yet. Chat to start planning!</p>
-                </div>
-            </div>
-
-            <div id="aboutme-container"
-                style="background: white; padding: 1rem; border-radius: 15px; margin-bottom: 1rem; width: 100%; box-sizing: border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); min-height: 200px; display: none;">
-                <h3 style="margin-top: 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.5rem;">
-                    About Me</h3>
-                <div style="display: flex; flex-direction: column; height: 100%;">
-                    <p style="font-size: 0.8rem; color: #666; margin-bottom: 5px;">Edit your profile (Markdown
-                        supported)</p>
-                    <textarea id="profile-editor"
-                        style="width: 100%; min-height: 150px; font-family: monospace; padding: 10px; border-radius: 8px; border: 1px solid #ccc; resize: vertical; box-sizing: border-box;"></textarea>
-                    <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
-                        <button class="action-btn" onclick="saveProfile()" style="font-size: 0.9rem;">Save
-                            Profile</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="transcript"></div>
-        </div>
+<!-- Navigation Sidebar (Desktop) -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <h2>Ray & Rae</h2>
     </div>
+    <nav class="sidebar-nav">
+        <button class="nav-item active" onclick="switchView('chat')">
+            <span class="icon">💬</span> Chat
+        </button>
+        <button class="nav-item" onclick="switchView('packages')">
+            <span class="icon">📦</span> Packages
+        </button>
+        <button class="nav-item" onclick="switchView('profile')">
+            <span class="icon">👤</span> About Me
+        </button>
+    </nav>
+</div>
+
+<!-- Mobile Header -->
+<div class="mobile-header">
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+    <h2>Ray & Rae</h2>
+</div>
+
+<!-- Main View Container -->
+<div id="main-view">
+
+    <!-- VIEW 1: CHAT -->
+    <section id="view-chat" class="view-section active">
+        <div class="chat-layout">
+            <!-- Avatar Area -->
+            <div class="avatar-area">
+                <div class="controls-overlay">
+                    <select id="ttsProvider" title="TTS Provider">
+                        <option value="google" selected>Google Chirp</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="elevenlabs">ElevenLabs</option>
+                    </select>
+                    <select id="avatarSelector" title="Avatar">
+                        <option value="vrm_shadow">Shadow</option>
+                        <option value="vrm_jack">Jack</option>
+                        <option value="glb_avatar" selected>Jack (RPM)</option>
+                        <option value="glb_jackie">Jackie</option>
+                        <option value="glb_cole">Cole</option>
+                    </select>
+                </div>
+
+                <div class="avatar-container">
+                    <div id="avatar-loader">Loading...</div>
+                    <canvas id="avatar-canvas"></canvas>
+                </div>
+
+                <div id="status" style="display:none;"></div>
+            </div>
+
+            <!-- Conversation Area -->
+            <div class="conversation-area">
+                <div id="transcript"></div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Plan your trip here..." autocomplete="off">
+                    <button id="send-btn" onclick="sendChatMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VIEW 2: PACKAGES -->
+    <section id="view-packages" class="view-section">
+        <div class="view-header">
+            <h2>Your Packages</h2>
+        </div>
+        <div id="packages-container">
+            <div id="packages-list">
+                <p style="color: #999; font-style: italic; text-align: center; margin-top: 50px;">
+                    No packages created yet.<br>Go to Chat to start planning!
+                </p>
+            </div>
+        </div>
+
+        <!-- Package Details Overlay (Hidden by default) -->
+        <div id="package-details-overlay" class="hidden">
+            <button class="back-btn" onclick="closePackageDetails()">← Back</button>
+            <div id="package-details-content"></div>
+        </div>
+    </section>
+
+    <!-- VIEW 3: PROFILE -->
+    <section id="view-profile" class="view-section">
+        <div class="view-header">
+            <h2>About Me</h2>
+            <button id="edit-profile-btn" class="action-btn small" onclick="toggleProfileEdit()">✎ Edit</button>
+        </div>
+
+        <div id="profile-read-mode">
+            <!-- Markdown rendered content will go here -->
+            <div id="profile-content" class="markdown-body">Loading profile...</div>
+        </div>
+
+        <div id="profile-edit-mode" style="display: none;">
+            <textarea id="profile-editor" placeholder="Tell us about yourself..."></textarea>
+            <div class="edit-actions">
+                <button class="action-btn secondary" onclick="cancelProfileEdit()">Cancel</button>
+                <button class="action-btn" onclick="saveProfile()">Save Changes</button>
+            </div>
+        </div>
+    </section>
+
 </div>
 
 <!-- Three.js Avatar Setup (Module) -->
@@ -1111,7 +1438,7 @@
 
     const transcriptDiv = document.getElementById('transcript');
 
-    let sessionId = null;
+    let sessionId = localStorage.getItem('chat_session_id');
     let recognition;
     let isConversationActive = false;
     let isBotSpeaking = false;
@@ -1144,7 +1471,7 @@
             const transcript = event.results[0][0].transcript;
             addMessage('You', transcript);
             isProcessing = true;
-            setBotStatusMessage("Thinking...", 'left');
+            startProcessingStatus(); // Start dynamic updates
 
             try {
                 // Pass REGION to backend
@@ -1160,10 +1487,15 @@
                     body: JSON.stringify(requestBody)
                 });
 
+                stopProcessingStatus(); // Stop updates
+
                 const data = await response.json();
                 console.log('Received data:', data);
 
-                if (data.session_id) sessionId = data.session_id;
+                if (data.session_id) {
+                    sessionId = data.session_id;
+                    localStorage.setItem('chat_session_id', sessionId);
+                }
 
                 let botResponse = data.response;
                 let shouldEndConversation = false;
@@ -1223,18 +1555,49 @@
         renderStartButton();
     }
 
-    function startConversationMode() {
+    async function startConversationMode() {
         isConversationActive = true;
 
         // Remove Start Button
         const btn = document.getElementById('dynamic-start-btn');
         if (btn) btn.remove();
 
-        setBotStatusMessage("Starting...", 'center');
+        // 1. Add "Hi!" to UI
+        addMessage('You', 'Hi!');
+
+        // 2. Start dynamic updates
+        isProcessing = true;
+        startProcessingStatus();
+
+        // 3. Send "Hi!" to backend
         try {
-            recognition.start();
+            const requestBody = {
+                message: "Hi!",
+                region: window.currentRegion || 'US'
+            };
+            if (sessionId) requestBody.session_id = sessionId;
+
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            stopProcessingStatus();
+
+            const data = await response.json();
+            if (data.session_id) {
+                sessionId = data.session_id;
+                localStorage.setItem('chat_session_id', sessionId);
+            }
+
+            speak(data.response);
         } catch (e) {
-            console.error("Could not start recognition:", e);
+            console.error("Auto-greeting failed:", e);
+            isProcessing = false;
+            stopProcessingStatus();
+            // Fallback: just start recognition if fetch fails
+            recognition.start();
         }
     }
 
@@ -1262,7 +1625,7 @@
         const btn = document.createElement('button');
         btn.id = 'dynamic-start-btn';
         btn.className = 'action-btn start-btn';
-        btn.textContent = 'Start Conversation';
+        btn.textContent = 'Say hi!';
         btn.style.alignSelf = 'center';
         btn.style.marginTop = '1rem';
         btn.style.marginBottom = '1rem';
@@ -1292,22 +1655,17 @@
 
     // Helper for Status Indicators
     function setBotStatusMessage(text, align = 'center') {
-        let statusDiv = document.getElementById('bot-status-bubble');
         const tDiv = document.getElementById('transcript');
 
-        // Always remove first to ensure we re-append at the bottom
-        if (statusDiv) {
-            statusDiv.remove();
-        }
-
         const div = document.createElement('div');
-        div.id = 'bot-status-bubble';
+        // We use a class instead of ID to allow multiple status messages to exist
+        div.className = 'bot-status-message';
 
         let alignSelf = 'center';
         if (align === 'left') alignSelf = 'flex-start';
         if (align === 'right') alignSelf = 'flex-end';
 
-        div.style.cssText = `text-align: ${align}; align-self: ${alignSelf}; color: #888; font-style: italic; margin: 10px 0; font-size: 0.9em; opacity: 0.8; max-width: 80%;`;
+        div.style.cssText = `text-align: ${align}; align-self: ${alignSelf}; color: #888; font-style: italic; margin: 5px 0; font-size: 0.9em; opacity: 0.8; max-width: 80%;`;
         div.textContent = text;
 
         tDiv.appendChild(div);
@@ -1315,15 +1673,53 @@
     }
 
     function clearBotStatusMessage() {
-        const statusBubble = document.getElementById('bot-status-bubble');
-        if (statusBubble) {
-            statusBubble.remove();
+        // Now that we want recorded messages, we only clear "transient" states
+        // Like "Listening..." if we really want to, but the user said "all recorded".
+        // To be safe and satisfy "all recorded", we'll just not clear them here.
+        // If we need to clear specific ones (like 'Listening'), we'd need more logic.
+        // For now, let's just make it do nothing to ensure they "stay in the chat".
+    }
+
+    let statusInterval = null;
+    const statusMessages = [
+        "Thinking...",
+        "Consulting Agent Tools...",
+        "Checking database...",
+        "Analyzing request...",
+        "Formulating response...",
+        "Just a moment..."
+    ];
+
+    function startProcessingStatus() {
+        let i = 0;
+        setBotStatusMessage(statusMessages[0], 'left');
+
+        if (statusInterval) clearInterval(statusInterval);
+
+        statusInterval = setInterval(() => {
+            i = (i + 1) % statusMessages.length;
+            setBotStatusMessage(statusMessages[i], 'left');
+        }, 1500);
+    }
+
+    function stopProcessingStatus() {
+        if (statusInterval) {
+            clearInterval(statusInterval);
+            statusInterval = null;
         }
+        clearBotStatusMessage();
     }
 
     async function speak(text, shouldEnd = false) {
         isBotSpeaking = true;
         if (recognition) recognition.stop();
+
+        // Handle Navigation Trigger
+        let shouldNavigate = false;
+        if (text.includes('[NAVIGATE_TO_PACKAGE]')) {
+            shouldNavigate = true;
+            text = text.replace('[NAVIGATE_TO_PACKAGE]', '').trim();
+        }
 
         try {
             const provider = document.getElementById('ttsProvider').value;
@@ -1379,18 +1775,22 @@
                 startSpeaking();
                 addMessage('Bot', text); // Delay text display until audio starts
                 updateAudioVolumeGlobal();
-                // statusDiv.textContent = "Speaking... 🗣️"; // Disabled as requested
-                // statusDiv.style.color = "#667eea";
-                // Start Lip Sync Loop
             };
 
-            window.audioElement.onended = () => {
+            window.audioElement.onended = async () => {
                 stopSpeaking();
                 URL.revokeObjectURL(audioUrl);
                 isBotSpeaking = false;
                 isProcessing = false;
 
-                if (isConversationActive && !shouldEnd) {
+                if (shouldNavigate) {
+                    switchView('packages');
+                    const packages = await updatePackages();
+                    if (packages && packages.length > 0) {
+                        // Show the most recent package automatically
+                        showPackageDetails(packages[packages.length - 1]);
+                    }
+                } else if (isConversationActive && !shouldEnd) {
                     setBotStatusMessage("Listening...", 'right');
                     try { recognition.start(); } catch (e) { }
                 } else if (shouldEnd) {
@@ -1432,263 +1832,548 @@
         return new Blob([byteArray], { type: mimeType });
     }
 
+    // Old updatePackages and bookPackage removed.
+    // New logic is defined below.
+
+    // --- View Navigation & Mobile Menu ---
+    function switchView(viewName) {
+        // Hide all views
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+        // Show selected view
+        const view = document.getElementById(`view-${viewName}`);
+        if (view) view.classList.add('active');
+
+        // Update Nav State
+        const navBtns = document.querySelectorAll(`.nav-item[onclick="switchView('${viewName}')"]`);
+        navBtns.forEach(btn => btn.classList.add('active'));
+
+        // Mobile: Close sidebar after selection
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar.classList.contains('open')) toggleSidebar();
+
+        // Specific Layout Logic
+        if (viewName === 'chat') {
+            // Ensure avatar/chat is visible (controlled by CSS, but good to know)
+        } else if (viewName === 'packages') {
+            updatePackages(); // Refresh when entering
+        } else if (viewName === 'profile') {
+            loadProfileView();
+        }
+    }
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // --- Package Logic (List & Details) ---
     async function updatePackages() {
-        if (!sessionId) return;
+        if (!sessionId) return [];
         try {
             const res = await fetch(`/api/session/${sessionId}/packages`);
             const packages = await res.json();
-
-            const container = document.getElementById('packages-container');
             const list = document.getElementById('packages-list');
 
-            // Get Config for Current Region
-            const currentR = window.currentRegion || 'US';
-            let config;
-            if (currentR === 'OTHER') {
-                config = window.REGION_CONFIG ? window.REGION_CONFIG['US'] : null; // Fallback to US
-                if (config) {
-                    config = { ...config, label: '🇺🇸 USA (Reference only)' }; // Override label
-                }
-            } else {
-                config = window.REGION_CONFIG ? window.REGION_CONFIG[currentR] : null;
+            if (packages.length === 0) {
+                list.innerHTML = `<p style="color: #999; font-style: italic; text-align: center; margin-top: 50px;">No packages created yet.<br>Go to Chat to start planning!</p>`;
+                return [];
             }
 
-            // Fallback defaults if config missing
-            const sym = config ? config.currency : '$';
-            const tld = config ? config.tld : 'com';
-            const tag = config ? config.tag : 'rayandrae-21';
-            const regionLabel = config ? config.label : 'USA';
+            list.innerHTML = '';
 
-            // If OTHER, we might want to hide the "Add All" button or show a warning
-            const isSupportedRegion = currentR !== 'OTHER';
+            packages.forEach(pkg => {
+                // Summary Card
+                const card = document.createElement('div');
+                card.style.cssText = "background: #f9f9f9; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);";
+                card.onmouseover = () => card.style.transform = "translateY(-2px)";
+                card.onmouseout = () => card.style.transform = "none";
+                card.onclick = () => showPackageDetails(pkg);
 
-            if (packages.length > 0) {
-                container.style.display = 'block';
-                list.innerHTML = ''; // Clear current
+                const itemCount = pkg.items.length;
+                const statusIcon = pkg.status === 'booked' ? '✅' : '📝';
 
-                packages.forEach(pkg => {
-                    const pkgDiv = document.createElement('div');
-                    pkgDiv.style.cssText = "border: 1px solid #eee; border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #fdfdfd;";
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0; color:#333; font-size: 1.1rem;">${statusIcon} ${pkg.title}</h3>
+                        <span style="font-size:0.8rem; color:#666; background: #e0e0e0; padding: 2px 8px; border-radius: 10px;">${pkg.type}</span>
+                    </div>
+                    <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #666;">${itemCount} items &bull; Click to view details</p>
+                `;
+                list.appendChild(card);
+            });
 
-                    // Filter items
-                    const travelItems = pkg.items.filter(i => ['flight', 'hotel', 'activity'].includes(i.item_type));
-                    // Relaxed filter for shopping items
-                    const productItems = pkg.items.filter(i => !['flight', 'hotel', 'activity'].includes(i.item_type));
+            return packages;
 
-                    const travelTotal = travelItems.reduce((sum, i) => sum + i.price, 0);
-                    const productTotal = productItems.reduce((sum, i) => sum + i.price, 0);
-
-                    // --- Render Travel Section ---
-                    let travelHtml = '';
-                    if (travelItems.length > 0) {
-                        travelHtml += `<div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
-                            <h5 style="margin:0 0 5px 0; color:#555;">✈️ Travel & Activities</h5>
-                            <ul style="padding-left: 20px; margin: 5px 0;">`;
-                        travelItems.forEach(item => {
-                            const statusColor = item.status === 'booked' ? 'green' : (item.status === 'failed' ? 'red' : '#555');
-                            travelHtml += `<li><strong>${item.name}</strong> - ${sym}${item.price} <span style="font-size:0.8em; color:${statusColor}">[${item.status}]</span></li>`;
-                        });
-                        travelHtml += `</ul>
-                            <div style="text-align:right; font-weight:bold; margin-top:5px;">Subtotal: ${sym}${travelTotal}</div>
-                        </div>`;
-                    }
-
-                    // --- Render Product Section ---
-                    let productHtml = '';
-                    if (productItems.length > 0) {
-                        // 1. Collect ASINs for the "Add All to Basket" button
-                        let asinParams = '';
-                        let asinCount = 0;
-                        let totalItems = 0;
-
-                        productItems.forEach((item, index) => {
-                            totalItems++;
-                            const pUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : '';
-                            let asinMatch = pUrl.match(/(?:\/dp\/|\/gp\/product\/|\/d\/)([A-Z0-9]{10})/);
-                            if (!asinMatch) asinMatch = pUrl.match(/[?&]ASIN=([A-Z0-9]{10})/);
-
-                            if (asinMatch) {
-                                asinCount++;
-                                const asin = asinMatch[1];
-                                asinParams += `&ASIN.${asinCount}=${asin}&Quantity.${asinCount}=1`;
-                            }
-                        });
-
-
-                        let actionBtnHtml = '';
-                        if (asinCount > 0 && isSupportedRegion) {
-                            // Use TLD from Config
-                            const addAllUrl = `https://www.amazon.${tld}/gp/aws/cart/add.html?AssociateTag=${tag}${asinParams}`;
-                            const btnText = (asinCount === totalItems)
-                                ? `Add All ${asinCount} to Cart 🛒`
-                                : `Add ${asinCount}/${totalItems} to Cart 🛒`;
-
-                            actionBtnHtml = `<a href="${addAllUrl}" target="_blank" style="font-size:0.75rem; background:#f0c14b; color:#111; border:1px solid #a88734; padding:4px 10px; border-radius:3px; text-decoration:none; cursor:pointer; font-weight:bold;">${btnText}</a>`;
-                        } else if (!isSupportedRegion) {
-                            actionBtnHtml = `<span style="font-size:0.7rem; color:#888;">(Local cart not supported)</span>`;
-                        } else {
-                            actionBtnHtml = `<button onclick="openAllAmazonLinks('${pkg.id}')" style="font-size:0.75rem; background:#eee; color:#333; border:1px solid #ccc; padding:2px 8px; border-radius:4px; cursor:pointer;">Open All Tabs ↗</button>`;
-                        }
-
-                        productHtml += `<div>
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <h5 style="margin:0 0 5px 0; color:#555;">🛍️ Shopping List (${regionLabel})</h5>
-                                ${actionBtnHtml}
-                            </div>
-                            <ul style="padding-left: 20px; margin: 5px 0;">`;
-
-                        productItems.forEach(item => {
-                            // Use specific Product URL if available, else generic search
-                            const imageUrl = (item.metadata && item.metadata.image_url) ? item.metadata.image_url : null;
-                            const directUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : null;
-                            const amzLink = directUrl || `https://www.amazon.${tld}/s?k=${encodeURIComponent(item.name)}&tag=${tag}`;
-
-                            let imgHtml = '';
-                            if (imageUrl) {
-                                imgHtml = `<img src="${imageUrl}" style="width:50px; height:50px; object-fit:contain; border:1px solid #ddd; border-radius:4px; margin-right:10px; vertical-align:middle;">`;
-                            }
-
-                            // Store link in data attribute for "Buy All"
-                            productHtml += `<li style="display:flex; align-items:center; margin-bottom: 5px;">
-                                ${imgHtml}
-                                <span>
-                                    <strong>${item.name}</strong> - ~${sym}${item.price} 
-                                    <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="font-size:0.9em; color:#ff9900; text-decoration:none; margin-left:5px;">[Buy on Amazon ↗]</a>
-                                </span>
-                             </li>`;
-                        });
-                        productHtml += `</ul>
-                            <div style="text-align:right; font-weight:bold; margin-top:5px;">Est. Cost: ${sym}${productTotal}</div>
-                        </div>`;
-                    }
-
-                    // --- Action Buttons ---
-                    let actionButton = '';
-                    if (pkg.status === 'draft' && travelItems.length > 0) {
-                        actionButton = `<button onclick="bookPackage('${pkg.id}')" style="background: #28a745; color: white; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer; margin-top: 5px;">Pay Agent for Travel (£${travelTotal})</button>`;
-                    } else if (pkg.status === 'booked') {
-                        actionButton = `<span style="color: green; font-weight: bold;">✅ Travel Booked!</span>`;
-                    }
-
-                    pkgDiv.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                            <h4 style="margin:0; color:#333;">${pkg.title}</h4>
-                            <span style="font-size:0.8em; background:#eee; padding:2px 6px; border-radius:4px;">${pkg.type}</span>
-                        </div>
-                        ${travelHtml}
-                        ${productHtml}
-                        <div style="text-align:right; margin-top:10px; border-top: 2px solid #eee; padding-top:10px;">
-                            ${actionButton}
-                        </div>
-                    `;
-                    list.appendChild(pkgDiv);
-                });
-            } else {
-                container.style.display = 'none';
-            }
         } catch (e) {
             console.error("Failed to fetch packages", e);
+            return [];
         }
     }
 
-    // Expose updatePackages to window for Region Selector
-    window.updatePackages = updatePackages;
+    // Store current package data for "Add All" logic context if needed
+    let currentPackageDetails = null;
 
-    // Expose bookPackage to window
-    window.bookPackage = async function (pkgId) {
-        if (!sessionId) return;
-        const btn = event.target;
-        const originalText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = "Booking...";
+    // --- Review Carousel Utilities ---
+    window.renderReviewCarousel = function (reviews, reviewLink) {
+        if (!reviews || !Array.isArray(reviews) || reviews.length === 0) return '';
 
-        try {
-            const res = await fetch(`/api/packages/${sessionId}/${pkgId}/book`, { method: 'POST' });
-            const result = await res.json();
+        const carouselId = 'carousel-' + Math.random().toString(36).substr(2, 9);
 
-            if (result.status === 'success') {
-                alert("Booking Successful!");
-            } else {
-                alert("Booking Failed: " + result.message);
-            }
-            // Refresh
-            updatePackages();
-        } catch (e) {
-            alert("Error booking package");
-            console.error(e);
-            btn.disabled = false;
-            btn.textContent = originalText;
-        }
+        let slidesHtml = '';
+        reviews.forEach((review, idx) => {
+            const isObj = typeof review === 'object' && review !== null;
+            const text = isObj ? review.text : review;
+            const rating = isObj ? review.rating : null;
+
+            slidesHtml += `
+                <div class="review-slide ${idx === 0 ? 'active' : ''}" data-index="${idx}">
+                    <div style="font-style: italic; color: #555; line-height: 1.4; position: relative;">
+                        "${text}"
+                    </div>
+                    ${rating ? `<div style="font-size: 0.75rem; color: #f39c12; margin-top: 6px; font-weight: 600;">⭐ ${rating}/5</div>` : ''}
+                </div>
+            `;
+        });
+
+        return `
+            <div class="reviews-carousel" id="${carouselId}">
+                <div style="font-size: 0.7rem; font-weight: 800; color: #999; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Latest Reviews</div>
+                <div class="carousel-content">
+                    ${slidesHtml}
+                </div>
+                <div class="carousel-nav">
+                    <button class="carousel-btn prev" onclick="moveCarousel('${carouselId}', -1)">←</button>
+                    <span class="carousel-indicator">1 / ${reviews.length}</span>
+                    <button class="carousel-btn next" onclick="moveCarousel('${carouselId}', 1)">→</button>
+                    ${reviewLink ? `<a href="${reviewLink}" target="_blank" style="margin-left: auto; font-size: 0.75rem; color: var(--primary-color); text-decoration: none; font-weight: 600;">View source</a>` : ''}
+                </div>
+            </div>
+        `;
     };
 
-    // --- Tab & Profile Logic ---
-    let currentTab = 'packages';
+    window.moveCarousel = function (carouselId, direction) {
+        const carousel = document.getElementById(carouselId);
+        if (!carousel) return;
 
-    function switchTab(tab) {
-        currentTab = tab;
+        const slides = carousel.querySelectorAll('.review-slide');
+        const indicator = carousel.querySelector('.carousel-indicator');
 
-        // Update Buttons
-        document.querySelectorAll('.nav-tab').forEach(b => {
-            if (b.innerText.toLowerCase().replace(' ', '') === tab) { // simple match
-                b.classList.add('active');
-            } else {
-                b.classList.remove('active');
-            }
-            // Better match based on onclick attr or index? 
-            // Let's just assume order or use event if passed.
-        });
-        // Actually, easier to toggle classes based on clicked element if passed, 
-        // but since I used inline onclick="switchTab('packages')", I don't have 'this' easily unless passed.
-        // Let's rely on re-querying.
+        let activeIdx = 0;
+        slides.forEach((s, i) => { if (s.classList.contains('active')) activeIdx = i; });
 
-        const tabs = document.querySelectorAll('.nav-tab');
-        if (tab === 'packages') {
-            tabs[0].classList.add('active');
-            tabs[1].classList.remove('active');
+        slides[activeIdx].classList.remove('active');
 
-            document.getElementById('packages-container').style.display = 'block';
-            document.getElementById('aboutme-container').style.display = 'none';
-            // document.getElementById('panel-heading').textContent = "Your Packages"; // Heading is inside containers now
-            updatePackages();
+        let nextIdx = activeIdx + direction;
+        if (nextIdx >= slides.length) nextIdx = 0;
+        if (nextIdx < 0) nextIdx = slides.length - 1;
+
+        slides[nextIdx].classList.add('active');
+        indicator.textContent = `${nextIdx + 1} / ${slides.length}`;
+    };
+
+    function showPackageDetails(pkg) {
+        currentPackageDetails = pkg;
+        const overlay = document.getElementById('package-details-overlay');
+        const content = document.getElementById('package-details-content');
+
+        // Region Config
+        const currentR = window.currentRegion || 'US';
+        let config;
+        if (currentR === 'OTHER') {
+            config = window.REGION_CONFIG ? window.REGION_CONFIG['US'] : null;
+            if (config) config = { ...config, label: '🇺🇸 USA (Reference)' };
         } else {
-            tabs[0].classList.remove('active');
-            tabs[1].classList.add('active');
-
-            document.getElementById('packages-container').style.display = 'none';
-            document.getElementById('aboutme-container').style.display = 'block';
-            loadProfile();
+            config = window.REGION_CONFIG ? window.REGION_CONFIG[currentR] : null;
         }
+        const sym = config ? config.currency : '$';
+        const tld = config ? config.tld : 'com';
+        const tag = config ? config.tag : 'rayandrae-21';
+        const regionLabel = config ? config.label : 'USA';
+        const isSupported = currentR !== 'OTHER';
+
+        // Filter Items Helper
+        const isItineraryItem = (i) => {
+            const type = i.item_type ? i.item_type.toLowerCase() : '';
+            const name = i.name ? i.name.toLowerCase() : '';
+            if (type === 'checklist') return false; // Checklist items are separate
+            // Strict types
+            if (['flight', 'hotel', 'activity', 'accommodation', 'transportation', 'car_rental'].includes(type)) return true;
+            // Ambiguous 'travel' type heuristic
+            if (type === 'travel') {
+                const keywords = ['flight', 'fly', 'hotel', 'stay', 'accommodation', 'train', 'bus', 'trip', 'ticket', 'tour'];
+                return keywords.some(k => name.includes(k));
+            }
+            return false;
+        };
+
+        const travelItems = pkg.items.filter(isItineraryItem);
+        const checklistItems = pkg.items.filter(i => i.item_type === 'checklist');
+        const productItems = pkg.items.filter(i => !isItineraryItem(i) && i.item_type !== 'checklist');
+
+        const travelTotal = travelItems.reduce((sum, i) => sum + i.price, 0);
+        const productTotal = productItems.reduce((sum, i) => sum + i.price, 0);
+
+        // --- Build Details HTML ---
+        let html = `
+            <h2 style="margin-top:0; color:var(--primary-color);">${pkg.title}</h2>
+            <div style="margin-bottom: 20px; font-size: 0.9rem; color: #666;">
+                Type: <strong>${pkg.type}</strong> &bull; Status: <strong>${pkg.status}</strong>
+            </div>
+        `;
+
+        // 1. Shopping Section
+        if (productItems.length > 0) {
+            // Add All Logic
+            let asinParams = '';
+            let asinCount = 0;
+            productItems.forEach((item) => {
+                const pUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : '';
+                let asinMatch = pUrl.match(/(?:\/dp\/|\/gp\/product\/|\/d\/)([A-Z0-9]{10})/);
+                if (!asinMatch) asinMatch = pUrl.match(/[?&]ASIN=([A-Z0-9]{10})/);
+
+                if (asinMatch) {
+                    asinCount++;
+                    asinParams += `&ASIN.${asinCount}=${asinMatch[1]}&Quantity.${asinCount}=1`;
+                }
+            });
+
+            let actionBtnHtml = '';
+            if (asinCount > 0 && isSupported) {
+                const addAllUrl = `https://www.amazon.${tld}/gp/aws/cart/add.html?AssociateTag=${tag}${asinParams}`;
+                const btnText = (asinCount === productItems.length) ? `Add All to Cart 🛒` : `Add ${asinCount} to Cart 🛒`;
+                actionBtnHtml = `<a href="${addAllUrl}" target="_blank" class="action-btn small" style="text-decoration:none;">${btnText}</a>`;
+            } else if (!isSupported) {
+                actionBtnHtml = `<span style="font-size:0.8rem; color:#999;">(Local cart not supported)</span>`;
+            } else {
+                actionBtnHtml = `<button onclick="openAllAmazonLinks('${pkg.id}')" class="action-btn small secondary">Open All Tabs ↗</button>`;
+            }
+
+            html += `
+                <div style="background:#fdfdfd; border:1px solid #eee; border-radius:10px; padding:15px; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed #ddd; padding-bottom:5px;">
+                        <h3 style="margin:0; font-size:1.1rem;">🛍️ Shopping List (${regionLabel})</h3>
+                        ${actionBtnHtml}
+                    </div>
+                    <ul style="list-style:none; padding:0; margin:0;">
+            `;
+
+            productItems.forEach(item => {
+                const imageUrl = (item.metadata && item.metadata.image_url) ? item.metadata.image_url : null;
+                const directUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : null;
+                const amzLink = directUrl || `https://www.amazon.${tld}/s?k=${encodeURIComponent(item.name)}&tag=${tag}`;
+
+                let imgHtml = imageUrl ? `<img src="${imageUrl}" style="width:60px; height:60px; object-fit:contain; border:1px solid #eee; border-radius:4px; margin-right:15px; background:#fff;">` : '';
+
+                html += `
+                    <li style="display:flex; align-items:center; margin-bottom: 10px; background:#fff; padding:5px; border-radius:6px;">
+                        ${imgHtml}
+                        <div style="flex:1;">
+                            <div style="font-weight:600; color:#333;">${item.name}</div>
+                            <div style="font-size:0.85rem; color:#666; margin-top:2px;">
+                                ~${sym}${item.price} 
+                                <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="color:#ff9900; text-decoration:none; margin-left:8px;">Buy on Amazon ↗</a>
+                            </div>
+                        </div>
+                    </li>
+                `;
+            });
+            html += `</ul>
+                <div style="text-align:right; font-weight:bold; margin-top:10px; color:#555;">Est. Cost: ${sym}${productTotal}</div>
+            </div>`;
+        }
+
+        // 2. Itinerary Section (Travel)
+        if (travelItems.length > 0) {
+            // Group items by day (assuming items have metadata.day or we infer from order)
+            // For now, we'll group flights/hotels separately and activities by day
+            const flights = travelItems.filter(i => i.item_type && i.item_type.toLowerCase().includes('flight'));
+            const hotels = travelItems.filter(i => i.item_type && ['hotel', 'accommodation'].includes(i.item_type.toLowerCase()));
+            const activities = travelItems.filter(i => !flights.includes(i) && !hotels.includes(i));
+
+            html += `
+                <div style="background:#fdfdfd; border:1px solid #eee; border-radius:10px; padding:20px; margin-bottom:20px;">
+                    <div style="border-bottom:2px solid var(--primary-color); padding-bottom:10px; margin-bottom:20px;">
+                        <h3 style="margin:0; font-size:1.3rem; color:var(--primary-color);">✈️ Your Itinerary</h3>
+                    </div>
+            `;
+
+            // Checklist Section
+            if (checklistItems.length > 0) {
+                html += `<div style="margin-bottom:25px; background: #fffaf0; border: 1px solid #ffe4b5; border-radius: 10px; padding: 15px;">
+                    <h4 style="margin:0 0 10px 0; color:#856404; font-size:1.1rem;">📝 Pre-holiday Checklist</h4>
+                    <ul style="list-style:none; padding:0; margin:0;">`;
+                checklistItems.forEach(item => {
+                    const pUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : null;
+                    const bUrl = (item.metadata && item.metadata.review_link) ? item.metadata.review_link : null;
+                    const url = pUrl || bUrl;
+
+                    html += `
+                        <li style="display:flex; align-items:flex-start; margin-bottom: 8px; font-size: 0.95rem;">
+                            <span style="margin-right: 10px;">☐</span>
+                            <div style="flex:1;">
+                                <div style="font-weight:600;">${item.name}</div>
+                                ${item.description ? `<div style="font-size:0.85rem; color:#666; margin-top:2px;">${item.description}</div>` : ''}
+                                ${url ? `<a href="${url}" target="_blank" style="font-size:0.8rem; color:var(--primary-color); text-decoration:none; margin-top:4px; display:inline-block;">Book/View Here ↗</a>` : ''}
+                            </div>
+                        </li>
+                    `;
+                });
+                html += `</ul></div>`;
+            }
+
+            // Flights Section
+            if (flights.length > 0) {
+                html += `<div style="margin-bottom:25px;">
+                    <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">🛫 Flights</h4>`;
+                flights.forEach(flight => {
+                    const flightImage = (flight.metadata && flight.metadata.image_url) ? flight.metadata.image_url : null;
+                    const rating = (flight.metadata && flight.metadata.rating) ? flight.metadata.rating : null;
+                    const reviewLink = (flight.metadata && flight.metadata.review_link) ? flight.metadata.review_link : null;
+
+                    const reviews = (flight.metadata && flight.metadata.reviews) ? flight.metadata.reviews : null;
+                    const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
+
+                    html += `
+                        <div class="package-item-responsive" style="border-left:4px solid #667eea; overflow: hidden;">
+                            ${flightImage ? `<img src="${flightImage}" alt="Flight">` : ''}
+                            <div class="package-item-details">
+                                <div style="font-weight:600; color:#333; margin-bottom:4px;">${flight.name}</div>
+                                <div style="font-size:0.85rem; color:#666;">${sym}${flight.price}</div>
+                                ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:#667eea; text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
+                                ${flight.description ? `<div style="font-size:0.8rem; color:#888; margin-top:6px;">${flight.description}</div>` : ''}
+                                ${reviewCarouselHtml}
+                            </div>
+                        </div>`;
+                });
+                html += `</div>`;
+            }
+
+            // Hotels Section
+            if (hotels.length > 0) {
+                html += `<div style="margin-bottom:25px;">
+                    <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">🏨 Accommodation</h4>`;
+                hotels.forEach(hotel => {
+                    const hotelImage = (hotel.metadata && hotel.metadata.image_url) ? hotel.metadata.image_url : null;
+                    const rating = (hotel.metadata && hotel.metadata.rating) ? hotel.metadata.rating : null;
+                    const reviewLink = (hotel.metadata && hotel.metadata.review_link) ? hotel.metadata.review_link : null;
+
+                    const reviews = (hotel.metadata && hotel.metadata.reviews) ? hotel.metadata.reviews : null;
+                    const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
+
+                    html += `
+                        <div class="package-item-responsive" style="border-left:4px solid #764ba2; overflow: hidden;">
+                            ${hotelImage ? `<img src="${hotelImage}" alt="Hotel">` : ''}
+                            <div class="package-item-details">
+                                <div style="font-weight:600; color:#333; margin-bottom:4px;">${hotel.name}</div>
+                                <div style="font-size:0.85rem; color:#666;">${sym}${hotel.price}</div>
+                                ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:#764ba2; text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
+                                ${hotel.description ? `<div style="font-size:0.8rem; color:#888; margin-top:6px;">${hotel.description}</div>` : ''}
+                                ${reviewCarouselHtml}
+                            </div>
+                        </div>`;
+                });
+                html += `</div>`;
+            }
+
+            // Activities - Day by Day
+            if (activities.length > 0) {
+                html += `<div style="margin-bottom:15px;">
+                    <h4 style="margin:0 0 15px 0; color:#555; font-size:1rem;">🎯 Activities & Experiences</h4>`;
+
+                // Group activities by day (if metadata.day exists, otherwise infer from order)
+                const activityDays = {};
+
+                // Check if ANY activity has explicit day metadata
+                const hasExplicitDays = activities.some(a => a.metadata && a.metadata.day !== undefined);
+
+                if (hasExplicitDays) {
+                    // Use explicit day metadata
+                    activities.forEach((activity, idx) => {
+                        const day = (activity.metadata && activity.metadata.day !== undefined) ? activity.metadata.day : (idx + 1);
+                        if (!activityDays[day]) activityDays[day] = [];
+                        activityDays[day].push(activity);
+                    });
+                } else {
+                    // Infer days from order: assume first activity is Day 0 if it's airport-related, otherwise Day 1
+                    let currentDay = 0;
+                    let activitiesPerDay = 3; // Assume ~3 activities per day
+
+                    activities.forEach((activity, idx) => {
+                        // Check if this is a travel/airport activity
+                        const name = activity.name ? activity.name.toLowerCase() : '';
+                        const isTravel = name.includes('airport') || name.includes('travel to') || name.includes('transfer');
+                        const isWelcome = name.includes('welcome home');
+
+                        // Day 0: First travel to airport
+                        // Day 1+: Regular activities (grouped by 3s)
+                        // Final: Travel to airport + Welcome home
+                        if (idx === 0 && isTravel) {
+                            currentDay = 0;
+                        } else if (isWelcome) {
+                            currentDay = Math.ceil(activities.length / activitiesPerDay);
+                        } else if (isTravel && idx > 0) {
+                            // Likely final day travel to airport
+                            currentDay = Math.ceil((idx - 1) / activitiesPerDay);
+                        } else {
+                            // Regular activity
+                            currentDay = Math.ceil((idx + 1) / activitiesPerDay);
+                        }
+
+                        if (!activityDays[currentDay]) activityDays[currentDay] = [];
+                        activityDays[currentDay].push(activity);
+                    });
+                }
+
+                Object.keys(activityDays).sort((a, b) => parseInt(a) - parseInt(b)).forEach(day => {
+                    const dayActivities = activityDays[day];
+                    const dayDate = dayActivities[0].metadata && dayActivities[0].metadata.date ? dayActivities[0].metadata.date : '';
+
+                    // Special labels for Day 0 and final day
+                    let dayLabel = `Day ${day}`;
+                    if (parseInt(day) === 0) {
+                        dayLabel = '🛫 Departure Day';
+                    } else if (dayActivities.some(a => a.name && a.name.toLowerCase().includes('welcome home'))) {
+                        dayLabel = '🏡 Return Day';
+                    }
+
+                    html += `
+                        <div style="background:linear-gradient(135deg, rgba(102,126,234,0.05) 0%, rgba(118,75,162,0.05) 100%); border-radius:12px; padding:15px; margin-bottom:15px; border:1px solid #e8e8f0;">
+                            <div style="margin-bottom:12px;">
+                                <div style="font-size:1.1rem; font-weight:700; color:var(--primary-color);">${dayLabel}</div>
+                                ${dayDate ? `<div style="font-size:0.85rem; color:#888; margin-top:2px;">${dayDate}</div>` : ''}
+                            </div>
+                            <div style="display:grid; gap:10px;">
+                    `;
+
+                    dayActivities.forEach(activity => {
+                        const imageUrl = (activity.metadata && activity.metadata.image_url) ? activity.metadata.image_url : null;
+                        const rating = (activity.metadata && activity.metadata.rating) ? activity.metadata.rating : null;
+                        const reviewLink = (activity.metadata && activity.metadata.review_link) ? activity.metadata.review_link : null;
+                        const imgHtml = imageUrl ?
+                            `<img src="${imageUrl}" alt="${activity.name}">` : '';
+
+                        const reviews = (activity.metadata && activity.metadata.reviews) ? activity.metadata.reviews : null;
+                        const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
+
+                        html += `
+                            <div class="package-item-responsive">
+                                ${imgHtml}
+                                <div class="package-item-details">
+                                    <div style="font-weight:600; color:#333; margin-bottom:6px; font-size:0.95rem;">${activity.name}</div>
+                                    <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">${sym}${activity.price}</div>
+                                    ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:var(--primary-color); text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
+                                    ${activity.description ? `<div style="font-size:0.8rem; color:#666; line-height:1.4; margin-top:8px;">${activity.description}</div>` : ''}
+                                    ${reviewCarouselHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+            }
+
+            html += `
+                <div style="text-align:right; font-weight:bold; margin-top:15px; padding-top:15px; border-top:2px solid #eee; color:#555; font-size:1.1rem;">
+                    Total: ${sym}${travelTotal}
+                </div>
+            </div>`;
+        }
+
+        // Booking Action
+        if (pkg.status === 'draft' && travelItems.length > 0) {
+            html += `
+                <div style="text-align:center; margin-top:20px;">
+                    <button onclick="bookPackage('${pkg.id}')" class="action-btn" style="background:#28a745; font-size:1.1rem; padding:10px 30px;">
+                        Book Travel Now (${sym}${travelTotal})
+                    </button>
+                    <p style="font-size:0.8rem; color:#888; margin-top:5px;">Secure payment via Agent</p>
+                </div>
+            `;
+        }
+
+        content.innerHTML = html;
+        overlay.classList.remove('hidden');
+        document.getElementById('packages-container').style.display = 'none'; // Hide list
     }
 
-    async function loadProfile() {
+    function closePackageDetails() {
+        document.getElementById('package-details-overlay').classList.add('hidden');
+        document.getElementById('packages-container').style.display = 'block'; // Show list
+        currentPackageDetails = null;
+    }
+
+    // --- Profile Logic ---
+    function toggleProfileEdit() {
+        document.getElementById('edit-profile-btn').style.display = 'none';
+        document.getElementById('profile-read-mode').style.display = 'none';
+        document.getElementById('profile-edit-mode').style.display = 'block';
+
+        // Load current content into textarea
+        const currentContent = document.getElementById('profile-content').innerText;
+        // Ideally we fetch raw content again to avoid stripping markdown
+        loadProfileRaw();
+    }
+
+    function cancelProfileEdit() {
+        document.getElementById('edit-profile-btn').style.display = 'inline-block';
+        document.getElementById('profile-read-mode').style.display = 'block';
+        document.getElementById('profile-edit-mode').style.display = 'none';
+    }
+
+    async function loadProfileView() {
+        // Fetch rendered HTML or raw text? Let's just use raw text and simple render for now.
+        // Or better, fetch profile and assume it's just text for now as we don't have a markdown parser lib loaded.
         try {
             const res = await fetch(`/api/profile/web_user`);
             const data = await res.json();
-            document.getElementById('profile-editor').value = data.content;
+            // Simple textual display for Read Mode (preserving whitespace)
+            document.getElementById('profile-content').style.whiteSpace = 'pre-wrap';
+            document.getElementById('profile-content').textContent = data.content || "No profile information yet.";
         } catch (e) {
-            console.error("Failed to load profile", e);
+            console.error(e);
         }
+    }
+
+    async function loadProfileRaw() {
+        try {
+            const res = await fetch(`/api/profile/web_user`);
+            const data = await res.json();
+            document.getElementById('profile-editor').value = data.content || "";
+        } catch (e) { }
     }
 
     async function saveProfile() {
         const content = document.getElementById('profile-editor').value;
-        const btn = event.target;
+        const btn = document.querySelector('#profile-edit-mode .action-btn:last-child');
         const originalText = btn.textContent;
         btn.textContent = "Saving...";
         btn.disabled = true;
 
         try {
-            const res = await fetch(`/api/profile/web_user`, {
+            await fetch(`/api/profile/web_user`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: content })
             });
-            // alert("Profile Saved!");
-            btn.textContent = "Saved!";
-            setTimeout(() => {
-                btn.textContent = originalText;
-                btn.disabled = false;
-            }, 2000);
+
+            // Switch back to Read Mode
+            cancelProfileEdit();
+            loadProfileView();
+
+            btn.textContent = originalText;
+            btn.disabled = false;
+
+            // Chat switch & Reconciliation disabled as per user request
+            // switchView('chat');
+            // sendSystemTrigger(...);
+
         } catch (e) {
             console.error("Failed to save profile", e);
             alert("Error saving profile");
@@ -1697,19 +2382,146 @@
         }
     }
 
-    // Expose to window for inline onclick handlers
-    window.switchTab = switchTab;
+    // Send a system message that acts like a user message but is invisible or specially handled
+    // For simplicity, we'll just send it as a user message but MAYBE hide it? 
+    // The prompt says "ask permission", so it's better if the user sees the agent responding ta *something*.
+    // Let's send a hidden message to the backend only?
+    // Actually, `sendMessage` puts it in transcript.
+    // Let's manually call the chat API and then add the BOT response.
+
+    async function sendSystemTrigger(text) {
+        if (!sessionId) return;
+
+        // Don't show this trigger in the UI transcript as a user bubble
+        // display nothing
+
+        try {
+            // We need to simulate the user saying this, but formatted as a system event?
+            // Or just a normal message that describes what happened.
+            // "System Event: User updated profile."
+
+            // Let's use the existing chat endpoint but maybe we can suppress the user bubble?
+            // We will manually fetch and NOT call 'addMessage' for the user part.
+
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    text: `[SYSTEM EVENT: ${text}]`,
+                    region: window.currentRegion || 'US'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.reply) {
+                addMessage('Bot', data.reply);
+                speak(data.reply);
+            }
+        } catch (e) {
+            console.error("Trigger failed", e);
+        }
+    }
+
+    // Init
+    window.addEventListener('load', () => {
+        // Init avatar is called by ThreeJS init
+        // Switch to Chat by default
+        switchView('chat');
+
+        // Restore Packages if session exists
+        if (sessionId) {
+            updatePackages();
+        }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            const sidebar = document.getElementById('sidebar');
+            const hamburger = document.querySelector('.hamburger');
+
+            // Only if sidebar is open and on mobile (checked via CSS/window width or just logic)
+            if (sidebar.classList.contains('open') &&
+                !sidebar.contains(e.target) &&
+                !hamburger.contains(e.target)) {
+                toggleSidebar();
+            }
+        });
+    });
+
+    async function sendChatMessage() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if (!text || isProcessing) return;
+
+        input.value = '';
+        addMessage('You', text);
+
+        // Hide start button if active
+        const btn = document.getElementById('dynamic-start-btn');
+        if (btn) btn.remove();
+
+        isConversationActive = true;
+        isProcessing = true;
+        startProcessingStatus();
+
+        try {
+            const requestBody = {
+                message: text,
+                region: window.currentRegion || 'UK'
+            };
+            if (sessionId) requestBody.session_id = sessionId;
+
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            stopProcessingStatus();
+
+            const data = await response.json();
+            if (data.session_id) {
+                sessionId = data.session_id;
+                localStorage.setItem('chat_session_id', sessionId);
+            }
+
+            // Update packages view
+            updatePackages();
+
+            // Speak response
+            speak(data.response);
+        } catch (e) {
+            console.error("Chat message failed:", e);
+            isProcessing = false;
+            stopProcessingStatus();
+        }
+    }
+
+    // Add Enter key listener
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && document.activeElement.id === 'chat-input') {
+            sendChatMessage();
+        }
+    });
+
+    // Expose globals
+    window.sendChatMessage = sendChatMessage;
+    window.switchView = switchView;
+    window.toggleSidebar = toggleSidebar;
+    window.updatePackages = updatePackages;
     window.saveProfile = saveProfile;
-    window.loadProfile = loadProfile;
+    window.cancelProfileEdit = cancelProfileEdit;
+    window.toggleProfileEdit = toggleProfileEdit;
+    window.showPackageDetails = showPackageDetails;
+    window.closePackageDetails = closePackageDetails;
 
     window.openAllAmazonLinks = function (pkgId) {
+        // Re-query links based on pkgId class
         const links = document.querySelectorAll(`.amz-link-${pkgId}`);
         if (links.length === 0) return;
-
-        if (confirm(`Open ${links.length} Amazon tabs? (Ensure popups are allowed)`)) {
-            links.forEach(link => {
-                window.open(link.href, '_blank');
-            });
+        if (confirm(`Open ${links.length} Amazon tabs?`)) {
+            links.forEach(link => window.open(link.href, '_blank'));
         }
     };
 
