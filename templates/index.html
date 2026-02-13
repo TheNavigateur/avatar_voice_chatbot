@@ -645,6 +645,78 @@
         .hidden {
             display: none !important;
         }
+
+        /* Shopping Checklist Table Styles */
+        .shopping-checklist-container {
+            margin-top: 15px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .checklist-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .checklist-table th {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 2px solid #f1f5f9;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .checklist-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .checklist-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .checklist-column-header {
+            text-align: center !important;
+        }
+
+        .checklist-checkbox-cell {
+            text-align: center;
+        }
+
+        .checklist-checkbox-cell input {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary-color);
+        }
+
+        .checklist-continue-container {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .checklist-continue-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .checklist-continue-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
     </style>
     <!-- Import Maps -->
     <script type="importmap">
@@ -1643,15 +1715,117 @@
         const div = document.createElement('div');
         const isUser = sender === 'You';
         div.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
+
+        let displayContent = text;
+        let checklistHtml = '';
+
+        // Check for Shopping Checklist block
+        if (text.includes('[SHOPPING_CHECKLIST]')) {
+            const checklistRegex = /\[SHOPPING_CHECKLIST\]([\s\S]*?)\[\/SHOPPING_CHECKLIST\]/;
+            const match = text.match(checklistRegex);
+            if (match) {
+                try {
+                    const checklistData = JSON.parse(match[1]);
+                    checklistHtml = renderShoppingTable(checklistData.items);
+                    displayContent = text.replace(checklistRegex, '').trim();
+                } catch (e) {
+                    console.error("Failed to parse shopping checklist JSON", e);
+                }
+            }
+        }
+
         div.innerHTML = `
             <div class="message-bubble">
                 <div class="bubble-sender">${sender}</div>
-                <div>${text}</div>
+                <div>${displayContent}</div>
+                ${checklistHtml}
             </div>
         `;
         const tDiv = document.getElementById('transcript');
         tDiv.appendChild(div);
         tDiv.scrollTop = tDiv.scrollHeight;
+    }
+
+    function renderShoppingTable(items) {
+        let rows = '';
+        items.forEach((item, index) => {
+            const name = item.name;
+            const status = item.status || 'need';
+
+            rows += `
+                <tr>
+                    <td style="font-weight: 500;">${name}</td>
+                    <td class="checklist-checkbox-cell">
+                        <input type="radio" name="item-${index}" ${status === 'have' ? 'checked' : ''} onclick="updateChecklistFact('${name}', 'have')">
+                    </td>
+                    <td class="checklist-checkbox-cell">
+                        <input type="radio" name="item-${index}" ${status === 'need' ? 'checked' : ''} onclick="updateChecklistFact('${name}', 'need')">
+                    </td>
+                    <td class="checklist-checkbox-cell">
+                        <input type="radio" name="item-${index}" ${status === 'dont_want' ? 'checked' : ''} onclick="updateChecklistFact('${name}', 'dont_want')">
+                    </td>
+                </tr>
+            `;
+        });
+
+        return `
+            <div class="shopping-checklist-container">
+                <table class="checklist-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th class="checklist-column-header">Have</th>
+                            <th class="checklist-column-header">Need</th>
+                            <th class="checklist-column-header">No</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+                <div class="checklist-continue-container">
+                    <button class="checklist-continue-btn" onclick="continueShoppingConversation()">Continue</button>
+                    <button class="checklist-continue-btn" style="background:#64748b; margin-left:10px;" onclick="continueShoppingConversation('Skip checklist')">Skip</button>
+                </div>
+            </div>
+        `;
+    }
+
+    async function updateChecklistFact(itemName, status) {
+        console.log(`Updating ${itemName} to ${status}`);
+        let fact = "";
+        let remove = false;
+
+        if (status === 'have') {
+            fact = `I have ${itemName}`;
+        } else if (status === 'dont_want') {
+            fact = `I don't want ${itemName}`;
+        } else {
+            // If they click 'need', it implies they don't have it and didn't say 'don't want'.
+            // For now, we'll just remove the 'I have' or 'I don't want' facts if they exist.
+            remove = true;
+            fact = itemName; // The backend uses a simple regex to remove lines containing this
+        }
+
+        try {
+            await fetch('/api/profile/fact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: 'web_user',
+                    fact: fact,
+                    remove: remove
+                })
+            });
+        } catch (e) {
+            console.error("Failed to update profile fact", e);
+        }
+    }
+
+    function continueShoppingConversation(optionalMessage) {
+        const msg = optionalMessage || "I've updated the checklist. Let's continue.";
+        document.getElementById('chat-input').value = msg;
+        sendChatMessage();
     }
 
     let lastStatusText = "";
@@ -1725,6 +1899,12 @@
             text = text.replace('[NAVIGATE_TO_PACKAGE]', '').trim();
         }
 
+        // Strip Shopping Checklist block from TTS (but keep it for display)
+        let ttsText = text;
+        if (ttsText.includes('[SHOPPING_CHECKLIST]')) {
+            ttsText = ttsText.replace(/\[SHOPPING_CHECKLIST\][\s\S]*?\[\/SHOPPING_CHECKLIST\]/g, '').trim();
+        }
+
         try {
             const provider = document.getElementById('ttsProvider').value;
             const avatar = document.getElementById('avatarSelector').value;
@@ -1749,7 +1929,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    text: text,
+                    text: ttsText,
                     language_code: 'en-GB',
                     voice_name: voiceName,
                     provider: provider

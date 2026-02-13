@@ -43,6 +43,11 @@ class TTSRequest(BaseModel):
 class ProfileUpdateRequest(BaseModel):
     content: str
 
+class ProfileFactRequest(BaseModel):
+    user_id: str
+    fact: str
+    remove: bool = False
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -54,6 +59,17 @@ async def get_profile(user_id: str):
 @app.post("/api/profile/{user_id}")
 async def update_profile(user_id: str, request: ProfileUpdateRequest):
     ProfileService.update_profile(user_id, request.content)
+    return {"status": "success"}
+
+@app.post("/api/profile/fact")
+async def update_profile_fact(request: ProfileFactRequest):
+    if request.remove:
+        # Simple removal logic: find line and remove it
+        current = ProfileService.get_profile(request.user_id)
+        lines = [l for l in current.split('\n') if request.fact.lower() not in l.lower()]
+        ProfileService.update_profile(request.user_id, "\n".join(lines))
+    else:
+        ProfileService.append_to_profile(request.user_id, request.fact)
     return {"status": "success"}
 
 @app.post("/chat")
