@@ -12,7 +12,7 @@ class BookingService:
     def get_packages(session_id: str) -> List[Package]:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM packages WHERE session_id = ?", (session_id,))
+        c.execute("SELECT * FROM packages WHERE session_id = ? ORDER BY rowid ASC", (session_id,))
         rows = c.fetchall()
         
         packages = []
@@ -44,7 +44,57 @@ class BookingService:
             packages.append(Package(
                 id=pkg_id,
                 session_id=row['session_id'],
-                user_id=row['user_id'] if 'user_id' in row.keys() else "web_user",
+                user_id=row['user_id'] if row['user_id'] else "web_user",
+                title=row['title'],
+                type=PackageType(row['type']),
+                status=BookingStatus(row['status']),
+                total_price=row['total_price'],
+                items=items
+            ))
+        conn.close()
+        return packages
+
+    @staticmethod
+    def get_user_packages(user_id: str) -> List[Package]:
+        conn = get_db_connection()
+        c = conn.cursor()
+        # If user_id is web_user, also include legacy packages with no user_id
+        if user_id == "web_user":
+            c.execute("SELECT * FROM packages WHERE user_id = ? OR user_id IS NULL OR user_id = '' ORDER BY rowid DESC", (user_id,))
+        else:
+            c.execute("SELECT * FROM packages WHERE user_id = ? ORDER BY rowid DESC", (user_id,))
+        rows = c.fetchall()
+        
+        packages = []
+        for row in rows:
+            pkg_id = row['id']
+            # Get items for this package
+            c.execute("SELECT * FROM package_items WHERE package_id = ?", (pkg_id,))
+            item_rows = c.fetchall()
+            items = []
+            for item in item_rows:
+                try:
+                    meta = json.loads(item['metadata']) if item['metadata'] else {}
+                except:
+                    meta = {}
+
+                # Handle potentially missing status
+                item_status = item['status'] if item['status'] else 'draft'
+
+                items.append(PackageItem(
+                    id=item['id'] if item['id'] else str(uuid.uuid4()),
+                    name=item['name'],
+                    item_type=item['item_type'],
+                    price=item['price'],
+                    status=BookingStatus(item_status),
+                    description=item['description'],
+                    metadata=meta
+                ))
+            
+            packages.append(Package(
+                id=pkg_id,
+                session_id=row['session_id'],
+                user_id=row['user_id'] if row['user_id'] else "web_user",
                 title=row['title'],
                 type=PackageType(row['type']),
                 status=BookingStatus(row['status']),
@@ -91,7 +141,7 @@ class BookingService:
         pkg = Package(
             id=pkg_id,
             session_id=row['session_id'],
-            user_id=row['user_id'] if 'user_id' in row.keys() else "web_user",
+            user_id=row['user_id'] if row['user_id'] else "web_user",
             title=row['title'],
             type=PackageType(row['type']),
             status=BookingStatus(row['status']),

@@ -238,7 +238,7 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 4px;
             padding-right: 5px;
         }
 
@@ -497,7 +497,7 @@
         }
 
         .message {
-            margin-bottom: 4px;
+            margin-bottom: 12px;
             display: flex;
             flex-direction: column;
             width: 100%;
@@ -1443,6 +1443,7 @@
     let isConversationActive = false;
     let isBotSpeaking = false;
     let isProcessing = false;
+    let isUpdatingPackages = false;
     let startBtn = null; // Dynamic ref
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1653,8 +1654,11 @@
         tDiv.scrollTop = tDiv.scrollHeight;
     }
 
-    // Helper for Status Indicators
+    let lastStatusText = "";
     function setBotStatusMessage(text, align = 'center') {
+        if (text === lastStatusText) return;
+        lastStatusText = text;
+
         const tDiv = document.getElementById('transcript');
 
         const div = document.createElement('div');
@@ -1665,7 +1669,7 @@
         if (align === 'left') alignSelf = 'flex-start';
         if (align === 'right') alignSelf = 'flex-end';
 
-        div.style.cssText = `text-align: ${align}; align-self: ${alignSelf}; color: #888; font-style: italic; margin: 5px 0; font-size: 0.9em; opacity: 0.8; max-width: 80%;`;
+        div.style.cssText = `text-align: ${align}; align-self: ${alignSelf}; color: #888; font-style: italic; margin: 0; font-size: 0.85em; opacity: 0.8; max-width: 85%;`;
         div.textContent = text;
 
         tDiv.appendChild(div);
@@ -1857,6 +1861,7 @@
         if (viewName === 'chat') {
             // Ensure avatar/chat is visible (controlled by CSS, but good to know)
         } else if (viewName === 'packages') {
+            closePackageDetails(); // Ensure list is shown, not old details
             updatePackages(); // Refresh when entering
         } else if (viewName === 'profile') {
             loadProfileView();
@@ -1870,9 +1875,13 @@
     // --- Package Logic (List & Details) ---
     async function updatePackages() {
         if (!sessionId) return [];
+        if (isUpdatingPackages) return [];
+        isUpdatingPackages = true;
+        console.log(`[UI] Updating packages for user: web_user`);
         try {
-            const res = await fetch(`/api/session/${sessionId}/packages`);
+            const res = await fetch(`/api/user/web_user/packages`);
             const packages = await res.json();
+            console.log(`[UI] Received ${packages.length} packages`);
             const list = document.getElementById('packages-list');
 
             if (packages.length === 0) {
@@ -1908,6 +1917,8 @@
         } catch (e) {
             console.error("Failed to fetch packages", e);
             return [];
+        } finally {
+            isUpdatingPackages = false;
         }
     }
 
@@ -1973,6 +1984,11 @@
     };
 
     function showPackageDetails(pkg) {
+        if (!pkg) {
+            console.error("[UI] Attempted to show details for null package");
+            return;
+        }
+        console.log(`[UI] Showing details for package: ${pkg.title} (${pkg.id})`);
         currentPackageDetails = pkg;
         const overlay = document.getElementById('package-details-overlay');
         const content = document.getElementById('package-details-content');

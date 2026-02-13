@@ -326,8 +326,8 @@ class VoiceAgent:
         except Exception:
             pass
 
-        # Fetch the latest draft package for this session
-        latest_package = BookingService.get_latest_session_package(session_id)
+        # Fetch the latest draft package for this user (across sessions)
+        latest_package = BookingService.get_latest_user_package(user_id)
         package_context = "No active draft package."
         if latest_package:
             items_desc = ", ".join([f"{i.item_type}: {i.name}" for i in latest_package.items])
@@ -428,9 +428,6 @@ class VoiceAgent:
             1. **Activity Discovery**: Ask what type of experience they'd like for the day, allowing for a mix (e.g., "For Day 2, would you prefer something active like [Search Concept A], something relaxed like [Search Concept B], or a bit of both?").
             2. **Silent Search**: Call `search_activities_amadeus()` based on their answer.
             3. **Proactive Add**: Pick the best match from tool results and add it. 
-            4. **Shopping Discovery**: "Since we've added [Activity], would you like to see some [Relevant Products] to take with you?" 
-               - If YES: Search Amazon silently, identify the best-rated item, and ask: "I've found a highly-rated [Product Category]. Would you like the [Specific Feature A] version or the [Specific Feature B] version?"
-               - Add based on preference.
             
             **Phase 4: Complete & Final Reveal**
             1. Add return travel.

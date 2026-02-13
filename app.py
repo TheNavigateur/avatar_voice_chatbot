@@ -76,6 +76,11 @@ async def get_packages(session_id: str):
     packages = BookingService.get_packages(session_id)
     return [p.dict() for p in packages]
 
+@app.get("/api/user/{user_id}/packages")
+async def get_user_packages(user_id: str):
+    packages = BookingService.get_user_packages(user_id)
+    return [p.dict() for p in packages]
+
 @app.post("/api/packages/{session_id}/{package_id}/book")
 async def book_package(session_id: str, package_id: str):
     package = BookingService.get_package(session_id, package_id)
