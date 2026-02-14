@@ -518,7 +518,11 @@ def check_amazon_stock(product_name: str, variant_details: str, region: str = "U
         
         rating_obj = best_match.get("rating") or {}
         rating = rating_obj.get("value")
+        rating_count = rating_obj.get("votes_count") or rating_obj.get("rating_count") or rating_obj.get("reviews_count") or 0
+        
         rating_str = f"Rating: {rating}⭐" if rating else ""
+        if rating and rating_count:
+            rating_str = f"Rating: {rating}⭐ ({rating_count} ratings)"
         
         # Add delivery info to output if detected
         delivery_info = ""
@@ -532,6 +536,7 @@ def check_amazon_stock(product_name: str, variant_details: str, region: str = "U
                 f"Full Details:\n"
                 f"- Image URL: {image_url}\n"
                 f"- Product URL: {product_url}\n"
+                f"- Rating Count: {rating_count}\n"
                 f"Match: Found via {(best_match.get('type','unknown')).title()}.")
     else:
             return (f"⚠️ **Check Required**\n"

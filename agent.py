@@ -39,7 +39,7 @@ def create_new_package_tool(session_id: str, user_id: str, title: str, package_t
     pkg = BookingService.create_package(session_id, title, p_type, user_id=user_id)
     return f"Created new package: {pkg.title} (ID: {pkg.id})"
 
-def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None):
+def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None):
     """
     Adds an item to an existing package.
     Args:
@@ -49,40 +49,25 @@ def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, i
         item_type: Type of item (flight, hotel, activity, product).
         price: Estimated price.
         description: Optional description.
-        image_url: Optional URL of the product/activity/hotel image.
+        image_url: Optional primary URL of the product/activity/hotel image.
         product_url: Optional direct URL to the product page.
         day: Optional day number for itinerary (e.g., 1, 2, 3).
         date: Optional date string for itinerary (e.g., 'March 10, 2024').
         rating: Optional rating (e.g., 4.5 out of 5).
         review_link: Optional link to reviews.
         reviews: Optional list of objects with "text" and "rating" (e.g. [{"text": "Great!", "rating": 5}, ...]).
+        images: Optional list of image URLs for carousel.
     """
     item = PackageItem(name=item_name, item_type=item_type, price=price, description=description)
     
-    # If no image_url provided and it's an activity, search for one
-    if not image_url and item_type == 'activity':
-        try:
-            image_service = ImageSearchService()
-            # Extract location from package if possible, otherwise just use activity name
-            pkg = BookingService.get_package(session_id, package_id)
-            location = None
-            if pkg and pkg.title:
-                # Try to extract location from package title (e.g., "Paris Holiday" -> "Paris")
-                location = pkg.title.replace('Holiday', '').replace('Trip', '').replace('Getaway', '').strip()
-            
-            image_url = image_service.get_activity_image(item_name, location)
-            if image_url:
-                logger.info(f"Auto-found image for {item_name}: {image_url}")
-        except Exception as e:
-            logger.warning(f"Failed to auto-search image for {item_name}: {e}")
-    
-    # Validate image URL - reject unreliable sources that often fail to load
-    if image_url:
-        unreliable_domains = ['getyourguide.com', 'tripadvisor.com', 'viator.com', 'booking.com']
+    # Multi-image support
+    if not images:
+        images = []
+        if image_url:
+            images.append(image_url)
         
-        if any(domain in image_url.lower() for domain in unreliable_domains):
-            logger.warning(f"Rejecting unreliable image URL: {image_url}")
-            # Try to find a better image from reliable sources
+        # If we still have few images, search for more
+        if len(images) < 3:
             try:
                 image_service = ImageSearchService()
                 pkg = BookingService.get_package(session_id, package_id)
@@ -90,21 +75,30 @@ def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, i
                 if pkg and pkg.title:
                     location = pkg.title.replace('Holiday', '').replace('Trip', '').replace('Getaway', '').strip()
                 
-                better_image = image_service.get_activity_image(item_name, location)
+                found_images = []
+                if item_type == 'activity':
+                    found_images = image_service.get_activity_image(item_name, location, num=5)
+                elif item_type == 'hotel':
+                    found_images = image_service.get_hotel_image(item_name, num=5)
+                elif item_type == 'flight':
+                    found_images = image_service.get_flight_image(item_name, num=5)
                 
-                # Only use if it's from a reliable source
-                if better_image and not any(domain in better_image.lower() for domain in unreliable_domains):
-                    image_url = better_image
-                    logger.info(f"Found reliable alternative: {image_url}")
-                else:
-                    # No reliable image found, don't store any image
-                    image_url = None
-                    logger.info(f"No reliable image for {item_name}, will display without image")
+                # Filter out current image_url and duplicates
+                for img in found_images:
+                    if img not in images:
+                        images.append(img)
+                    if len(images) >= 5:
+                        break
             except Exception as e:
-                logger.warning(f"Failed to find alternative image: {e}")
-                image_url = None
-    
+                logger.warning(f"Failed to auto-search multiple images for {item_name}: {e}")
+
     # Store extended details in metadata
+    if images:
+        item.metadata['images'] = images
+        # Set primary image_url if not already set
+        if not image_url:
+            image_url = images[0]
+            
     if image_url:
         item.metadata['image_url'] = image_url
     if product_url:
@@ -216,9 +210,9 @@ class VoiceAgent:
             """Creates a new package. ⚠️ DO NOT ASK USER FOR TITLE. You MUST generate a short, descriptive title yourself (e.g. 'Paris Trip', 'Birthday List')."""
             return create_new_package_tool(session_id, user_id, title, package_type)
             
-        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None):
-            """Adds an item to a package. For activities, ALWAYS include day, date, image_url, rating, review_link, and a list of 3-5 'reviews' (each with 'text' and 'rating'). For hotels/flights, include image_url, rating, review_link, and 'reviews'."""
-            return add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description, image_url, product_url, day, date, rating, review_link, reviews)
+        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None):
+            """Adds an item to a package. For activities, ALWAYS include day, date, image_url (or 'images' list), rating, review_link, and a list of 3-5 'reviews' (each with 'text' and 'rating'). For hotels/flights, include image_url/images, rating, review_link, and 'reviews'."""
+            return add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description, image_url, product_url, day, date, rating, review_link, reviews, images)
 
         def save_user_info_bound(fact: str):
             """Saves a permanent fact or preference about the user to their 'About Me' profile."""
@@ -389,11 +383,11 @@ class VoiceAgent:
                - **NEW SESSION ({is_first_message})**: If this is the start of a session and the user greets you:
                  - Introduce yourself: "Hi! I'm Ray."
                  - **GREETING RULE (STRICT)**: EVEN if the **ABOUT ME** mentions a specific location (e.g., "Italy", "Maldives"), you MUST NOT name it in your greeting. Use the *type* of experience instead.
-                 - **BOOKED HOLIDAY OPTION**: If a **Recently Booked Holiday** exists, offer the shopping flow: "Since you've booked your {latest_booked_package.title if latest_booked_package else 'holiday'}, would you like to see some recommended items to take with you?".
-                 - **CONTINUE PACKAGE**: If an **Active Package** exists in the context, ask if they want to continue building it (unless you already offered the booked holiday option).
+                 - **BOOKED HOLIDAY OPTION**: If a **Recently Booked Holiday** exists, offer the shopping flow: "Since you've booked your {latest_booked_package.title if latest_booked_package else 'holiday'}, would you like to see some recommended items to take with you? [OPTIONS: [\"Yes, please!\", \"No thanks\"]]".
+                 - **CONTINUE PACKAGE**: If an **Active Package** exists in the context, ask if they want to continue building it (unless you already offered the booked holiday option): "I see we have an active package for {latest_package.title if latest_package else 'your holiday'}. Would you like to continue building it? [OPTIONS: [\"Yes, let's continue\", \"Start something new\"]]".
                  - **SUGGEST NEW**: If no active package or if they want something new:
-                   - If **ABOUT ME** contains actual interests/preferences (beyond "new user"): Suggest a contextual holiday as a *possibility* based on their interests.
-                   - If **ABOUT ME** is empty or just says "new user": Ask suggestively: "Hi! I'm Ray. Are you thinking about a holiday?".
+                   - If **ABOUT ME** contains actual interests/preferences (beyond "new user"): Suggest a contextual holiday as a *possibility* based on their interests. Example: "Hi! I'm Ray. Would you like to plan a trip based on your love for beaches? [OPTIONS: [\"Yes!\", \"Tell me more\"]]".
+                   - If **ABOUT ME** is empty or just says "new user": Ask suggestively: "Hi! I'm Ray. Are you thinking about a holiday? [OPTIONS: [\"Yes!\", \"Maybe later\"]]".
                  - **STRICT NO-ASSUMPTION RULE**: NEVER assume the user has visited a place before. DO NOT use terms like "another trip", "returning", "again", or "back to" unless the **ABOUT ME** clearly states it.
                - **RETURNING**: If you've already identified an intent, move to Phase 1.
                - DO NOT start asking deep discovery questions (vibe, adventurous, etc.) until the user confirms they want to plan or continue something.
@@ -401,10 +395,10 @@ class VoiceAgent:
             **Phase 1: Deep Discovery (Multiple turns)**
             1. **Goal**: Understand the *essence* of what the user wants *after* an intent is expressed.
             2. **Questioning Stage**: Ask sequential questions about things that matter:
-                - **Vibe**: "Relaxing, adventurous, or a mix?", "Modern urban or historic charm?", "Social or secluded?"
-               - **Activities**: "Tell me which of these you enjoy (you can pick as many as you like): beach clubs, hiking, or cultural museums?", "Nightlife or family-friendly?"
-               - **Environment**: "What's your ideal weather for this trip?", "Sea views or forest trails?"
-               - **Dates & Group**: "When are you thinking of going?", "How many nights?", "How many travelers?"
+                - **Vibe**: "Relaxing, adventurous, or a mix? [OPTIONS: [\"Relaxing\", \"Adventurous\", \"A mix\"]]", "Modern urban or historic charm? [OPTIONS: [\"Modern Urban\", \"Historic Charm\"]]", "Social or secluded? [OPTIONS: [\"Social\", \"Secluded\"]]"
+               - **Activities**: "Tell me which of these you enjoy (you can pick as many as you like): beach clubs, hiking, or cultural museums? [OPTIONS: [\"Beach Clubs\", \"Hiking\", \"Museums\", \"All three\"]]", "Nightlife or family-friendly? [OPTIONS: [\"Nightlife\", \"Family-friendly\"]]"
+               - **Environment**: "What's your ideal weather for this trip? [OPTIONS: [\"Warm & Sunny\", \"Crisp & Cool\", \"Doesn't matter\"]]", "Sea views or forest trails? [OPTIONS: [\"Sea Views\", \"Forest Trails\"]]"
+               - **Dates & Group**: "When are you thinking of going? [OPTIONS: [\"Next month\", \"This summer\", \"I'm flexible\"]]", "How many nights? [OPTIONS: [\"3 nights\", \"7 nights\", \"14 nights\"]]", "How many travelers? [OPTIONS: [\"Just me\", \"Couple\", \"Family group\"]]"
             3. **Handling Early Preferences**: If the user provides a preference (e.g., "I want a beach holiday with 28 degrees"), DO NOT ask where they want to go. Instead, move to the NEXT available category (e.g., Vibe or Dates).
             4. **Destination Inference**:
                - Once you have 2-3 preference points, call `perform_google_search` silently (e.g., "best destinations for [Vibe] and [Weather] in [Month]").
@@ -420,19 +414,19 @@ class VoiceAgent:
             3. **Residence Discovery (No-Name Rule)**:
                - Search for hotels silently using `search_hotels_amadeus()`.
                - Look at the top 2-3 hotel results. Identify a key difference in atmosphere (e.g., "Boutique & intimate" vs. "Grand & full of amenities").
-               - Ask the user for their preference without naming the destination: "For your stay, would you prefer a [Option A - e.g. boutique hideaway] or a [Option B - e.g. grand resort with every possible amenity]?"
+               - Ask the user for their preference without naming the destination: "For your stay, would you prefer a [Option A - e.g. boutique hideaway] or a [Option B - e.g. grand resort with every possible amenity]? [OPTIONS: [\"Boutique Hideaway\", \"Grand Resort\"]]"
                - Based on their answer, pick the winner and `add_item_bound(item_type="hotel")`.
             
             **Phase 3: Day-by-Day Activity Planning**
             For Day 1, 2, 3...:
-            1. **Activity Discovery**: Ask what type of experience they'd like for the day, allowing for a mix (e.g., "For Day 2, would you prefer something active like [Search Concept A], something relaxed like [Search Concept B], or a bit of both?").
+            1. **Activity Discovery**: Ask what type of experience they'd like for the day, allowing for a mix (e.g., "For Day 2, would you prefer something active like [Search Concept A], something relaxed like [Search Concept B], or a bit of both? [OPTIONS: [\"Active\", \"Relaxed\", \"A bit of both\"]]").
             2. **Silent Search**: Call `search_activities_amadeus()` based on their answer.
             3. **Proactive Add**: Pick the best match from tool results and add it. 
             
             **Phase 4: Complete & Final Reveal**
             1. Add return travel.
             2. **THE REVEAL**: This is the ONLY time you name the destination and explain your choices.
-            3. **Structure**: "I've completed your package! Based on your love for [Vibe], I've picked [Destination] for you. I'm opening it now so you can see the [Hotel Type] and activities I've selected. [NAVIGATE_TO_PACKAGE]"
+            3. **Structure**: "I've completed your package! Based on your love for [Vibe], I've picked [Destination] for you. I'm opening it now so you can see the [Hotel Type] and activities I've selected. [NAVIGATE_TO_PACKAGE] [OPTIONS: [\"Review Package\", \"Start Shopping\"]]"
             
             **Phase 5: Shopping / Pre-Holiday Checklist**
             1. **Goal**: Create a shopping checklist for a booked holiday, allowing the user to mark items as "Already have", "Need", or "Don't want".
@@ -457,9 +451,43 @@ class VoiceAgent:
                  - If profile says "I don't want [item]", set status to `"dont_want"`.
                  - Default status is `"need"`.
             4. **Behavior**:
-               - Present the table and explain: "Here is a checklist for your [Holiday Title]. You can mark what you already have, what you need, or what you don't want. This helps me build your 1-click shopping package."
-               - Include a "Continue" button below the table.
+               - Present the table and explain: "Here is a checklist for your [Holiday Title]. You can mark what you already have, what you need, or what you don't want. This helps me build your 1-click shopping package. [OPTIONS: [\"Continue\"]]"
+               - Include a "Continue" button below the table using the `[OPTIONS]` protocol.
                - If the user provides info like sizes (e.g., "I'm a size Large"), save it using `save_user_info_bound`.
+            
+            **Phase 5b: Shopping Deep Discovery & Product Selection**
+            1. **Trigger**: User clicks "Continue" on the shopping checklist.
+            2. **Immediate Action**: 
+               - **Goal**: Give the user immediate visual feedback. 
+               - **Tools**: Call `create_package_bound(title="Shopping for [Holiday Title]")` immediately.
+               - **Navigate**: Add `[NAVIGATE_TO_PACKAGE]` to your message to open the fresh package.
+               - **Acknowledge**: "Great! I've started a new shopping package for you. I'm opening it now so you can see it while we pick the best items. [OPTIONS: [\"Sounds Good!\"]]"
+            3. **Goal**: Ask discriminating questions for each item marked as "need", then find and add highly-rated Amazon products.
+            4. **Combined Discovery Questions** (Group questions for the FIRST item marked as "need"):
+               - **Protocol**: Ask ONE combined question for the first item to gather all needed info (Size, Color, Brand, Budget) at once.
+               - **Contextual Awareness**: DO NOT ask irrelevant questions (e.g., skip "size" for "Sun Cream" or "Books").
+               - **Example**: "For the Mens Swimwear, what size and color would you like? Also, do you have a brand or budget preference? [OPTIONS: [\"Large, Blue\", \"Medium, Black\", \"No preference\"]]"
+            5. **Product Search & Selection**:
+               - After gathering preferences for an item, use `search_amazon_bound("[item] [preferences]")` to find options.
+               - **CRITICAL FILTER**: Only consider products with:
+                 - Rating: 4.0+ stars
+                 - **Rating Count: 100+ ratings**
+               - If multiple products match, pick the one with the HIGHEST rating count.
+               - Use `check_amazon_stock_bound()` to verify availability and get full details (ASIN, image, price, rating).
+            6. **Add to Package**:
+               - Call `add_item_bound()` with:
+                 - `item_type="product"`
+                 - `name="[Product Title]"`
+                 - `price=[Extracted Price]`
+                 - `description="[User preferences + key features]"`
+                 - `image_url="[Product Image]"`
+                 - `product_url="[Amazon Product URL with ASIN]"`
+                 - `rating=[Rating Value]`
+                 - Store in metadata: `rating_count`, `asin`
+               - **Acknowledge**: "I've added the [Item Name] to your package. What color would you like for the next item?"
+            7. **Repeat** for all items marked as "need". Move to the next item immediately after adding the previous one.
+            8. **Final Reveal**:
+               - After all products are added, say: "Perfect! I've added all your items to your shopping package. You can now review and add everything to your Amazon cart in one click. [OPTIONS: [\"Go to Cart\", \"Start Over\"]]"
             
             **CRITICAL RULES:**
             - **STRICT SECRECY**: Never mention names of destinations, airlines, hotels, or specific product brands/models until Phase 4 (Final Reveal).
@@ -467,6 +495,14 @@ class VoiceAgent:
             - **2026 DATES**: Use YYYY-MM-DD for 2026 only.
             - **ACKNOWLEDGE FIRST**: Always start with a short "OK", "Got it", etc.
             - **CHECKLIST PROTOCOL**: ALWAYS include the `[SHOPPING_CHECKLIST]` JSON block when discussing the pre-holiday shopping list.
+            - **OPTIONS PROTOCOL (CRITICAL)**: You MUST include clickable options (suggestion chips) in **EVERY SINGLE RESPONSE**. 
+              - **Purpose**: To provide the user with quick actions or common responses to keep the conversation flowing.
+              - **Format**: `[OPTIONS: ["Option A", "Option B", "Option C"]]` at the VERY END of your message.
+              - **JSON Rule**: The content after `[OPTIONS: ` MUST be a VALID JSON array of strings using DOUBLE QUOTES. No single quotes.
+              - **Universal Options**: Even for simple statements or greetings, provide at least one chip like "Yes!", "Let's go", "Help me", or "Tell me more".
+              - **Strict Rule**: Never leave the user without at least one button to click. If you ask a question like "would you like to see items?", the options MUST be `["Yes, please", "Not now"]`.
+            - **RATING REQUIREMENT**: NEVER add products with fewer than 100 ratings. If no products meet criteria, inform user and ask if they want to adjust preferences.
+            
             """
         )
         
@@ -503,35 +539,45 @@ class VoiceAgent:
             
             for event in runner.run(user_id=user_id, session_id=session_id, new_message=msg):
                 event_author = getattr(event, 'author', None)
-                logger.info(f"Event type: {type(event).__name__}, author: {event_author}")
+                event_role = getattr(event, 'role', None)
+                event_type = type(event).__name__
+                
+                logger.info(f"Event type: {event_type}, author: {event_author}, role: {event_role}")
+                
+                # Determine if this is a model event (not user)
+                is_model_event = (event_author and event_author != 'user') or (event_role and event_role == 'model') or event_author == 'ray_and_rae'
                 
                 # Try to capture text from ModelResponse events
                 if hasattr(event, 'text') and event.text:
-                    logger.info(f"Captured text from event.text: {event.text}")
-                    accumulated_text += event.text
+                    if is_model_event or not event_author:  # Include events without author
+                        logger.info(f"Captured text from event.text: {event.text}")
+                        accumulated_text += event.text
                 
                 # Check for content attribute
-                if hasattr(event, 'content'):
-                    # Only process if this is from the model (not user)
-                    if event_author and event_author != 'user':
-                        if hasattr(event.content, 'parts'):
+                if hasattr(event, 'content') and event.content:
+                    # Process if from model or if author is unknown (safer to include)
+                    if is_model_event or not event_author:
+                        if hasattr(event.content, 'parts') and event.content.parts:
                             for part in event.content.parts:
                                 if hasattr(part, 'text') and part.text:
-                                    logger.info(f"Captured text from event.content.parts (author={event_author}): {part.text}")
+                                    logger.info(f"Captured text from event.content.parts (author={event_author}, role={event_role}): {part.text}")
                                     accumulated_text += part.text
                         # Sometimes content itself has text
                         elif hasattr(event.content, 'text') and event.content.text:
-                            logger.info(f"Captured text from event.content.text (author={event_author}): {event.content.text}")
+                            logger.info(f"Captured text from event.content.text (author={event_author}, role={event_role}): {event.content.text}")
                             accumulated_text += event.content.text
                 
                 # Check for message attribute (some events use this)
-                if hasattr(event, 'message'):
-                    if hasattr(event.message, 'content'):
-                        if hasattr(event.message.content, 'parts'):
+                if hasattr(event, 'message') and event.message:
+                    if hasattr(event.message, 'content') and event.message.content:
+                        if hasattr(event.message.content, 'parts') and event.message.content.parts:
                             for part in event.message.content.parts:
                                 if hasattr(part, 'text') and part.text:
                                     logger.info(f"Captured text from event.message.content.parts: {part.text}")
                                     accumulated_text += part.text
+                        elif hasattr(event.message.content, 'text') and event.message.content.text:
+                            logger.info(f"Captured text from event.message.content.text: {event.message.content.text}")
+                            accumulated_text += event.message.content.text
                 
                 # Also check if it's a tool call or error
                 if hasattr(event, 'tool_calls') and event.tool_calls:
@@ -541,7 +587,7 @@ class VoiceAgent:
                         if hasattr(tc, 'name'):
                             tool_calls_made.append(tc.name)
                             
-                if hasattr(event, 'error'):
+                if hasattr(event, 'error') and event.error:
                     logger.error(f"Event error: {event.error}")
 
             # If we captured text during streaming/events, return it

@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Google ADK Voice Chatbot</title>
+    <title>Ray and Rae - Holidays and More</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -51,13 +51,21 @@
         }
 
         .sidebar-header h2 {
-            margin: 0 0 2rem 0;
+            margin: 0;
+            /* Removed bottom margin */
             font-size: 1.5rem;
             color: var(--primary-color);
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-subtitle {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin: 0.2rem 0 2rem 0;
+            font-weight: 500;
         }
 
         .sidebar-nav {
@@ -397,6 +405,100 @@
             font-weight: 600;
         }
 
+        /* --- Image Carousel (Premium) --- */
+        .image-slider {
+            position: relative;
+            width: 100%;
+            height: 250px;
+            background: #eee;
+            overflow: hidden;
+            border-radius: 8px 0 0 8px;
+            /* For desktop side-by-side */
+        }
+
+        @media (max-width: 767px) {
+            .image-slider {
+                border-radius: 8px 8px 0 0;
+            }
+        }
+
+        .slide-container {
+            display: flex;
+            height: 100%;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .slide-img {
+            flex: 0 0 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .slider-nav {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .image-slider:hover .slider-nav {
+            opacity: 1;
+        }
+
+        .slider-btn {
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            pointer-events: auto;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            font-size: 1.2rem;
+            color: #333;
+            transition: background 0.2s;
+        }
+
+        .slider-btn:hover {
+            background: #fff;
+            transform: scale(1.1);
+        }
+
+        .slider-dots {
+            position: absolute;
+            bottom: 12px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            pointer-events: none;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            transition: background 0.3s;
+        }
+
+        .dot.active {
+            background: #fff;
+            transform: scale(1.2);
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -526,6 +628,21 @@
             margin: 0;
             font-size: 1.2rem;
             color: var(--primary-color);
+        }
+
+        .mobile-header-text {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            /* Center vertically against hamburger */
+        }
+
+        .mobile-subtitle {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: -2px;
+            font-weight: 500;
         }
 
         @media (max-width: 768px) {
@@ -681,6 +798,47 @@
             border-bottom: none;
         }
 
+        /* Option Buttons Styles */
+        .option-buttons-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .option-btn {
+            background: #fff;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+            border-radius: 20px;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(99, 102, 241, 0.1);
+        }
+
+        .option-btn:hover {
+            background: var(--primary-color);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .option-btn:active {
+            transform: translateY(0);
+        }
+
+        .option-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(1);
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
         .checklist-column-header {
             text-align: center !important;
         }
@@ -733,7 +891,8 @@
 <!-- Navigation Sidebar (Desktop) -->
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-        <h2>Ray & Rae</h2>
+        <h2>Ray and Rae</h2>
+        <div class="sidebar-subtitle">Holidays and More</div>
     </div>
     <nav class="sidebar-nav">
         <button class="nav-item active" onclick="switchView('chat')">
@@ -751,7 +910,11 @@
 <!-- Mobile Header -->
 <div class="mobile-header">
     <button class="hamburger" onclick="toggleSidebar()">☰</button>
-    <h2>Ray & Rae</h2>
+    <div class="mobile-header-text">
+        <h2>Ray and Rae</h2>
+        <div class="mobile-subtitle">Holidays and More</div>
+    </div>
+    <div style="width: 24px;"></div> <!-- Spacer to balance hamburger -->
 </div>
 
 <!-- Main View Container -->
@@ -1521,8 +1684,8 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        recognition.continuous = true;
+        recognition.interimResults = true;
         recognition.lang = 'en-US';
 
         recognition.onstart = () => {
@@ -1541,15 +1704,40 @@
         };
 
         recognition.onresult = async (event) => {
-            const transcript = event.results[0][0].transcript;
-            addMessage('You', transcript);
+            // Check for interruption: if bot is speaking and we have any speech results
+            if (isBotSpeaking || isProcessing) {
+                console.log('[Voice] Interruption detected! Stopping bot speech.');
+                if (window.audioElement) {
+                    window.audioElement.pause();
+                    window.audioElement.currentTime = 0;
+                }
+                stopSpeaking();
+                isBotSpeaking = false;
+                isProcessing = false;
+                clearBotStatusMessage();
+                // Optionally: we can wait for a final result or just continue
+            }
+
+            // Find the most recent final result
+            let transcript = '';
+            let isFinal = false;
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    transcript += event.results[i][0].transcript;
+                    isFinal = true;
+                }
+            }
+
+            if (!isFinal) return; // Wait for final result before processing transcript
+
+            addMessage('You', transcript.trim());
             isProcessing = true;
             startProcessingStatus(); // Start dynamic updates
 
             try {
                 // Pass REGION to backend
                 const requestBody = {
-                    message: transcript,
+                    message: transcript.trim(),
                     region: currentRegion
                 };
                 if (sessionId) requestBody.session_id = sessionId;
@@ -1588,20 +1776,13 @@
                     botResponse = botResponse.replace(expressionRegex, '').trim();
                 }
 
-                // Temporary status cleared inside speak() just before new message or here?
-                // Actually speak() calls addMessage which is where the real text appears.
-                // Let's clear status here before calling speak.
-
-
                 await speak(botResponse, shouldEndConversation);
 
             } catch (error) {
                 console.error('Error:', error);
                 setBotStatusMessage("Error communicating with server ❌");
                 isProcessing = false;
-                if (isConversationActive) {
-                    try { recognition.start(); } catch (e) { }
-                }
+                // No need to restart recognition as it's continuous
             }
         };
 
@@ -1712,12 +1893,16 @@
 
 
     function addMessage(sender, text) {
+        if (sender === 'You') {
+            clearBotStatusMessage();
+        }
         const div = document.createElement('div');
         const isUser = sender === 'You';
         div.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
 
         let displayContent = text;
         let checklistHtml = '';
+        let optionsHtml = '';
 
         // Check for Shopping Checklist block
         if (text.includes('[SHOPPING_CHECKLIST]')) {
@@ -1734,17 +1919,79 @@
             }
         }
 
+        // Check for [OPTIONS: ["...", "..."]]
+        if (displayContent.includes('[OPTIONS:')) {
+            const optionsRegex = /\[OPTIONS:\s*(\[[\s\S]*?\])\s*\]/m;
+            const match = displayContent.match(optionsRegex);
+            if (match) {
+                try {
+                    let rawOptions = match[1].trim();
+                    // Handle potential single quotes from LLM by a simple heuristic
+                    // (Note: this is only for a simple array of strings)
+                    if (rawOptions.includes("'") && !rawOptions.includes('"')) {
+                        rawOptions = rawOptions.replace(/'/g, '"');
+                    }
+
+                    const optionsArray = JSON.parse(rawOptions);
+                    if (Array.isArray(optionsArray)) {
+                        optionsHtml = `<div class="option-buttons-container">`;
+                        optionsArray.forEach(opt => {
+                            optionsHtml += `<button class="option-btn" onclick="handleOptionClick(this, '${opt.toString().replace(/'/g, "\\'")}')">${opt}</button>`;
+                        });
+                        optionsHtml += `</div>`;
+                        displayContent = displayContent.replace(optionsRegex, '').trim();
+                    }
+                } catch (e) {
+                    console.error("Failed to parse options JSON. Raw:", match[1], e);
+                    // If parsing fails, we at least don't want to show the raw tag to the user
+                    displayContent = displayContent.replace(optionsRegex, '').trim();
+                }
+            }
+        }
+
         div.innerHTML = `
             <div class="message-bubble">
                 <div class="bubble-sender">${sender}</div>
                 <div>${displayContent}</div>
                 ${checklistHtml}
+                ${optionsHtml}
             </div>
         `;
         const tDiv = document.getElementById('transcript');
         tDiv.appendChild(div);
         tDiv.scrollTop = tDiv.scrollHeight;
     }
+
+    window.handleOptionClick = function (btn, text) {
+        if (btn.classList.contains('disabled')) return;
+
+        // Visual feedback
+        const container = btn.parentElement;
+        container.querySelectorAll('.option-btn').forEach(b => {
+            b.classList.add('disabled');
+        });
+        btn.style.background = 'var(--primary-color)';
+        btn.style.color = '#fff';
+
+        console.log('[UI] Option clicked:', text);
+
+        // Interruption logic (similar to user voice interruption)
+        if (isBotSpeaking || isProcessing) {
+            console.log('[UI] Interruption detected via option click! Stopping bot speech.');
+            if (window.audioElement) {
+                window.audioElement.pause();
+                window.audioElement.currentTime = 0;
+            }
+            stopSpeaking();
+            isBotSpeaking = false;
+            isProcessing = false;
+            clearBotStatusMessage();
+        }
+
+        // Send message
+        document.getElementById('chat-input').value = text;
+        sendChatMessage();
+    };
 
     function renderShoppingTable(items) {
         let rows = '';
@@ -1835,9 +2082,20 @@
 
         const tDiv = document.getElementById('transcript');
 
+        // For right-aligned messages (like "Listening..."), replace existing ones
+        if (align === 'right') {
+            // Remove any existing right-aligned status messages
+            const existingRightMessages = tDiv.querySelectorAll('.bot-status-message-right');
+            existingRightMessages.forEach(msg => msg.remove());
+        }
+
         const div = document.createElement('div');
-        // We use a class instead of ID to allow multiple status messages to exist
-        div.className = 'bot-status-message';
+        // Use different classes for left vs right to distinguish them
+        if (align === 'right') {
+            div.className = 'bot-status-message bot-status-message-right';
+        } else {
+            div.className = 'bot-status-message bot-status-message-left';
+        }
 
         let alignSelf = 'center';
         if (align === 'left') alignSelf = 'flex-start';
@@ -1851,11 +2109,11 @@
     }
 
     function clearBotStatusMessage() {
-        // Now that we want recorded messages, we only clear "transient" states
-        // Like "Listening..." if we really want to, but the user said "all recorded".
-        // To be safe and satisfy "all recorded", we'll just not clear them here.
-        // If we need to clear specific ones (like 'Listening'), we'd need more logic.
-        // For now, let's just make it do nothing to ensure they "stay in the chat".
+        // Clear right-aligned messages (like "Listening...") when conversation stops
+        const tDiv = document.getElementById('transcript');
+        const rightMessages = tDiv.querySelectorAll('.bot-status-message-right');
+        rightMessages.forEach(msg => msg.remove());
+        // Keep left-aligned thinking messages in the chat
     }
 
     let statusInterval = null;
@@ -1877,7 +2135,7 @@
         statusInterval = setInterval(() => {
             i = (i + 1) % statusMessages.length;
             setBotStatusMessage(statusMessages[i], 'left');
-        }, 1500);
+        }, 800);
     }
 
     function stopProcessingStatus() {
@@ -1889,20 +2147,37 @@
     }
 
     async function speak(text, shouldEnd = false) {
+        if (!isConversationActive) return; // Handle cases where conversation was stopped during processing
         isBotSpeaking = true;
-        if (recognition) recognition.stop();
+        // recognition.stop(); // Don't stop recognition, we want continuous listening
 
-        // Handle Navigation Trigger
+        // Wait briefly to allow any trailing user speech to finish processing or be ignored if small
+        // Browser AEC should filter out speakers, but we also have our interruption logic in onresult.
+
+        // Handle Navigation Triggers
         let shouldNavigate = false;
+        let isShoppingComplete = false;
+
         if (text.includes('[NAVIGATE_TO_PACKAGE]')) {
             shouldNavigate = true;
             text = text.replace('[NAVIGATE_TO_PACKAGE]', '').trim();
+        }
+
+        if (text.includes('[SHOPPING_PACKAGE_COMPLETE]')) {
+            isShoppingComplete = true;
+            shouldNavigate = true;
+            text = text.replace('[SHOPPING_PACKAGE_COMPLETE]', '').trim();
         }
 
         // Strip Shopping Checklist block from TTS (but keep it for display)
         let ttsText = text;
         if (ttsText.includes('[SHOPPING_CHECKLIST]')) {
             ttsText = ttsText.replace(/\[SHOPPING_CHECKLIST\][\s\S]*?\[\/SHOPPING_CHECKLIST\]/g, '').trim();
+        }
+
+        // Strip [OPTIONS: ...] from TTS
+        if (ttsText.includes('[OPTIONS:')) {
+            ttsText = ttsText.replace(/\[OPTIONS:\s*\[.*?\]\]/g, '').trim();
         }
 
         try {
@@ -1972,11 +2247,12 @@
                     const packages = await updatePackages();
                     if (packages && packages.length > 0) {
                         // Show the most recent package automatically
-                        showPackageDetails(packages[packages.length - 1]);
+                        // Packages are returned ordered by DESC in the API (latest first)
+                        showPackageDetails(packages[0]);
                     }
                 } else if (isConversationActive && !shouldEnd) {
                     setBotStatusMessage("Listening...", 'right');
-                    try { recognition.start(); } catch (e) { }
+                    // Recognition is already running (continuous)
                 } else if (shouldEnd) {
                     stopConversationMode();
                 }
@@ -2163,6 +2439,60 @@
         indicator.textContent = `${nextIdx + 1} / ${slides.length}`;
     };
 
+    // --- Image Slider Extensions ---
+    window.renderImageSlider = function (images, altText) {
+        if (!images || !Array.isArray(images) || images.length === 0) return '';
+        if (images.length === 1) {
+            return `<img src="${images[0]}" class="slide-img" style="border-radius: 8px 0 0 8px; width: 100%; object-fit: cover;" alt="${altText}">`;
+        }
+
+        const sliderId = 'slider-' + Math.random().toString(36).substr(2, 9);
+
+        let slidesHtml = '';
+        let dotsHtml = '';
+        images.forEach((img, idx) => {
+            slidesHtml += `<img src="${img}" class="slide-img" alt="${altText} ${idx + 1}">`;
+            dotsHtml += `<div class="dot ${idx === 0 ? 'active' : ''}"></div>`;
+        });
+
+        return `
+            <div class="image-slider" id="${sliderId}" data-current="0" data-total="${images.length}">
+                <div class="slide-container">
+                    ${slidesHtml}
+                </div>
+                <div class="slider-nav">
+                    <button class="slider-btn prev" onclick="moveSlider('${sliderId}', -1)">‹</button>
+                    <button class="slider-btn next" onclick="moveSlider('${sliderId}', 1)">›</button>
+                </div>
+                <div class="slider-dots">
+                    ${dotsHtml}
+                </div>
+            </div>
+        `;
+    };
+
+    window.moveSlider = function (sliderId, direction) {
+        const slider = document.getElementById(sliderId);
+        if (!slider) return;
+
+        const container = slider.querySelector('.slide-container');
+        const dots = slider.querySelectorAll('.dot');
+        let current = parseInt(slider.getAttribute('data-current'));
+        const total = parseInt(slider.getAttribute('data-total'));
+
+        current += direction;
+        if (current >= total) current = 0;
+        if (current < 0) current = total - 1;
+
+        slider.setAttribute('data-current', current);
+        container.style.transform = `translateX(-${current * 100}%)`;
+
+        dots.forEach((dot, idx) => {
+            if (idx === current) dot.classList.add('active');
+            else dot.classList.remove('active');
+        });
+    };
+
     function showPackageDetails(pkg) {
         if (!pkg) {
             console.error("[UI] Attempted to show details for null package");
@@ -2218,8 +2548,98 @@
             </div>
         `;
 
-        // 1. Shopping Section
+        // 1. Shopping Package Section (Premium view for product items)
+        // This section shows products added via deep discovery (item_type="product")
         if (productItems.length > 0) {
+            // Add All Logic
+            let asinParams = '';
+            let asinCount = 0;
+            productItems.forEach((item) => {
+                const pUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : '';
+                let asinMatch = pUrl.match(/(?:\/dp\/|\/gp\/product\/|\/d\/)([A-Z0-9]{10})/);
+                if (!asinMatch) asinMatch = pUrl.match(/[?&]ASIN=([A-Z0-9]{10})/);
+
+                if (asinMatch) {
+                    asinCount++;
+                    asinParams += `&ASIN.${asinCount}=${asinMatch[1]}&Quantity.${asinCount}=1`;
+                }
+            });
+
+            let actionBtnHtml = '';
+            if (asinCount > 0 && isSupported) {
+                const addAllUrl = `https://www.amazon.${tld}/gp/aws/cart/add.html?AssociateTag=${tag}${asinParams}`;
+                const btnText = (asinCount === productItems.length) ? `Add All ${asinCount} Items to Cart 🛒` : `Add ${asinCount} Items to Cart 🛒`;
+                actionBtnHtml = `<a href="${addAllUrl}" target="_blank" class="action-btn" style="text-decoration:none; background:#ff9900; color:#fff; padding:12px 24px; border-radius:8px; font-weight:600; display:inline-block; margin-bottom:15px;">${btnText}</a>`;
+            } else if (!isSupported) {
+                actionBtnHtml = `<span style="font-size:0.9rem; color:#999;">(Cart not supported in ${regionLabel})</span>`;
+            } else {
+                actionBtnHtml = `<button onclick="openAllAmazonLinks('${pkg.id}')" class="action-btn secondary" style="margin-bottom:15px;">Open All Tabs ↗</button>`;
+            }
+
+            html += `
+                <div style="background:linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%); border:2px solid #ff9900; border-radius:12px; padding:20px; margin-bottom:25px; box-shadow: 0 4px 12px rgba(255,153,0,0.15);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #ff9900; padding-bottom:10px;">
+                        <h3 style="margin:0; font-size:1.4rem; color:#ff9900;">🛍️ Your Shopping Package</h3>
+                    </div>
+                    <div style="text-align:center; margin-bottom:20px;">
+                        ${actionBtnHtml}
+                        <p style="font-size:0.85rem; color:#666; margin:5px 0 0 0;">One-click checkout for all your items</p>
+                    </div>
+                    <div style="display:grid; gap:15px;">
+            `;
+
+            productItems.forEach(item => {
+                const imageUrl = (item.metadata && item.metadata.image_url) ? item.metadata.image_url : null;
+                const images = (item.metadata && item.metadata.images) ? item.metadata.images : (imageUrl ? [imageUrl] : []);
+                const directUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : null;
+                const rating = (item.metadata && item.metadata.rating) ? item.metadata.rating : null;
+                const ratingCount = (item.metadata && item.metadata.rating_count) ? item.metadata.rating_count : null;
+                const amzLink = directUrl || `https://www.amazon.${tld}/s?k=${encodeURIComponent(item.name)}&tag=${tag}`;
+
+                let imgHtml = '';
+                if (images.length > 0) {
+                    imgHtml = `<div style="width:100px; height:100px; margin-right:15px; flex-shrink:0;">${renderImageSlider(images, item.name)}</div>`;
+                    // Adjust slider for small product view
+                    imgHtml = imgHtml.replace('height: 250px;', 'height: 100px;');
+                    imgHtml = imgHtml.replace('border-radius: 8px 0 0 8px;', 'border-radius: 8px;');
+                }
+
+                let ratingHtml = '';
+                if (rating) {
+                    ratingHtml = `<div style="font-size:0.85rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5`;
+                    if (ratingCount) {
+                        ratingHtml += ` <span style="color:#999;">(${ratingCount} ratings)</span>`;
+                    }
+                    ratingHtml += `</div>`;
+                }
+
+                html += `
+                    <div style="display:flex; align-items:center; background:#fff; padding:12px; border-radius:8px; border:1px solid #ffe6cc;">
+                        ${imgHtml}
+                        <div style="flex:1;">
+                            <div style="font-weight:600; color:#333; font-size:1rem;">${item.name}</div>
+                            ${item.description ? `<div style="font-size:0.85rem; color:#666; margin-top:4px;">${item.description}</div>` : ''}
+                            <div style="font-size:0.9rem; color:#333; margin-top:6px; font-weight:600;">
+                                ${sym}${item.price}
+                            </div>
+                            ${ratingHtml}
+                            <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="color:#ff9900; text-decoration:none; font-size:0.85rem; margin-top:6px; display:inline-block; font-weight:600;">View on Amazon ↗</a>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                    <div style="text-align:right; font-weight:bold; margin-top:15px; padding-top:15px; border-top:1px solid #ff9900; color:#333; font-size:1.1rem;">
+                        Total: ${sym}${productTotal}
+                    </div>
+                </div>`;
+        }
+
+        // 2. Shopping List Section (EXISTING - for draft packages with mixed items)
+        // This is the old shopping section that appears for non-booked packages
+        if (productItems.length > 0 && pkg.status !== 'booked') {
             // Add All Logic
             let asinParams = '';
             let asinCount = 0;
@@ -2256,10 +2676,18 @@
 
             productItems.forEach(item => {
                 const imageUrl = (item.metadata && item.metadata.image_url) ? item.metadata.image_url : null;
+                const images = (item.metadata && item.metadata.images) ? item.metadata.images : (imageUrl ? [imageUrl] : []);
                 const directUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : null;
                 const amzLink = directUrl || `https://www.amazon.${tld}/s?k=${encodeURIComponent(item.name)}&tag=${tag}`;
 
-                let imgHtml = imageUrl ? `<img src="${imageUrl}" style="width:60px; height:60px; object-fit:contain; border:1px solid #eee; border-radius:4px; margin-right:15px; background:#fff;">` : '';
+                let imgHtml = '';
+                if (images.length > 0) {
+                    imgHtml = `<div style="width:60px; height:60px; margin-right:15px; flex-shrink:0;">${renderImageSlider(images, item.name)}</div>`;
+                    // Adjust slider for tiny list view
+                    imgHtml = imgHtml.replace('height: 250px;', 'height: 60px;');
+                    imgHtml = imgHtml.replace('border-radius: 8px 0 0 8px;', 'border-radius: 4px;');
+                    imgHtml = imgHtml.replace('slider-btn', 'slider-btn hidden'); // Hide buttons in tiny view
+                }
 
                 html += `
                     <li style="display:flex; align-items:center; margin-bottom: 10px; background:#fff; padding:5px; border-radius:6px;">
@@ -2323,7 +2751,8 @@
                 html += `<div style="margin-bottom:25px;">
                     <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">🛫 Flights</h4>`;
                 flights.forEach(flight => {
-                    const flightImage = (flight.metadata && flight.metadata.image_url) ? flight.metadata.image_url : null;
+                    const imageUrl = (flight.metadata && flight.metadata.image_url) ? flight.metadata.image_url : null;
+                    const images = (flight.metadata && flight.metadata.images) ? flight.metadata.images : (imageUrl ? [imageUrl] : []);
                     const rating = (flight.metadata && flight.metadata.rating) ? flight.metadata.rating : null;
                     const reviewLink = (flight.metadata && flight.metadata.review_link) ? flight.metadata.review_link : null;
 
@@ -2331,9 +2760,9 @@
                     const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
 
                     html += `
-                        <div class="package-item-responsive" style="border-left:4px solid #667eea; overflow: hidden;">
-                            ${flightImage ? `<img src="${flightImage}" alt="Flight">` : ''}
-                            <div class="package-item-details">
+                        <div class="package-item-responsive" style="border-left:4px solid #667eea; overflow: hidden; padding:0;">
+                            ${renderImageSlider(images, flight.name)}
+                            <div class="package-item-details" style="padding:12px;">
                                 <div style="font-weight:600; color:#333; margin-bottom:4px;">${flight.name}</div>
                                 <div style="font-size:0.85rem; color:#666;">${sym}${flight.price}</div>
                                 ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:#667eea; text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
@@ -2350,7 +2779,8 @@
                 html += `<div style="margin-bottom:25px;">
                     <h4 style="margin:0 0 10px 0; color:#555; font-size:1rem;">🏨 Accommodation</h4>`;
                 hotels.forEach(hotel => {
-                    const hotelImage = (hotel.metadata && hotel.metadata.image_url) ? hotel.metadata.image_url : null;
+                    const imageUrl = (hotel.metadata && hotel.metadata.image_url) ? hotel.metadata.image_url : null;
+                    const images = (hotel.metadata && hotel.metadata.images) ? hotel.metadata.images : (imageUrl ? [imageUrl] : []);
                     const rating = (hotel.metadata && hotel.metadata.rating) ? hotel.metadata.rating : null;
                     const reviewLink = (hotel.metadata && hotel.metadata.review_link) ? hotel.metadata.review_link : null;
 
@@ -2358,9 +2788,9 @@
                     const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
 
                     html += `
-                        <div class="package-item-responsive" style="border-left:4px solid #764ba2; overflow: hidden;">
-                            ${hotelImage ? `<img src="${hotelImage}" alt="Hotel">` : ''}
-                            <div class="package-item-details">
+                        <div class="package-item-responsive" style="border-left:4px solid #764ba2; overflow: hidden; padding:0;">
+                            ${renderImageSlider(images, hotel.name)}
+                            <div class="package-item-details" style="padding:12px;">
                                 <div style="font-weight:600; color:#333; margin-bottom:4px;">${hotel.name}</div>
                                 <div style="font-size:0.85rem; color:#666;">${sym}${hotel.price}</div>
                                 ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:#764ba2; text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
@@ -2444,18 +2874,17 @@
 
                     dayActivities.forEach(activity => {
                         const imageUrl = (activity.metadata && activity.metadata.image_url) ? activity.metadata.image_url : null;
+                        const images = (activity.metadata && activity.metadata.images) ? activity.metadata.images : (imageUrl ? [imageUrl] : []);
                         const rating = (activity.metadata && activity.metadata.rating) ? activity.metadata.rating : null;
                         const reviewLink = (activity.metadata && activity.metadata.review_link) ? activity.metadata.review_link : null;
-                        const imgHtml = imageUrl ?
-                            `<img src="${imageUrl}" alt="${activity.name}">` : '';
 
                         const reviews = (activity.metadata && activity.metadata.reviews) ? activity.metadata.reviews : null;
                         const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
 
                         html += `
-                            <div class="package-item-responsive">
-                                ${imgHtml}
-                                <div class="package-item-details">
+                            <div class="package-item-responsive" style="padding:0; overflow:hidden;">
+                                ${renderImageSlider(images, activity.name)}
+                                <div class="package-item-details" style="padding:12px;">
                                     <div style="font-weight:600; color:#333; margin-bottom:6px; font-size:0.95rem;">${activity.name}</div>
                                     <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">${sym}${activity.price}</div>
                                     ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:var(--primary-color); text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
@@ -2703,6 +3132,8 @@
 
     // Expose globals
     window.sendChatMessage = sendChatMessage;
+    window.continueShoppingConversation = continueShoppingConversation;
+    window.updateChecklistFact = updateChecklistFact;
     window.switchView = switchView;
     window.toggleSidebar = toggleSidebar;
     window.updatePackages = updatePackages;
