@@ -10,7 +10,8 @@
     <title>Ray and Rae - Holidays and More</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fontdiner+Swanky&family=Lateef:wght@800&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --primary-color: #6366f1;
@@ -50,22 +51,34 @@
             z-index: 100;
         }
 
+        .sidebar-header {
+            text-align: center;
+        }
+
         .sidebar-header h2 {
             margin: 0;
-            /* Removed bottom margin */
-            font-size: 1.5rem;
-            color: var(--primary-color);
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 1.8rem;
+            color: #000;
+            font-family: 'Fontdiner Swanky', cursive;
         }
 
         .sidebar-subtitle {
             font-size: 0.85rem;
-            color: #64748b;
-            margin: 0.2rem 0 2rem 0;
-            font-weight: 500;
+            color: #000;
+            margin: -0.04rem 0px 2rem 0;
+            font-weight: 800;
+            font-family: 'Lateef', serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-logo {
+            width: 80px;
+            height: auto;
+            margin-bottom: 0px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .sidebar-nav {
@@ -329,9 +342,11 @@
                 align-items: stretch;
             }
 
-            .package-item-responsive img {
-                width: 250px !important;
-                height: auto !important;
+            .package-item-responsive img,
+            .package-item-responsive .image-slider {
+                width: 50% !important;
+                height: 250px !important;
+                /* Keep fixed height for consistency */
                 min-height: 100%;
                 margin-bottom: 0 !important;
                 flex-shrink: 0;
@@ -341,6 +356,7 @@
 
             .package-item-details {
                 flex: 1;
+                width: 50%;
             }
         }
 
@@ -626,8 +642,9 @@
 
         .mobile-header h2 {
             margin: 0;
-            font-size: 1.2rem;
-            color: var(--primary-color);
+            font-size: 1.5rem;
+            color: #000;
+            font-family: 'Fontdiner Swanky', cursive;
         }
 
         .mobile-header-text {
@@ -639,10 +656,13 @@
         }
 
         .mobile-subtitle {
-            font-size: 0.75rem;
-            color: #64748b;
+            font-size: 1rem;
+            color: #000;
             margin-top: -2px;
-            font-weight: 500;
+            font-weight: 800;
+            font-family: 'Lateef', serif;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         @media (max-width: 768px) {
@@ -839,6 +859,36 @@
             box-shadow: none !important;
         }
 
+        .option-btn.selected {
+            background: var(--primary-color);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+
+        .submit-btn {
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 24px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            margin-top: 5px;
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+        }
+
+        .submit-btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
         .checklist-column-header {
             text-align: center !important;
         }
@@ -875,6 +925,83 @@
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
+
+        /* Shoe Size Selector Styles */
+        .shoe-size-selector-container {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .size-region-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 10px;
+        }
+
+        .region-btn {
+            background: #f1f5f9;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #64748b;
+        }
+
+        .region-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .size-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+            gap: 8px;
+            max-height: 180px;
+            overflow-y: auto;
+            padding: 5px;
+        }
+
+        .size-btn {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .size-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            background: #f5f3ff;
+        }
+
+        .size-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .size-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
     </style>
     <!-- Import Maps -->
     <script type="importmap">
@@ -891,6 +1018,7 @@
 <!-- Navigation Sidebar (Desktop) -->
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
+        <img src="/static/icons/logo.svg" class="sidebar-logo" alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
         <div class="sidebar-subtitle">Holidays and More</div>
     </div>
@@ -908,14 +1036,16 @@
 </div>
 
 <!-- Mobile Header -->
-<div class="mobile-header">
-    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+<header class="mobile-header">
+    <button class="hamburger" id="hamburger-btn">☰</button>
     <div class="mobile-header-text">
+        <img src="/static/icons/logo.svg" class="sidebar-logo" style="width: 40px; margin-bottom: 0;"
+            alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
         <div class="mobile-subtitle">Holidays and More</div>
     </div>
-    <div style="width: 24px;"></div> <!-- Spacer to balance hamburger -->
-</div>
+    <div style="width: 24px;"></div> <!-- Spacer for symmetry -->
+</header>
 
 <!-- Main View Container -->
 <div id="main-view">
@@ -1693,12 +1823,17 @@
         };
 
         recognition.onend = () => {
-            if (isConversationActive && !isBotSpeaking && !isProcessing) {
-                console.log('Recognition ended (silence), restarting loop...');
+            console.log(`[Recognition] Loop ended. Active: ${isConversationActive}, BotSpeaking: ${isBotSpeaking}, Processing: ${isProcessing}`);
+            if (isConversationActive) {
+                // Always try to restart if conversation is active, unless we specifically don't want it to
+                // recognition.start() handles already-started cases gracefully or with a catchable error
                 try {
                     recognition.start();
-                } catch (e) { }
-            } else if (!isConversationActive) {
+                    console.log('[Recognition] Restarted loop.');
+                } catch (e) {
+                    // console.warn('[Recognition] Restart effort:', e.message);
+                }
+            } else {
                 clearBotStatusMessage();
             }
         };
@@ -1732,7 +1867,7 @@
 
             addMessage('You', transcript.trim());
             isProcessing = true;
-            startProcessingStatus(); // Start dynamic updates
+            startProcessingStatus(transcript.trim()); // Start context-aware updates
 
             try {
                 // Pass REGION to backend
@@ -1807,6 +1942,14 @@
     // logic moved to init/onload if supported
     if (SpeechRecognition) {
         renderStartButton();
+        // Periodically verify recognition is running if it should be
+        setInterval(() => {
+            if (isConversationActive && recognition) {
+                try {
+                    recognition.start();
+                } catch (e) { }
+            }
+        }, 5000);
     }
 
     async function startConversationMode() {
@@ -1821,7 +1964,7 @@
 
         // 2. Start dynamic updates
         isProcessing = true;
-        startProcessingStatus();
+        startProcessingStatus("Hi!");
 
         // 3. Send "Hi!" to backend
         try {
@@ -1857,7 +2000,13 @@
 
     function stopConversationMode() {
         isConversationActive = false;
-        if (recognition) recognition.stop();
+        isBotSpeaking = false;
+        isProcessing = false;
+
+        if (recognition) {
+            try { recognition.stop(); } catch (e) { }
+        }
+
         if (window.audioElement) {
             window.audioElement.pause();
             window.audioElement.currentTime = 0;
@@ -1926,12 +2075,9 @@
             if (match) {
                 try {
                     let rawOptions = match[1].trim();
-                    // Handle potential single quotes from LLM by a simple heuristic
-                    // (Note: this is only for a simple array of strings)
                     if (rawOptions.includes("'") && !rawOptions.includes('"')) {
                         rawOptions = rawOptions.replace(/'/g, '"');
                     }
-
                     const optionsArray = JSON.parse(rawOptions);
                     if (Array.isArray(optionsArray)) {
                         optionsHtml = `<div class="option-buttons-container">`;
@@ -1943,8 +2089,40 @@
                     }
                 } catch (e) {
                     console.error("Failed to parse options JSON. Raw:", match[1], e);
-                    // If parsing fails, we at least don't want to show the raw tag to the user
                     displayContent = displayContent.replace(optionsRegex, '').trim();
+                }
+            }
+        }
+
+        // Check for [SHOE_SIZE_SELECTOR]
+        if (displayContent.includes('[SHOE_SIZE_SELECTOR]')) {
+            optionsHtml = renderShoeSizeSelector();
+            displayContent = displayContent.replace('[SHOE_SIZE_SELECTOR]', '').trim();
+        }
+
+        // Check for [OPTIONS_MULTI: ["...", "..."]]
+        if (displayContent.includes('[OPTIONS_MULTI:')) {
+            const multiOptionsRegex = /\[OPTIONS_MULTI:\s*(\[[\s\S]*?\])\s*\]/m;
+            const match = displayContent.match(multiOptionsRegex);
+            if (match) {
+                try {
+                    let rawOptions = match[1].trim();
+                    if (rawOptions.includes("'") && !rawOptions.includes('"')) {
+                        rawOptions = rawOptions.replace(/'/g, '"');
+                    }
+                    const optionsArray = JSON.parse(rawOptions);
+                    if (Array.isArray(optionsArray)) {
+                        optionsHtml = `<div class="option-buttons-container multi-select-container">`;
+                        optionsArray.forEach(opt => {
+                            optionsHtml += `<button class="option-btn" onclick="handleMultiOptionClick(this, '${opt.toString().replace(/'/g, "\\'")}')">${opt}</button>`;
+                        });
+                        optionsHtml += `<button class="submit-btn" onclick="submitMultiOptions(this)">Submit</button>`;
+                        optionsHtml += `</div>`;
+                        displayContent = displayContent.replace(multiOptionsRegex, '').trim();
+                    }
+                } catch (e) {
+                    console.error("Failed to parse multi-options JSON. Raw:", match[1], e);
+                    displayContent = displayContent.replace(multiOptionsRegex, '').trim();
                 }
             }
         }
@@ -1967,7 +2145,7 @@
 
         // Visual feedback
         const container = btn.parentElement;
-        container.querySelectorAll('.option-btn').forEach(b => {
+        container.querySelectorAll('.option-btn, .submit-btn').forEach(b => {
             b.classList.add('disabled');
         });
         btn.style.background = 'var(--primary-color)';
@@ -1978,6 +2156,51 @@
         // Interruption logic (similar to user voice interruption)
         if (isBotSpeaking || isProcessing) {
             console.log('[UI] Interruption detected via option click! Stopping bot speech.');
+            if (window.audioElement) {
+                window.audioElement.pause();
+                window.audioElement.currentTime = 0;
+            }
+            stopSpeaking();
+            isBotSpeaking = false;
+            isProcessing = false;
+            clearBotStatusMessage();
+        }
+
+        // Send message
+        document.getElementById('chat-input').value = text;
+        sendChatMessage();
+    };
+
+    window.handleMultiOptionClick = function (btn, text) {
+        if (btn.classList.contains('disabled')) return;
+        btn.classList.toggle('selected');
+        console.log('[UI] Multi-option toggled:', text, 'Selected:', btn.classList.contains('selected'));
+    };
+
+    window.submitMultiOptions = function (submitBtn) {
+        if (submitBtn.classList.contains('disabled')) return;
+
+        const container = submitBtn.parentElement;
+        const selectedButtons = container.querySelectorAll('.option-btn.selected');
+
+        if (selectedButtons.length === 0) {
+            alert("Please select at least one option.");
+            return;
+        }
+
+        const selectedValues = Array.from(selectedButtons).map(btn => btn.innerText);
+        const text = selectedValues.join(', ');
+
+        // Disable everything in this container
+        container.querySelectorAll('.option-btn, .submit-btn').forEach(b => {
+            b.classList.add('disabled');
+        });
+
+        console.log('[UI] Multi-options submitted:', text);
+
+        // Interruption logic (similar to user voice interruption)
+        if (isBotSpeaking || isProcessing) {
+            console.log('[UI] Interruption detected via multi-submit! Stopping bot speech.');
             if (window.audioElement) {
                 window.audioElement.pause();
                 window.audioElement.currentTime = 0;
@@ -2075,6 +2298,68 @@
         sendChatMessage();
     }
 
+    // --- Shoe Size Selector Logic ---
+    window.renderShoeSizeSelector = function () {
+        const id = 'shoe-selector-' + Math.random().toString(36).substr(2, 9);
+        const currentRegion = window.currentRegion || 'UK';
+        const defaultType = currentRegion === 'US' ? 'US' : (currentRegion === 'EU' ? 'EU' : 'UK');
+
+        return `
+            <div class="shoe-size-selector-container" id="${id}">
+                <div class="size-region-toggle">
+                    <button class="region-btn ${defaultType === 'UK' ? 'active' : ''}" onclick="switchSizeRegion('${id}', 'UK')">UK</button>
+                    <button class="region-btn ${defaultType === 'US' ? 'active' : ''}" onclick="switchSizeRegion('${id}', 'US')">US</button>
+                    <button class="region-btn ${defaultType === 'EU' ? 'active' : ''}" onclick="switchSizeRegion('${id}', 'EU')">EU</button>
+                </div>
+                <div class="size-grid">
+                    ${renderSizeButtons(id, defaultType)}
+                </div>
+            </div>
+        `;
+    };
+
+    window.renderSizeButtons = function (selectorId, type) {
+        let sizes = [];
+        if (type === 'UK') {
+            for (let i = 3; i <= 14; i += 0.5) sizes.push(i);
+        } else if (type === 'US') {
+            for (let i = 4; i <= 15; i += 0.5) sizes.push(i);
+        } else if (type === 'EU') {
+            for (let i = 35; i <= 49; i++) sizes.push(i);
+        }
+
+        let html = '';
+        sizes.forEach(size => {
+            html += `<button class="size-btn" onclick="handleSizeClick(this, '${size}', '${type}')">${size}</button>`;
+        });
+        return html;
+    };
+
+    window.switchSizeRegion = function (selectorId, type) {
+        const container = document.getElementById(selectorId);
+        container.querySelectorAll('.region-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.textContent === type) btn.classList.add('active');
+        });
+        const grid = container.querySelector('.size-grid');
+        grid.innerHTML = renderSizeButtons(selectorId, type);
+    };
+
+    window.handleSizeClick = function (btn, size, type) {
+        if (btn.classList.contains('disabled')) return;
+
+        const container = btn.closest('.shoe-size-selector-container');
+        container.querySelectorAll('.size-btn').forEach(b => b.classList.add('disabled'));
+        btn.classList.add('active');
+
+        const selectionText = `Size ${size} (${type})`;
+        console.log('[UI] Shoe size selected:', selectionText);
+
+        // Send to chat
+        document.getElementById('chat-input').value = selectionText;
+        sendChatMessage();
+    };
+
     let lastStatusText = "";
     function setBotStatusMessage(text, align = 'center') {
         if (text === lastStatusText) return;
@@ -2117,25 +2402,86 @@
     }
 
     let statusInterval = null;
-    const statusMessages = [
-        "Thinking...",
-        "Consulting Agent Tools...",
-        "Checking database...",
-        "Analyzing request...",
-        "Formulating response...",
-        "Just a moment..."
-    ];
+    const statusMessages = {
+        generic: [
+            "Thinking...",
+            "Working on it...",
+            "One moment...",
+            "Checking details...",
+            "Reviewing...",
+            "Gathering information...",
+            "Analyzing request...",
+            "Processing..."
+        ],
+        recommendations: [
+            "Curating recommendations...",
+            "Almost ready with your recommendations!",
+            "Searching for the best options...",
+            "Finding the perfect suggestions..."
+        ],
+        flights: [
+            "Checking flight schedules and pricing...",
+            "Searching for the best flight deals...",
+            "Verifying airline availability...",
+            "Comparing flight options..."
+        ],
+        stays: [
+            "Looking for top-rated accommodations...",
+            "Checking hotel availability...",
+            "Searching for high-quality stays...",
+            "Comparing resort and hotel options..."
+        ],
+        activities: [
+            "Exploring local activities and attractions...",
+            "Finding hidden gems off the beaten path...",
+            "Sourcing exciting things to do...",
+            "Checking for top-rated tours and excursions..."
+        ],
+        holiday: [
+            "Sourcing exclusive holiday packages...",
+            "Curating a personalized itinerary just for you...",
+            "Optimizing your travel route...",
+            "Checking weather forecasts for your dates..."
+        ]
+    };
 
-    function startProcessingStatus() {
-        let i = 0;
-        setBotStatusMessage(statusMessages[0], 'left');
-
+    function startProcessingStatus(userText) {
         if (statusInterval) clearInterval(statusInterval);
 
+        const lowerText = (userText || "").toLowerCase();
+        let pool = [...statusMessages.generic];
+
+        // Recommendation context
+        if (lowerText.includes('find') || lowerText.includes('search') || lowerText.includes('recommend') ||
+            lowerText.includes('advice') || lowerText.includes('suggestion') || lowerText.includes('best') ||
+            lowerText.includes('option') || lowerText.includes('choose')) {
+            pool = pool.concat(statusMessages.recommendations);
+        }
+
+        // Categorize based on keywords
+        if (lowerText.includes('flight') || lowerText.includes('plane') || lowerText.includes('airline') || lowerText.includes('fly') || lowerText.includes('airport')) {
+            pool = pool.concat(statusMessages.flights);
+        }
+        if (lowerText.includes('hotel') || lowerText.includes('stay') || lowerText.includes('accommodation') || lowerText.includes('resort') || lowerText.includes('room') || lowerText.includes('hostel')) {
+            pool = pool.concat(statusMessages.stays);
+        }
+        if (lowerText.includes('activity') || lowerText.includes('tour') || lowerText.includes('excursion') || lowerText.includes('see') || lowerText.includes('visit') || lowerText.includes('interest') || lowerText.includes('attraction')) {
+            pool = pool.concat(statusMessages.activities);
+        }
+        if (lowerText.includes('itinerary') || lowerText.includes('plan') || lowerText.includes('trip') || lowerText.includes('holiday') || lowerText.includes('vacation')) {
+            pool = pool.concat(statusMessages.holiday);
+        }
+
+        // Shuffle pool
+        const shuffled = pool.sort(() => Math.random() - 0.5);
+        let i = 0;
+
+        setBotStatusMessage(shuffled[i], 'left');
+
         statusInterval = setInterval(() => {
-            i = (i + 1) % statusMessages.length;
-            setBotStatusMessage(statusMessages[i], 'left');
-        }, 800);
+            i = (i + 1) % shuffled.length;
+            setBotStatusMessage(shuffled[i], 'left');
+        }, 1200);
     }
 
     function stopProcessingStatus() {
@@ -2155,12 +2501,16 @@
         // Browser AEC should filter out speakers, but we also have our interruption logic in onresult.
 
         // Handle Navigation Triggers
-        let shouldNavigate = false;
-        let isShoppingComplete = false;
-
+        let targetPackageId = null;
         if (text.includes('[NAVIGATE_TO_PACKAGE]')) {
+            const idMatch = text.match(/\[NAVIGATE_TO_PACKAGE:([\w-]+)\]/);
+            if (idMatch) {
+                targetPackageId = idMatch[1];
+                text = text.replace(idMatch[0], '').trim();
+            } else {
+                text = text.replace('[NAVIGATE_TO_PACKAGE]', '').trim();
+            }
             shouldNavigate = true;
-            text = text.replace('[NAVIGATE_TO_PACKAGE]', '').trim();
         }
 
         if (text.includes('[SHOPPING_PACKAGE_COMPLETE]')) {
@@ -2245,12 +2595,15 @@
                 if (shouldNavigate) {
                     switchView('packages');
                     const packages = await updatePackages();
-                    if (packages && packages.length > 0) {
-                        // Show the most recent package automatically
-                        // Packages are returned ordered by DESC in the API (latest first)
+                    if (targetPackageId) {
+                        const target = packages.find(p => p.id === targetPackageId);
+                        if (target) showPackageDetails(target);
+                        else if (packages.length > 0) showPackageDetails(packages[0]);
+                    } else if (packages && packages.length > 0) {
                         showPackageDetails(packages[0]);
                     }
-                } else if (isConversationActive && !shouldEnd) {
+                }
+                else if (isConversationActive && !shouldEnd) {
                     setBotStatusMessage("Listening...", 'right');
                     // Recognition is already running (continuous)
                 } else if (shouldEnd) {
@@ -3088,7 +3441,7 @@
 
         isConversationActive = true;
         isProcessing = true;
-        startProcessingStatus();
+        startProcessingStatus(text);
 
         try {
             const requestBody = {
