@@ -7,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Ray and Rae - Holidays and More</title>
+    <title>Ray and Rae - Holidays and More...</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fontdiner+Swanky&family=Lateef:wght@800&display=swap"
@@ -614,6 +614,10 @@
             border-bottom-left-radius: 2px;
         }
 
+        .bot-content-text {
+            white-space: pre-wrap;
+        }
+
         .message {
             margin-bottom: 12px;
             display: flex;
@@ -726,9 +730,9 @@
             display: flex;
             gap: 10px;
             padding: 15px;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid #e2e8f0;
             border-bottom-left-radius: 16px;
             border-bottom-right-radius: 16px;
         }
@@ -737,17 +741,24 @@
             flex: 1;
             padding: 12px 16px;
             border-radius: 25px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
+            border: 1px solid #e2e8f0;
+            background: white;
+            color: var(--text-color);
             font-size: 0.95rem;
             outline: none;
             transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        #chat-input::placeholder {
+            color: #94a3b8;
+            opacity: 1;
         }
 
         #chat-input:focus {
             border-color: var(--primary-color);
-            background: rgba(255, 255, 255, 0.15);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
         #send-btn {
@@ -781,6 +792,119 @@
 
         .hidden {
             display: none !important;
+        }
+
+        /* --- Product Propose Tiles --- */
+        .products-propose-container {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 10px 5px;
+            margin-top: 10px;
+            scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .product-propose-tile {
+            flex: 0 0 280px;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s;
+        }
+
+        .product-propose-tile:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .product-tile-image-container {
+            height: 180px;
+            background: #f8f9fa;
+            position: relative;
+        }
+
+        .product-tile-details {
+            padding: 12px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .product-tile-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.3;
+        }
+
+        .product-tile-meta {
+            margin-top: auto;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 10px;
+        }
+
+        .product-tile-rating {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.85rem;
+            color: #f39c12;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .product-tile-votes {
+            color: #64748b;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .product-tile-price {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .product-tile-select-btn {
+            width: 100%;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+
+        .product-tile-select-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        .product-tile-amazon-link {
+            display: block;
+            text-align: center;
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: #6366f1;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .product-tile-amazon-link:hover {
+            text-decoration: underline;
         }
 
         /* Shopping Checklist Table Styles */
@@ -1002,6 +1126,39 @@
             cursor: not-allowed;
             pointer-events: none;
         }
+
+        /* Grouped Options Styles */
+        .option-group-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 12px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .option-group {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .option-group-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 4px;
+        }
+
+        .option-group-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
     </style>
     <!-- Import Maps -->
     <script type="importmap">
@@ -1020,7 +1177,7 @@
     <div class="sidebar-header">
         <img src="/static/icons/logo.svg" class="sidebar-logo" alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
-        <div class="sidebar-subtitle">Holidays and More</div>
+        <div class="sidebar-subtitle">Holidays and More...</div>
     </div>
     <nav class="sidebar-nav">
         <button class="nav-item active" onclick="switchView('chat')">
@@ -1042,7 +1199,7 @@
         <img src="/static/icons/logo.svg" class="sidebar-logo" style="width: 40px; margin-bottom: 0;"
             alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
-        <div class="mobile-subtitle">Holidays and More</div>
+        <div class="mobile-subtitle">Holidays and More...</div>
     </div>
     <div style="width: 24px;"></div> <!-- Spacer for symmetry -->
 </header>
@@ -1057,16 +1214,16 @@
             <div class="avatar-area">
                 <div class="controls-overlay">
                     <select id="ttsProvider" title="TTS Provider">
-                        <option value="google" selected>Google Chirp</option>
-                        <option value="openai">OpenAI</option>
+                        <option value="google">Google Chirp</option>
+                        <option value="openai" selected>OpenAI</option>
                         <option value="elevenlabs">ElevenLabs</option>
                     </select>
                     <select id="avatarSelector" title="Avatar">
                         <option value="vrm_shadow">Shadow</option>
                         <option value="vrm_jack">Jack</option>
-                        <option value="glb_avatar" selected>Jack (RPM)</option>
+                        <option value="glb_avatar">Jack (RPM)</option>
                         <option value="glb_jackie">Jackie</option>
-                        <option value="glb_cole">Cole</option>
+                        <option value="glb_cole" selected>Cole</option>
                     </select>
                 </div>
 
@@ -1082,7 +1239,7 @@
             <div class="conversation-area">
                 <div id="transcript"></div>
                 <div class="chat-input-container">
-                    <input type="text" id="chat-input" placeholder="Plan your trip here..." autocomplete="off">
+                    <input type="text" id="chat-input" placeholder="Prefer to type? Click here" autocomplete="off">
                     <button id="send-btn" onclick="sendChatMessage()">Send</button>
                 </div>
             </div>
@@ -1145,7 +1302,7 @@
         clock;
 
     // AVATAR STATE
-    let currentAvatarType = 'vrm'; // 'vrm' or 'glb'
+    let currentAvatarType = 'glb'; // 'vrm' or 'glb'
     let currentVrm = null; // The VRM instance
     let currentGlb = null; // The GLB instance
     let mixer = null; // For GLB Mixer (if needed, though we use manual morphs)
@@ -1251,7 +1408,7 @@
         const selector = document.getElementById('avatarSelector');
         // Default to glb_avatar if nothing selected, or handle legacy 'glb' if it exists in cache? 
         // Better to just grab value.
-        let selectedValue = selector ? selector.value : 'glb_avatar';
+        let selectedValue = selector ? selector.value : 'glb_cole';
 
         if (selectedValue.startsWith('vrm')) {
             currentAvatarType = 'vrm';
@@ -1773,6 +1930,20 @@
         });
     }
 
+    // --- Voice Provider/Name Selection Logic ---
+    const ttsProvider = document.getElementById('ttsProvider');
+    if (ttsProvider) {
+        window.voiceProvider = ttsProvider.value;
+        ttsProvider.addEventListener('change', (e) => {
+            window.voiceProvider = e.target.value;
+            console.log(`[TTS] Provider changed to: ${window.voiceProvider}`);
+        });
+    }
+    // Initialize voiceName if not set
+    if (!window.voiceName) {
+        window.voiceName = 'en-GB-Chirp3-HD-Algenib'; // Default for Google
+    }
+
 
 
 </script>
@@ -1808,52 +1979,55 @@
     let isConversationActive = false;
     let isBotSpeaking = false;
     let isProcessing = false;
+    let hasStartedSpeakingThisResponse = false;
     let isUpdatingPackages = false;
     let startBtn = null; // Dynamic ref
+    let lastBotSpeakStartTime = 0; // To prevent initial echo interruption
+    let lastBotSpeakEndTime = 0; // To prevent post-speech echo
+    let statusInterval = null; // Fix: Declare statusInterval to avoid ReferenceError
+    let currentBotMsgContentEl = null; // Track the active bot message container
+    let currentBotMsgDiv = null;      // Track the active bot message bubble element
+    let currentFullResponse = "";      // Track the response as it streams
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.continuous = true;
+        recognition.continuous = false;
         recognition.interimResults = true;
         recognition.lang = 'en-US';
 
         recognition.onstart = () => {
+            console.log(`[Recognition] Started at ${new Date().toLocaleTimeString()}`);
             setBotStatusMessage("Listening...", 'right');
         };
 
         recognition.onend = () => {
-            console.log(`[Recognition] Loop ended. Active: ${isConversationActive}, BotSpeaking: ${isBotSpeaking}, Processing: ${isProcessing}`);
-            if (isConversationActive) {
-                // Always try to restart if conversation is active, unless we specifically don't want it to
-                // recognition.start() handles already-started cases gracefully or with a catchable error
+            console.log(`[Recognition] onend at ${new Date().toLocaleTimeString()}. States: isConversationActive=${isConversationActive}, isBotSpeaking=${isBotSpeaking}, isProcessing=${isProcessing}`);
+
+            // Wait briefly before attempting to restart to avoid collisions
+            setTimeout(() => {
+                restartRecognitionIfPossible();
+            }, 100);
+        };
+
+        window.restartRecognitionIfPossible = function () {
+            console.log(`[Recognition] restartRecognitionIfPossible attempt. States: active=${isConversationActive}, speaking=${isBotSpeaking}, proc=${isProcessing}`);
+            if (isConversationActive && !isBotSpeaking && !isProcessing) {
                 try {
                     recognition.start();
-                    console.log('[Recognition] Restarted loop.');
+                    console.log('[Recognition] recognition.start() called.');
                 } catch (e) {
-                    // console.warn('[Recognition] Restart effort:', e.message);
+                    console.warn('[Recognition] recognition.start() error:', e.message);
                 }
             } else {
-                clearBotStatusMessage();
+                console.log(`[Recognition] Restart skipped. Reason: ${!isConversationActive ? 'Inactive' : (isBotSpeaking ? 'Bot Speaking' : 'Processing')}`);
+                if (!isBotSpeaking && !isProcessing) clearBotStatusMessage();
             }
         };
 
         recognition.onresult = async (event) => {
-            // Check for interruption: if bot is speaking and we have any speech results
-            if (isBotSpeaking || isProcessing) {
-                console.log('[Voice] Interruption detected! Stopping bot speech.');
-                if (window.audioElement) {
-                    window.audioElement.pause();
-                    window.audioElement.currentTime = 0;
-                }
-                stopSpeaking();
-                isBotSpeaking = false;
-                isProcessing = false;
-                clearBotStatusMessage();
-                // Optionally: we can wait for a final result or just continue
-            }
+            if (isProcessing) return; // Prevent double processing
 
-            // Find the most recent final result
             let transcript = '';
             let isFinal = false;
             for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -1863,71 +2037,37 @@
                 }
             }
 
-            if (!isFinal) return; // Wait for final result before processing transcript
+            if (!isFinal) return;
+            const text = transcript.trim();
+            if (!text) return;
 
-            addMessage('You', transcript.trim());
-            isProcessing = true;
-            startProcessingStatus(transcript.trim()); // Start context-aware updates
+            console.log(`[Recognition] Result (Final): "${text}"`);
 
-            try {
-                // Pass REGION to backend
-                const requestBody = {
-                    message: transcript.trim(),
-                    region: currentRegion
-                };
-                if (sessionId) requestBody.session_id = sessionId;
-
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody)
-                });
-
-                stopProcessingStatus(); // Stop updates
-
-                const data = await response.json();
-                console.log('Received data:', data);
-
-                if (data.session_id) {
-                    sessionId = data.session_id;
-                    localStorage.setItem('chat_session_id', sessionId);
-                }
-
-                let botResponse = data.response;
-                let shouldEndConversation = false;
-
-                // Poll for packages after receiving response
-                updatePackages();
-
-                if (botResponse.includes('[END_CONVERSATION]')) {
-                    shouldEndConversation = true;
-                    botResponse = botResponse.replace('[END_CONVERSATION]', '').trim();
-                }
-
-                // Strip Emotion Tags
-                const expressionRegex = /\[Expression:\s*([a-zA-Z]+)\]/i;
-                const match = botResponse.match(expressionRegex);
-                if (match) {
-                    botResponse = botResponse.replace(expressionRegex, '').trim();
-                }
-
-                await speak(botResponse, shouldEndConversation);
-
-            } catch (error) {
-                console.error('Error:', error);
-                setBotStatusMessage("Error communicating with server ❌");
-                isProcessing = false;
-                // No need to restart recognition as it's continuous
-            }
+            // Standardizing on sendChatMessage for all inputs
+            sendChatMessage(text);
         };
 
         recognition.onerror = (event) => {
-            if (event.error === 'no-speech' && isConversationActive && !isBotSpeaking) {
+            console.error('[Recognition] Error:', event.error);
+
+            // If we are currently processing a request or the bot is speaking, 
+            // we ignore most recognition errors to avoid UI noise (like "no-speech" timeouts)
+            if (isProcessing || isBotSpeaking) {
+                console.log(`[Recognition] Ignoring error "${event.error}" while processing/speaking.`);
+                return;
+            }
+
+            if (event.error === 'no-speech') {
                 setBotStatusMessage("Still listening...", 'right');
+                // Mic will restart automatically via onend 
             } else {
                 setBotStatusMessage("Error: " + event.error, 'center');
+                // Only reset isProcessing if we were waiting for result but NOT yet sent to backend
+                // (Though usually isProcessing is only true once sent to backend)
+                isProcessing = false;
             }
         };
+
     } else {
         // Web Speech API NOT SUPPORTED
         // Render error in transcript instead of statusDiv
@@ -1938,64 +2078,39 @@
         tDiv.appendChild(errDiv);
     }
 
-    // Initial Render of Start Button if supported
-    // logic moved to init/onload if supported
-    if (SpeechRecognition) {
-        renderStartButton();
-        // Periodically verify recognition is running if it should be
-        setInterval(() => {
-            if (isConversationActive && recognition) {
-                try {
-                    recognition.start();
-                } catch (e) { }
+    function initAudio() {
+        if (!window.audioElement) {
+            console.log("[Audio] Initializing audio context and element on gesture.");
+            window.audioElement = new Audio();
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                window.audioContext = new AudioContext();
+                window.analyser = window.audioContext.createAnalyser();
+                window.analyser.fftSize = 256;
+                const bufferLength = window.analyser.frequencyBinCount;
+                window.dataArray = new Uint8Array(bufferLength);
+
+                const source = window.audioContext.createMediaElementSource(window.audioElement);
+                source.connect(window.analyser);
+                window.analyser.connect(window.audioContext.destination);
             }
-        }, 5000);
+        }
     }
 
+
     async function startConversationMode() {
+        initAudio();
+        sendChatMessage("Hi!");
+    }
+    async function startVoiceConversationMode() {
+        initAudio();
         isConversationActive = true;
+        const container = document.getElementById('dynamic-start-container');
+        if (container) container.remove();
 
-        // Remove Start Button
-        const btn = document.getElementById('dynamic-start-btn');
-        if (btn) btn.remove();
-
-        // 1. Add "Hi!" to UI
-        addMessage('You', 'Hi!');
-
-        // 2. Start dynamic updates
-        isProcessing = true;
-        startProcessingStatus("Hi!");
-
-        // 3. Send "Hi!" to backend
-        try {
-            const requestBody = {
-                message: "Hi!",
-                region: window.currentRegion || 'US'
-            };
-            if (sessionId) requestBody.session_id = sessionId;
-
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
-            });
-
-            stopProcessingStatus();
-
-            const data = await response.json();
-            if (data.session_id) {
-                sessionId = data.session_id;
-                localStorage.setItem('chat_session_id', sessionId);
-            }
-
-            speak(data.response);
-        } catch (e) {
-            console.error("Auto-greeting failed:", e);
-            isProcessing = false;
-            stopProcessingStatus();
-            // Fallback: just start recognition if fetch fails
-            recognition.start();
-        }
+        // Just start listening
+        setBotStatusMessage("Ready! Speak to initiate...", 'right');
+        restartRecognitionIfPossible();
     }
 
     function stopConversationMode() {
@@ -2023,32 +2138,35 @@
     // Helper to Render Start Button
     function renderStartButton() {
         // Avoid duplicates
-        if (document.getElementById('dynamic-start-btn')) return;
+        if (document.getElementById('dynamic-start-container')) return;
 
-        const btn = document.createElement('button');
-        btn.id = 'dynamic-start-btn';
-        btn.className = 'action-btn start-btn';
-        btn.textContent = 'Say hi!';
-        btn.style.alignSelf = 'center';
-        btn.style.marginTop = '1rem';
-        btn.style.marginBottom = '1rem';
+        const container = document.createElement('div');
+        container.id = 'dynamic-start-container';
+        container.style.cssText = "display: flex; gap: 10px; justify-content: center; margin-top: 1rem; margin-bottom: 1rem;";
 
-        btn.onclick = startConversationMode;
+        const hiBtn = document.createElement('button');
+        hiBtn.className = 'action-btn start-btn';
+        hiBtn.textContent = '"Hi"'; // In quotes as requested
+        hiBtn.onclick = startConversationMode;
+
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'action-btn start-btn';
+        speakBtn.textContent = 'Tell Ray what you want';
+        speakBtn.onclick = startVoiceConversationMode;
+
+        container.appendChild(hiBtn);
+        container.appendChild(speakBtn);
 
         const tDiv = document.getElementById('transcript');
-        tDiv.appendChild(btn);
-        tDiv.scrollTop = tDiv.scrollHeight;
+        const isNearBottom = tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100;
+        tDiv.appendChild(container);
+        if (isNearBottom) {
+            tDiv.scrollTop = tDiv.scrollHeight;
+        }
     }
 
 
-    function addMessage(sender, text) {
-        if (sender === 'You') {
-            clearBotStatusMessage();
-        }
-        const div = document.createElement('div');
-        const isUser = sender === 'You';
-        div.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
-
+    function parseProtocols(text) {
         let displayContent = text;
         let checklistHtml = '';
         let optionsHtml = '';
@@ -2061,16 +2179,16 @@
                 try {
                     const checklistData = JSON.parse(match[1]);
                     checklistHtml = renderShoppingTable(checklistData.items);
-                    displayContent = text.replace(checklistRegex, '').trim();
+                    displayContent = displayContent.replace(checklistRegex, '').trim();
                 } catch (e) {
                     console.error("Failed to parse shopping checklist JSON", e);
                 }
             }
         }
 
-        // Check for [OPTIONS: ["...", "..."]]
-        if (displayContent.includes('[OPTIONS:')) {
-            const optionsRegex = /\[OPTIONS:\s*(\[[\s\S]*?\])\s*\]/m;
+        // Check for [OPTIONS: [...] ] or [RESPONSE_OPTIONS] [...]
+        if (displayContent.includes('[OPTIONS:') || displayContent.includes('[RESPONSE_OPTIONS]')) {
+            const optionsRegex = /\[(?:OPTIONS|RESPONSE_OPTIONS):?\]?\s*(\[[\s\S]*?\])\s*\]?/m;
             const match = displayContent.match(optionsRegex);
             if (match) {
                 try {
@@ -2127,17 +2245,116 @@
             }
         }
 
+        // Check for [OPTIONS_GROUPED: {...}]
+        if (displayContent.includes('[OPTIONS_GROUPED:')) {
+            const groupedOptionsRegex = /\[OPTIONS_GROUPED:\s*(\{[\s\S]*?\})\s*\]/m;
+            const match = displayContent.match(groupedOptionsRegex);
+            if (match) {
+                try {
+                    let rawGroups = match[1].trim();
+                    if (rawGroups.includes("'") && !rawGroups.includes('"')) {
+                        rawGroups = rawGroups.replace(/'/g, '"');
+                    }
+                    const groups = JSON.parse(rawGroups);
+                    let groupedHtml = `<div class="option-group-container multi-select-container">`;
+                    for (const [title, opts] of Object.entries(groups)) {
+                        groupedHtml += `
+                            <div class="option-group">
+                                <div class="option-group-title">${title}</div>
+                                <div class="option-group-buttons">
+                        `;
+                        opts.forEach(opt => {
+                            const isNoPref = opt.toLowerCase().includes('no preference') || opt.toLowerCase().includes('none');
+                            groupedHtml += `<button class="option-btn ${isNoPref ? 'no-pref-btn' : ''}" onclick="handleMultiOptionClick(this, '${opt.toString().replace(/'/g, "\\'")}')">${opt}</button>`;
+                        });
+                        groupedHtml += `
+                                </div>
+                            </div>
+                        `;
+                    }
+                    groupedHtml += `<button class="submit-btn" onclick="submitMultiOptions(this)">Submit</button>`;
+                    groupedHtml += `</div>`;
+                    optionsHtml = groupedHtml;
+                    displayContent = displayContent.replace(groupedOptionsRegex, '').trim();
+                } catch (e) {
+                    console.error("Failed to parse grouped-options JSON. Raw:", match[1], e);
+                    displayContent = displayContent.replace(groupedOptionsRegex, '').trim();
+                }
+            }
+        }
+
+        // Check for [PROPOSE_PRODUCTS: JSON]
+        if (displayContent.includes('[PROPOSE_PRODUCTS:')) {
+            const proposeRegex = /\[PROPOSE_PRODUCTS:\s*([\s\S]*?)\]\s*/m;
+            const match = displayContent.match(proposeRegex);
+            if (match) {
+                try {
+                    const products = JSON.parse(match[1].trim());
+                    if (Array.isArray(products)) {
+                        let productsHtml = `<div class="products-propose-container">`;
+                        products.forEach(prod => {
+                            productsHtml += `
+                                <div class="product-propose-tile">
+                                    <div class="product-tile-image-container">
+                                        ${window.renderImageSlider(prod.variants || [prod.thumbnail], prod.title)}
+                                    </div>
+                                    <div class="product-tile-details">
+                                        <div class="product-tile-title">${prod.title}</div>
+                                        <div class="product-tile-meta">
+                                            <div class="product-tile-rating">
+                                                ${prod.rating} ⭐ <span class="product-tile-votes">(${prod.rating_count} ratings)</span>
+                                            </div>
+                                            <div class="product-tile-price">${prod.price}</div>
+                                            
+                                            ${window.renderReviewCarousel(prod.reviews)}
+                                            
+                                            <button class="product-tile-select-btn" onclick="handleProductSelect(this, '${prod.title.replace(/'/g, "\\'")}', '${prod.asin || ''}')">Select this</button>
+                                            <a href="${prod.url}" target="_blank" class="product-tile-amazon-link">View on Amazon</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        productsHtml += `</div>`;
+                        optionsHtml = productsHtml;
+                        displayContent = displayContent.replace(proposeRegex, '').trim();
+                    }
+                } catch (e) {
+                    console.error("Failed to parse PROPOSE_PRODUCTS JSON", e);
+                    displayContent = displayContent.replace(proposeRegex, '').trim();
+                }
+            }
+        }
+
+        return { displayContent, checklistHtml, optionsHtml };
+    }
+
+    function addMessage(sender, text) {
+        if (sender === 'You') {
+            clearBotStatusMessage();
+        }
+        const div = document.createElement('div');
+        const isUser = sender === 'You';
+        div.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
+
+        const { displayContent, checklistHtml, optionsHtml } = parseProtocols(text);
+
         div.innerHTML = `
             <div class="message-bubble">
                 <div class="bubble-sender">${sender}</div>
-                <div>${displayContent}</div>
-                ${checklistHtml}
-                ${optionsHtml}
+                <div class="${sender === 'Bot' ? 'bot-content-text' : ''}">${displayContent}</div>
+                <div class="bot-protocol-checklist">${checklistHtml}</div>
+                <div class="bot-protocol-options">${optionsHtml}</div>
             </div>
         `;
         const tDiv = document.getElementById('transcript');
+        const isNearBottom = tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100;
         tDiv.appendChild(div);
-        tDiv.scrollTop = tDiv.scrollHeight;
+        if (isNearBottom) {
+            tDiv.scrollTop = tDiv.scrollHeight;
+            return div;
+        }
+        return div;
     }
 
     window.handleOptionClick = function (btn, text) {
@@ -2167,14 +2384,47 @@
         }
 
         // Send message
-        document.getElementById('chat-input').value = text;
-        sendChatMessage();
+        sendChatMessage(text);
     };
 
     window.handleMultiOptionClick = function (btn, text) {
         if (btn.classList.contains('disabled')) return;
-        btn.classList.toggle('selected');
+
+        const isSelected = btn.classList.toggle('selected');
+        const isNoPref = btn.classList.contains('no-pref-btn');
+
+        // Logical deselection for grouped options
+        const groupButtons = btn.closest('.option-group-buttons');
+        if (groupButtons) {
+            if (isNoPref && isSelected) {
+                // Deselect all others in this group
+                groupButtons.querySelectorAll('.option-btn:not(.no-pref-btn)').forEach(other => {
+                    other.classList.remove('selected');
+                });
+            } else if (!isNoPref && isSelected) {
+                // Deselect "No preference" in this group
+                groupButtons.querySelectorAll('.no-pref-btn').forEach(noPref => {
+                    noPref.classList.remove('selected');
+                });
+            }
+        }
+
         console.log('[UI] Multi-option toggled:', text, 'Selected:', btn.classList.contains('selected'));
+    };
+
+    window.handleProductSelect = function (btn, title, asin) {
+        if (btn.classList.contains('disabled')) return;
+
+        // Visual feedback
+        const container = btn.closest('.products-propose-container');
+        container.querySelectorAll('.product-tile-select-btn').forEach(b => b.classList.add('disabled'));
+        btn.style.background = '#10b981'; // Success green
+        btn.textContent = 'Selected ✓';
+
+        console.log('[UI] Product selected:', title, asin);
+
+        // Send to chat
+        sendChatMessage(`I'll take the ${title}.`);
     };
 
     window.submitMultiOptions = function (submitBtn) {
@@ -2212,8 +2462,7 @@
         }
 
         // Send message
-        document.getElementById('chat-input').value = text;
-        sendChatMessage();
+        sendChatMessage(text);
     };
 
     function renderShoppingTable(items) {
@@ -2294,8 +2543,7 @@
 
     function continueShoppingConversation(optionalMessage) {
         const msg = optionalMessage || "I've updated the checklist. Let's continue.";
-        document.getElementById('chat-input').value = msg;
-        sendChatMessage();
+        sendChatMessage(msg);
     }
 
     // --- Shoe Size Selector Logic ---
@@ -2356,8 +2604,7 @@
         console.log('[UI] Shoe size selected:', selectionText);
 
         // Send to chat
-        document.getElementById('chat-input').value = selectionText;
-        sendChatMessage();
+        sendChatMessage(selectionText);
     };
 
     let lastStatusText = "";
@@ -2389,8 +2636,11 @@
         div.style.cssText = `text-align: ${align}; align-self: ${alignSelf}; color: #888; font-style: italic; margin: 0; font-size: 0.85em; opacity: 0.8; max-width: 85%;`;
         div.textContent = text;
 
+        const isNearBottom = tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100;
         tDiv.appendChild(div);
-        tDiv.scrollTop = tDiv.scrollHeight;
+        if (isNearBottom) {
+            tDiv.scrollTop = tDiv.scrollHeight;
+        }
     }
 
     function clearBotStatusMessage() {
@@ -2398,82 +2648,31 @@
         const tDiv = document.getElementById('transcript');
         const rightMessages = tDiv.querySelectorAll('.bot-status-message-right');
         rightMessages.forEach(msg => msg.remove());
-        // Keep left-aligned thinking messages in the chat
+
+        // Clear left-aligned thinking messages too
+        const leftMessages = tDiv.querySelectorAll('.bot-status-message-left');
+        leftMessages.forEach(msg => msg.remove());
+
+        lastStatusText = ""; // Reset trackers so messages can be re-issued
     }
 
-    let statusInterval = null;
-    const statusMessages = {
-        generic: [
-            "Thinking...",
-            "Working on it...",
-            "One moment...",
-            "Checking details...",
-            "Reviewing...",
-            "Gathering information...",
-            "Analyzing request...",
-            "Processing..."
-        ],
-        recommendations: [
-            "Curating recommendations...",
-            "Almost ready with your recommendations!",
-            "Searching for the best options...",
-            "Finding the perfect suggestions..."
-        ],
-        flights: [
-            "Checking flight schedules and pricing...",
-            "Searching for the best flight deals...",
-            "Verifying airline availability...",
-            "Comparing flight options..."
-        ],
-        stays: [
-            "Looking for top-rated accommodations...",
-            "Checking hotel availability...",
-            "Searching for high-quality stays...",
-            "Comparing resort and hotel options..."
-        ],
-        activities: [
-            "Exploring local activities and attractions...",
-            "Finding hidden gems off the beaten path...",
-            "Sourcing exciting things to do...",
-            "Checking for top-rated tours and excursions..."
-        ],
-        holiday: [
-            "Sourcing exclusive holiday packages...",
-            "Curating a personalized itinerary just for you...",
-            "Optimizing your travel route...",
-            "Checking weather forecasts for your dates..."
-        ]
-    };
+    const statusMessages = [
+        "Thinking...",
+        "Working on it...",
+        "One moment...",
+        "Checking details...",
+        "Reviewing...",
+        "Gathering information...",
+        "Analyzing request...",
+        "Processing..."
+    ];
 
     function startProcessingStatus(userText) {
+        if (hasStartedSpeakingThisResponse) return; // Ignore if speech already started
         if (statusInterval) clearInterval(statusInterval);
 
-        const lowerText = (userText || "").toLowerCase();
-        let pool = [...statusMessages.generic];
-
-        // Recommendation context
-        if (lowerText.includes('find') || lowerText.includes('search') || lowerText.includes('recommend') ||
-            lowerText.includes('advice') || lowerText.includes('suggestion') || lowerText.includes('best') ||
-            lowerText.includes('option') || lowerText.includes('choose')) {
-            pool = pool.concat(statusMessages.recommendations);
-        }
-
-        // Categorize based on keywords
-        if (lowerText.includes('flight') || lowerText.includes('plane') || lowerText.includes('airline') || lowerText.includes('fly') || lowerText.includes('airport')) {
-            pool = pool.concat(statusMessages.flights);
-        }
-        if (lowerText.includes('hotel') || lowerText.includes('stay') || lowerText.includes('accommodation') || lowerText.includes('resort') || lowerText.includes('room') || lowerText.includes('hostel')) {
-            pool = pool.concat(statusMessages.stays);
-        }
-        if (lowerText.includes('activity') || lowerText.includes('tour') || lowerText.includes('excursion') || lowerText.includes('see') || lowerText.includes('visit') || lowerText.includes('interest') || lowerText.includes('attraction')) {
-            pool = pool.concat(statusMessages.activities);
-        }
-        if (lowerText.includes('itinerary') || lowerText.includes('plan') || lowerText.includes('trip') || lowerText.includes('holiday') || lowerText.includes('vacation')) {
-            pool = pool.concat(statusMessages.holiday);
-        }
-
         // Shuffle pool
-        const shuffled = pool.sort(() => Math.random() - 0.5);
+        const shuffled = [...statusMessages].sort(() => Math.random() - 0.5);
         let i = 0;
 
         setBotStatusMessage(shuffled[i], 'left');
@@ -2492,138 +2691,201 @@
         clearBotStatusMessage();
     }
 
-    async function speak(text, shouldEnd = false) {
-        if (!isConversationActive) return; // Handle cases where conversation was stopped during processing
-        isBotSpeaking = true;
-        // recognition.stop(); // Don't stop recognition, we want continuous listening
+    let speechQueue = [];
+    let isPlayingQueue = false;
 
-        // Wait briefly to allow any trailing user speech to finish processing or be ignored if small
-        // Browser AEC should filter out speakers, but we also have our interruption logic in onresult.
+    async function processSpeechQueue() {
+        if (speechQueue.length === 0 || isPlayingQueue) return;
 
-        // Handle Navigation Triggers
-        let targetPackageId = null;
-        if (text.includes('[NAVIGATE_TO_PACKAGE]')) {
-            const idMatch = text.match(/\[NAVIGATE_TO_PACKAGE:([\w-]+)\]/);
-            if (idMatch) {
-                targetPackageId = idMatch[1];
-                text = text.replace(idMatch[0], '').trim();
-            } else {
-                text = text.replace('[NAVIGATE_TO_PACKAGE]', '').trim();
-            }
-            shouldNavigate = true;
-        }
-
-        if (text.includes('[SHOPPING_PACKAGE_COMPLETE]')) {
-            isShoppingComplete = true;
-            shouldNavigate = true;
-            text = text.replace('[SHOPPING_PACKAGE_COMPLETE]', '').trim();
-        }
-
-        // Strip Shopping Checklist block from TTS (but keep it for display)
-        let ttsText = text;
-        if (ttsText.includes('[SHOPPING_CHECKLIST]')) {
-            ttsText = ttsText.replace(/\[SHOPPING_CHECKLIST\][\s\S]*?\[\/SHOPPING_CHECKLIST\]/g, '').trim();
-        }
-
-        // Strip [OPTIONS: ...] from TTS
-        if (ttsText.includes('[OPTIONS:')) {
-            ttsText = ttsText.replace(/\[OPTIONS:\s*\[.*?\]\]/g, '').trim();
-        }
+        isPlayingQueue = true;
+        const speechItem = speechQueue.shift();
+        const textToSpeak = speechItem.text;
 
         try {
-            const provider = document.getElementById('ttsProvider').value;
-            const avatar = document.getElementById('avatarSelector').value;
+            // Re-apply protocol stripping for safety (though it should be stripped before queuing)
+            let ttsText = textToSpeak;
 
-            let voiceName = 'en-GB-Chirp3-HD-Algenib'; // Default for Google
-
-            if (provider === 'openai') {
-                if (avatar === 'glb_jackie') {
-                    voiceName = 'nova';
-                } else {
-                    voiceName = 'alloy';
-                }
-            } else if (provider === 'elevenlabs') {
-                if (avatar === 'glb_jackie') {
-                    voiceName = 'hDCQ0elACClokHYB6RkC';
-                } else {
-                    voiceName = '8fcyCHOzlKDlxh1InJSf';
-                }
-            }
-
+            // Call /tts
             const response = await fetch('/tts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     text: ttsText,
+                    voice_name: window.voiceName || 'en-GB-Chirp3-HD-Algenib',
                     language_code: 'en-GB',
-                    voice_name: voiceName,
-                    provider: provider
+                    provider: window.voiceProvider || 'google'
                 })
             });
 
-            const data = await response.json();
-            const audioBlob = base64ToBlob(data.audio, 'audio/mp3');
-            const audioUrl = URL.createObjectURL(audioBlob);
-
-            if (!window.audioElement) {
-                window.audioElement = new Audio();
-                window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                window.analyser = window.audioContext.createAnalyser();
-                window.analyser.fftSize = 256;
-                const bufferLength = window.analyser.frequencyBinCount;
-                window.dataArray = new Uint8Array(bufferLength);
-                const audioSource = window.audioContext.createMediaElementSource(window.audioElement);
-                audioSource.connect(window.analyser);
-                window.analyser.connect(window.audioContext.destination);
+            if (!response.ok) {
+                const errData = await response.json();
+                console.error("[TTS] Server error:", errData.detail || response.statusText);
+                throw new Error(errData.detail || "TTS failed");
             }
 
-            window.audioElement.src = audioUrl;
+            const data = await response.json();
+            if (!data.audio) {
+                console.error("[TTS] No audio data in response:", data);
+                throw new Error("No audio data");
+            }
 
-            window.audioElement.onplay = () => {
-                clearBotStatusMessage(); // Clear "Thinking..." now that we are speaking
-                startSpeaking();
-                addMessage('Bot', text); // Delay text display until audio starts
-                updateAudioVolumeGlobal();
-            };
+            const audio = window.audioElement;
+            audio.src = "data:audio/mp3;base64," + data.audio;
 
-            window.audioElement.onended = async () => {
+            const onEndedHandler = () => {
+                audio.removeEventListener('ended', onEndedHandler);
+                isPlayingQueue = false;
                 stopSpeaking();
-                URL.revokeObjectURL(audioUrl);
-                isBotSpeaking = false;
-                isProcessing = false;
 
-                if (shouldNavigate) {
-                    switchView('packages');
-                    const packages = await updatePackages();
-                    if (targetPackageId) {
-                        const target = packages.find(p => p.id === targetPackageId);
-                        if (target) showPackageDetails(target);
-                        else if (packages.length > 0) showPackageDetails(packages[0]);
-                    } else if (packages && packages.length > 0) {
-                        showPackageDetails(packages[0]);
+                if (speechQueue.length === 0) {
+                    isBotSpeaking = false;
+                    restartRecognitionIfPossible();
+                } else {
+                    processSpeechQueue();
+                }
+            };
+            audio.addEventListener('ended', onEndedHandler);
+
+            const onPlayingHandler = () => {
+                audio.removeEventListener('playing', onPlayingHandler);
+                console.log("[TTS] playing event triggered. textToSpeak:", textToSpeak, "currentBotMsgDiv exists:", !!currentBotMsgDiv);
+                isBotSpeaking = true;
+                startSpeaking();
+                updateAudioVolumeGlobal();
+                clearBotStatusMessage();
+
+                // Stop thinking messages once speech starts
+                hasStartedSpeakingThisResponse = true;
+                stopProcessingStatus();
+
+                // Initialize UI bubble if it's the first audio segment
+                if (!currentBotMsgDiv) {
+                    currentBotMsgDiv = addMessage('Bot', '');
+                    currentBotMsgContentEl = currentBotMsgDiv.querySelector('.bot-content-text');
+                    console.log("[TTS] Created botMsgDiv on speech start.");
+
+                    // Immediately render any protocols accumulated so far
+                    if (currentFullResponse.includes('[') || currentFullResponse.includes(']')) {
+                        const { checklistHtml, optionsHtml } = parseProtocols(currentFullResponse);
+                        const checklistContainer = currentBotMsgDiv.querySelector('.bot-protocol-checklist');
+                        const optionsContainer = currentBotMsgDiv.querySelector('.bot-protocol-options');
+                        if (checklistContainer && checklistHtml) checklistContainer.innerHTML = checklistHtml;
+                        if (optionsContainer && optionsHtml) optionsContainer.innerHTML = optionsHtml;
                     }
                 }
-                else if (isConversationActive && !shouldEnd) {
-                    setBotStatusMessage("Listening...", 'right');
-                    // Recognition is already running (continuous)
-                } else if (shouldEnd) {
-                    stopConversationMode();
+
+                // Initialize UI bubble if it's the first audible segment
+                if (!currentBotMsgDiv) {
+                    // Create bubble with first chunk already included
+                    currentBotMsgDiv = addMessage('Bot', textToSpeak);
+                    currentBotMsgContentEl = currentBotMsgDiv.querySelector('.bot-content-text');
+                    console.log("[TTS] Created botMsgDiv on speech start with text:", textToSpeak);
+
+                    // Immediately render any protocols accumulated in previous silent chunks
+                    if (currentFullResponse.includes('[') || currentFullResponse.includes(']')) {
+                        const { checklistHtml, optionsHtml } = parseProtocols(currentFullResponse);
+                        const checklistContainer = currentBotMsgDiv.querySelector('.bot-protocol-checklist');
+                        const optionsContainer = currentBotMsgDiv.querySelector('.bot-protocol-options');
+                        if (checklistContainer && checklistHtml) checklistContainer.innerHTML = checklistHtml;
+                        if (optionsContainer && optionsHtml) optionsContainer.innerHTML = optionsHtml;
+                    }
+                } else if (currentBotMsgContentEl && textToSpeak) {
+                    // Synchronized Text Display (Subsequent chunks)
+                    const currentText = currentBotMsgContentEl.textContent;
+
+                    // Add space if needed between logical chunks
+                    if (currentText && !currentText.endsWith(' ') && !textToSpeak.startsWith(' ')) {
+                        currentBotMsgContentEl.textContent += ' ';
+                    }
+                    currentBotMsgContentEl.textContent += textToSpeak;
+
+                    // Auto-scroll
+                    const tDiv = document.getElementById('transcript');
+                    tDiv.scrollTop = tDiv.scrollHeight;
                 }
             };
+            audio.addEventListener('playing', onPlayingHandler);
 
-            await window.audioElement.play();
+            audio.play().catch(e => {
+                console.error("[TTS] Playback blocked or failed:", e);
+                stopSpeaking();
+                isPlayingQueue = false;
+                processSpeechQueue();
+            });
 
-        } catch (error) {
-            console.error('TTS Error:', error);
-            // Fallback UI logic removed for brevity, assume fetch works or handle simply
-            stopConversationMode();
+        } catch (e) {
+            console.error("[TTS] Error:", e);
+            isPlayingQueue = false;
+            stopSpeaking();
+            if (speechQueue.length === 0) {
+                isBotSpeaking = false;
+                restartRecognitionIfPossible();
+            } else {
+                processSpeechQueue();
+            }
         }
     }
 
+    async function speak(text, shouldEnd = false) {
+        if (!isConversationActive) return;
+
+        // Ensure recognition is stopped while bot is speaking
+        if (recognition) {
+            try { recognition.stop(); } catch (e) { }
+        }
+
+        // Strip protocols for TTS
+        let processedText = text;
+
+        // Remove known protocol blocks first
+        const protocols = [
+            'SHOPPING_CHECKLIST', 'OPTIONS', 'OPTIONS_MULTI',
+            'OPTIONS_GROUPED', 'PROPOSE_PRODUCTS', 'RESPONSE_OPTIONS',
+            'SHOE_SIZE_SELECTOR'
+        ];
+
+        protocols.forEach(p => {
+            // Match [PROTOCOL: data] or [PROTOCOL] [data]
+            const regex = new RegExp('\\[' + p + '\\]?:?\\s*(\\[[\\s\\S]*?\\])?', 'g');
+            processedText = processedText.replace(regex, '');
+            // Also handle closed tags if any (e.g. [/SHOPPING_CHECKLIST])
+            const closeRegex = new RegExp('\\[\\/' + p + '\\]', 'g');
+            processedText = processedText.replace(closeRegex, '');
+        });
+
+        let ttsText = '';
+        let i = 0;
+        while (i < processedText.length) {
+            if (processedText[i] === '[' && /^[A-Z_]+[:\]]/.test(processedText.substring(i + 1))) {
+                let depth = 1; i++;
+                while (i < processedText.length && depth > 0) {
+                    if (processedText[i] === '[') depth++;
+                    else if (processedText[i] === ']') depth--;
+                    i++;
+                }
+            } else {
+                ttsText += processedText[i];
+                i++;
+            }
+        }
+
+        // Basic normalization
+        ttsText = ttsText.replace(/\*/g, '').replace(/_/g, '').trim();
+
+        if (ttsText) {
+            speechQueue.push({ text: ttsText });
+            processSpeechQueue();
+        }
+    }
+
+
     // Globals for Audio Animation
-    function startSpeaking() { window.isSpeaking = true; }
+    function startSpeaking() { window.isSpeaking = true; isBotSpeaking = true; }
     function stopSpeaking() {
         window.isSpeaking = false;
+        isBotSpeaking = false;
+        isPlayingQueue = false;
+        speechQueue.length = 0;
         window.currentAudioVolume = 0;
     }
 
@@ -2735,6 +2997,33 @@
     let currentPackageDetails = null;
 
     // --- Review Carousel Utilities ---
+    window.moveCarousel = function (carouselId, direction, isAuto = false) {
+        const carousel = document.getElementById(carouselId);
+        if (!carousel) return;
+
+        // Clear existing timer if it's a manual click
+        if (!isAuto && carousel.dataset.timer) {
+            clearInterval(carousel.dataset.timer);
+            delete carousel.dataset.timer;
+        }
+
+        const slides = carousel.querySelectorAll('.review-slide');
+        const indicator = carousel.querySelector('.carousel-indicator');
+        if (slides.length <= 1) return;
+
+        let activeIdx = 0;
+        slides.forEach((s, i) => { if (s.classList.contains('active')) activeIdx = i; });
+
+        slides[activeIdx].classList.remove('active');
+
+        let nextIdx = activeIdx + direction;
+        if (nextIdx >= slides.length) nextIdx = 0;
+        if (nextIdx < 0) nextIdx = slides.length - 1;
+
+        slides[nextIdx].classList.add('active');
+        indicator.textContent = `${nextIdx + 1} / ${slides.length}`;
+    };
+
     window.renderReviewCarousel = function (reviews, reviewLink) {
         if (!reviews || !Array.isArray(reviews) || reviews.length === 0) return '';
 
@@ -2756,6 +3045,17 @@
             `;
         });
 
+        // Auto-cycle setup
+        setTimeout(() => {
+            const carousel = document.getElementById(carouselId);
+            if (carousel && reviews.length > 1) {
+                const timer = setInterval(() => {
+                    moveCarousel(carouselId, 1, true);
+                }, 4000); // Cycle every 4 seconds
+                carousel.dataset.timer = timer;
+            }
+        }, 100);
+
         return `
             <div class="reviews-carousel" id="${carouselId}">
                 <div style="font-size: 0.7rem; font-weight: 800; color: #999; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Latest Reviews</div>
@@ -2770,26 +3070,6 @@
                 </div>
             </div>
         `;
-    };
-
-    window.moveCarousel = function (carouselId, direction) {
-        const carousel = document.getElementById(carouselId);
-        if (!carousel) return;
-
-        const slides = carousel.querySelectorAll('.review-slide');
-        const indicator = carousel.querySelector('.carousel-indicator');
-
-        let activeIdx = 0;
-        slides.forEach((s, i) => { if (s.classList.contains('active')) activeIdx = i; });
-
-        slides[activeIdx].classList.remove('active');
-
-        let nextIdx = activeIdx + direction;
-        if (nextIdx >= slides.length) nextIdx = 0;
-        if (nextIdx < 0) nextIdx = slides.length - 1;
-
-        slides[nextIdx].classList.add('active');
-        indicator.textContent = `${nextIdx + 1} / ${slides.length}`;
     };
 
     // --- Image Slider Extensions ---
@@ -2932,11 +3212,17 @@
             html += `
                 <div style="background:linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%); border:2px solid #ff9900; border-radius:12px; padding:20px; margin-bottom:25px; box-shadow: 0 4px 12px rgba(255,153,0,0.15);">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:2px solid #ff9900; padding-bottom:10px;">
-                        <h3 style="margin:0; font-size:1.4rem; color:#ff9900;">🛍️ Your Shopping Package</h3>
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-size:0.75rem; font-weight:800; color:#ff9900; text-transform:uppercase; letter-spacing:1px;">Phase 1: Preparation</span>
+                            <h3 style="margin:0; font-size:1.4rem; color:#d35400;">🛍️ Your Shopping Package</h3>
+                        </div>
+                        <div style="background:#ff9900; color:#fff; padding:4px 12px; border-radius:15px; font-size:0.85rem; font-weight:700;">
+                            ${productItems.length} Items Added
+                        </div>
                     </div>
                     <div style="text-align:center; margin-bottom:20px;">
                         ${actionBtnHtml}
-                        <p style="font-size:0.85rem; color:#666; margin:5px 0 0 0;">One-click checkout for all your items</p>
+                        <p style="font-size:0.85rem; color:#666; margin:5px 0 0 0;">Complete these purchases before your holiday starts</p>
                     </div>
                     <div style="display:grid; gap:15px;">
             `;
@@ -2949,34 +3235,29 @@
                 const ratingCount = (item.metadata && item.metadata.rating_count) ? item.metadata.rating_count : null;
                 const amzLink = directUrl || `https://www.amazon.${tld}/s?k=${encodeURIComponent(item.name)}&tag=${tag}`;
 
-                let imgHtml = '';
-                if (images.length > 0) {
-                    imgHtml = `<div style="width:100px; height:100px; margin-right:15px; flex-shrink:0;">${renderImageSlider(images, item.name)}</div>`;
-                    // Adjust slider for small product view
-                    imgHtml = imgHtml.replace('height: 250px;', 'height: 100px;');
-                    imgHtml = imgHtml.replace('border-radius: 8px 0 0 8px;', 'border-radius: 8px;');
-                }
-
-                let ratingHtml = '';
-                if (rating) {
-                    ratingHtml = `<div style="font-size:0.85rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5`;
-                    if (ratingCount) {
-                        ratingHtml += ` <span style="color:#999;">(${ratingCount} ratings)</span>`;
-                    }
-                    ratingHtml += `</div>`;
-                }
+                const reviewLink = (item.metadata && item.metadata.review_link) ? item.metadata.review_link : null;
+                const reviews = (item.metadata && item.metadata.reviews) ? item.metadata.reviews : null;
+                const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
 
                 html += `
-                    <div style="display:flex; align-items:center; background:#fff; padding:12px; border-radius:8px; border:1px solid #ffe6cc;">
-                        ${imgHtml}
-                        <div style="flex:1;">
-                            <div style="font-weight:600; color:#333; font-size:1rem;">${item.name}</div>
+                    <div class="package-item-responsive" style="border-left:4px solid #ff9900; overflow: hidden; padding:0;">
+                        ${renderImageSlider(images, item.name)}
+                        <div class="package-item-details" style="padding:12px;">
+                            <div style="font-weight:600; color:#333; font-size:1rem; margin-bottom:4px;">${item.name}</div>
                             ${item.description ? `<div style="font-size:0.85rem; color:#666; margin-top:4px;">${item.description}</div>` : ''}
                             <div style="font-size:0.9rem; color:#333; margin-top:6px; font-weight:600;">
                                 ${sym}${item.price}
                             </div>
-                            ${ratingHtml}
-                            <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="color:#ff9900; text-decoration:none; font-size:0.85rem; margin-top:6px; display:inline-block; font-weight:600;">View on Amazon ↗</a>
+                            ${rating ? `
+                                <div style="font-size:0.85rem; color:#f39c12; margin-top:4px;">
+                                    ⭐ ${rating}/5 ${ratingCount ? `<span style="color:#999;">(${ratingCount} ratings)</span>` : ''}
+                                    ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:#ff9900; text-decoration:none; margin-left:5px;">See reviews</a>` : ''}
+                                </div>` : ''}
+                            <div style="margin-top:10px; display:flex; align-items:center; gap:15px;">
+                                <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="color:#ff9900; text-decoration:none; font-size:0.85rem; font-weight:600;">View on Amazon ↗</a>
+                                <button onclick="removeItemFromPackage('${pkg.id}', '${item.id}')" style="background:none; border:none; color:#ef4444; font-size:0.8rem; cursor:pointer; padding:0; font-weight:600;">Remove</button>
+                            </div>
+                            ${reviewCarouselHtml}
                         </div>
                     </div>
                 `;
@@ -3032,27 +3313,33 @@
                 const images = (item.metadata && item.metadata.images) ? item.metadata.images : (imageUrl ? [imageUrl] : []);
                 const directUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : null;
                 const amzLink = directUrl || `https://www.amazon.${tld}/s?k=${encodeURIComponent(item.name)}&tag=${tag}`;
+                const rating = (item.metadata && item.metadata.rating) ? item.metadata.rating : null;
+                const ratingCount = (item.metadata && item.metadata.rating_count) ? item.metadata.rating_count : null;
 
-                let imgHtml = '';
-                if (images.length > 0) {
-                    imgHtml = `<div style="width:60px; height:60px; margin-right:15px; flex-shrink:0;">${renderImageSlider(images, item.name)}</div>`;
-                    // Adjust slider for tiny list view
-                    imgHtml = imgHtml.replace('height: 250px;', 'height: 60px;');
-                    imgHtml = imgHtml.replace('border-radius: 8px 0 0 8px;', 'border-radius: 4px;');
-                    imgHtml = imgHtml.replace('slider-btn', 'slider-btn hidden'); // Hide buttons in tiny view
-                }
+                const reviewLink = (item.metadata && item.metadata.review_link) ? item.metadata.review_link : null;
+                const reviews = (item.metadata && item.metadata.reviews) ? item.metadata.reviews : null;
+                const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
 
                 html += `
-                    <li style="display:flex; align-items:center; margin-bottom: 10px; background:#fff; padding:5px; border-radius:6px;">
-                        ${imgHtml}
-                        <div style="flex:1;">
-                            <div style="font-weight:600; color:#333;">${item.name}</div>
-                            <div style="font-size:0.85rem; color:#666; margin-top:2px;">
-                                ~${sym}${item.price} 
-                                <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="color:#ff9900; text-decoration:none; margin-left:8px;">Buy on Amazon ↗</a>
+                    <div class="package-item-responsive" style="border-left:4px solid #ff9900; overflow: hidden; padding:0;">
+                         ${renderImageSlider(images, item.name)}
+                        <div class="package-item-details" style="padding:12px;">
+                            <div style="font-weight:600; color:#333; font-size:1rem; margin-bottom:4px;">${item.name}</div>
+                            ${item.description ? `<div style="font-size:0.85rem; color:#666; margin-top:4px;">${item.description}</div>` : ''}
+                            <div style="font-size:0.9rem; color:#333; margin-top:6px; font-weight:600;">
+                                ~${sym}${item.price}
                             </div>
+                            ${rating ? `
+                                <div style="font-size:0.85rem; color:#f39c12; margin-top:4px;">
+                                    ⭐ ${rating} ${ratingCount ? `<span style="color:#999;">(${ratingCount})</span>` : ''}
+                                </div>` : ''}
+                            <div style="margin-top:10px; display:flex; align-items:center; gap:15px;">
+                                <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="color:#ff9900; text-decoration:none; font-size:0.85rem; font-weight:600;">Buy ↗</a>
+                                <button onclick="removeItemFromPackage('${pkg.id}', '${item.id}')" style="background:none; border:none; color:#ef4444; font-size:0.8rem; cursor:pointer; padding:0; font-weight:600;">Remove</button>
+                            </div>
+                            ${reviewCarouselHtml}
                         </div>
-                    </li>
+                    </div>
                 `;
             });
             html += `</ul>
@@ -3393,9 +3680,9 @@
 
             const data = await response.json();
 
-            if (data.reply) {
-                addMessage('Bot', data.reply);
-                speak(data.reply);
+            if (data.response) {
+                addMessage('Bot', data.response);
+                speak(data.response);
             }
         } catch (e) {
             console.error("Trigger failed", e);
@@ -3403,7 +3690,8 @@
     }
 
     // Init
-    window.addEventListener('load', () => {
+    // Module scripts execute after load event, so we need to initialize immediately
+    function initApp() {
         // Init avatar is called by ThreeJS init
         // Switch to Chat by default
         switchView('chat');
@@ -3425,54 +3713,155 @@
                 toggleSidebar();
             }
         });
-    });
 
-    async function sendChatMessage() {
+        // Render start buttons after DOM is ready
+        if (SpeechRecognition) {
+            renderStartButton();
+        }
+    }
+
+    // For module scripts, check if DOM is already ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        // DOM is already ready, execute immediately
+        initApp();
+    }
+
+    async function sendChatMessage(textOverride) {
+        initAudio();
         const input = document.getElementById('chat-input');
-        const text = input.value.trim();
-        if (!text || isProcessing) return;
+        const text = (textOverride !== undefined ? textOverride : input.value).trim();
+        if (!text) return;
+
+        if (isProcessing && textOverride !== undefined) {
+            console.log('[Chat] Explicit interaction override during processing.');
+            isProcessing = false;
+            stopProcessingStatus();
+        }
+
+        if (isProcessing) return;
 
         input.value = '';
         addMessage('You', text);
 
-        // Hide start button if active
-        const btn = document.getElementById('dynamic-start-btn');
-        if (btn) btn.remove();
+        // Hide start buttons
+        const startContainer = document.getElementById('dynamic-start-container');
+        if (startContainer) startContainer.remove();
 
         isConversationActive = true;
         isProcessing = true;
+        hasStartedSpeakingThisResponse = false; // Reset for new response
+        currentFullResponse = ""; // Reset stream tracker
+        currentBotMsgDiv = null;  // Reset placeholder tracker
         startProcessingStatus(text);
 
-        try {
-            const requestBody = {
-                message: text,
-                region: window.currentRegion || 'UK'
-            };
-            if (sessionId) requestBody.session_id = sessionId;
+        let currentChunk = "";
 
-            const response = await fetch('/chat', {
+        try {
+            const response = await fetch('/chat_stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify({
+                    message: text,
+                    session_id: sessionId,
+                    region: window.currentRegion || 'UK'
+                })
             });
 
-            stopProcessingStatus();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
 
-            const data = await response.json();
-            if (data.session_id) {
-                sessionId = data.session_id;
-                localStorage.setItem('chat_session_id', sessionId);
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.slice(6).trim();
+                        if (dataStr === '[DONE]') continue;
+
+                        // Robustly handle cases where multiple JSON objects might be in one line/chunk
+                        const blocks = dataStr.match(/\{[\s\S]*?\}/g) || [dataStr];
+
+                        for (const block of blocks) {
+                            try {
+                                const data = JSON.parse(block);
+                                if (data.session_id) {
+                                    sessionId = data.session_id;
+                                    localStorage.setItem('chat_session_id', sessionId);
+                                    continue;
+                                }
+
+                                if (data.chunk) {
+                                    currentFullResponse += data.chunk;
+                                    currentChunk += data.chunk;
+
+                                    // Trigger Early TTS on sentence boundaries
+                                    if (/[.!?]\s$/.test(currentChunk) || currentChunk.length > 200) {
+                                        console.log("[Stream] Triggering early TTS for chunk:", currentChunk);
+                                        speak(currentChunk);
+                                        currentChunk = "";
+                                    }
+
+                                    // Early protocol rendering ONLY if speech has already started
+                                    if (currentBotMsgDiv && (currentFullResponse.includes('[') || currentFullResponse.includes(']'))) {
+                                        const { checklistHtml, optionsHtml } = parseProtocols(currentFullResponse);
+                                        const checklistContainer = currentBotMsgDiv.querySelector('.bot-protocol-checklist');
+                                        const optionsContainer = currentBotMsgDiv.querySelector('.bot-protocol-options');
+                                        if (checklistContainer && checklistHtml) checklistContainer.innerHTML = checklistHtml;
+                                        if (optionsContainer && optionsHtml) optionsContainer.innerHTML = optionsHtml;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn("[Stream] Failed to parse block:", block);
+                            }
+                        }
+                    }
+                }
             }
 
-            // Update packages view
+            // Final chunk
+            if (currentChunk.trim()) {
+                speak(currentChunk);
+            }
+
+            // Wait for speech to finish before finalizing the UI
+            // This ensures piece-by-piece display is followed by full protocol rendering
+            console.log("[Chat] Waiting for speech to finish. Queue len:", speechQueue.length, "isBotSpeaking:", isBotSpeaking, "isPlayingQueue:", isPlayingQueue);
+            while (speechQueue.length > 0 || isBotSpeaking || isPlayingQueue) {
+                await new Promise(r => setTimeout(r, 100));
+            }
+            console.log("[Chat] Speech finished. Finalizing UI.");
+
+            stopProcessingStatus();
+            isProcessing = false;
+
+            // Manual restart as speech is finished and isProcessing is reset
+            restartRecognitionIfPossible();
+
+            // Re-render full bot response for protocols
+            if (currentBotMsgDiv) {
+                // Speech happened, replace the dynamic placeholder with the final rendered one
+                addMessage('Bot', currentFullResponse);
+                currentBotMsgDiv.remove();
+                currentBotMsgDiv = null;
+                currentBotMsgContentEl = null;
+            } else if (currentFullResponse.trim()) {
+                // No speech happened (or no text to speak) but we have content/protocols
+                addMessage('Bot', currentFullResponse);
+            }
+
             updatePackages();
 
-            // Speak response
-            speak(data.response);
         } catch (e) {
             console.error("Chat message failed:", e);
             isProcessing = false;
             stopProcessingStatus();
+            clearBotStatusMessage();
         }
     }
 
@@ -3482,6 +3871,30 @@
             sendChatMessage();
         }
     });
+
+    async function removeItemFromPackage(packageId, itemId) {
+        if (!confirm("Are you sure you want to remove this item?")) return;
+
+        console.log(`[UI] Removing item ${itemId} from package ${packageId}`);
+        try {
+            const res = await fetch(`/api/packages/${sessionId}/${packageId}/items/${itemId}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                const updatedPkg = await res.json();
+                console.log("[UI] Item removed successfully");
+                // Refresh both the list and the details view
+                await updatePackages();
+                showPackageDetails(updatedPkg);
+            } else {
+                const err = await res.json();
+                alert("Error removing item: " + (err.detail || "Unknown error"));
+            }
+        } catch (e) {
+            console.error("Failed to remove item", e);
+            alert("Failed to remove item");
+        }
+    }
 
     // Expose globals
     window.sendChatMessage = sendChatMessage;

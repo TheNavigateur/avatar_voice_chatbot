@@ -266,18 +266,21 @@ def _fetch_amazon_candidates(query: str, region: str = "UK") -> list:
         tasks = data.get("tasks", [])
         if not tasks: return []
         
-        result_items = tasks[0].get("result", [])
-        if not result_items: return []
+        result_items = tasks[0].get("result")
+        if not result_items or not result_items[0]: return []
         
-        items = result_items[0].get("items", [])
+        items = result_items[0].get("items")
+        if not items: return []
         
         candidates = []
         
         for item in items:
             # Look for structured shopping blocks
             if item.get("type") == "popular_products":
-                for sub_item in item.get("items", []):
-                    candidates.append(sub_item)
+                sub_items = item.get("items")
+                if sub_items:
+                    for sub_item in sub_items:
+                        candidates.append(sub_item)
             elif item.get("type") == "shopping":
                 candidates.append(item)
             elif item.get("type") == "organic":
@@ -321,7 +324,7 @@ def _fetch_amazon_candidates(query: str, region: str = "UK") -> list:
             
             if is_unavailable:
                 continue
-
+            
             # If it passes availability, we keep it as a potential candidate
             valid_candidates.append(cand)
             
@@ -467,13 +470,28 @@ def check_amazon_stock(product_name: str, variant_details: str, region: str = "U
                 delivery_bonus += 0.1 # Small boost
             
             # 3. Calculate Final Score
-            score = rating_val + delivery_bonus
+            # Rule: Prefer 4+ stars. Among 4+ stars, prefer highest rating count.
+            # ENHANCEMENT: Also heavily prioritize brand matches.
+            is_4_plus = 1.0 if rating_val >= 4.0 else 0.0
+            rating_count = cand.get("votes_count") or cand.get("rating_count") or cand.get("reviews_count") or 0
+            
+            # Brand Match logic
+            brand_bonus = 0
+            # Try to extract a potential brand from product_name (first word is a good heuristic)
+            brand_query = product_name.split()[0].lower()
+            if brand_query in title:
+                brand_bonus = 5000000 # Significant boost for brand match
+            
+            # Score = (brand bonus) + (4+ bonus) + (rating count as tiebreaker)
+            score = brand_bonus + (is_4_plus * 1000000) + rating_count
             
             scored_candidates.append({
                 "candidate": cand,
                 "score": score,
                 "rating": rating_val,
-                "delivery_bonus": delivery_bonus
+                "rating_count": rating_count,
+                "delivery_bonus": delivery_bonus,
+                "is_brand_match": brand_bonus > 0
             })
         
         # Sort by Score Descending
@@ -512,13 +530,18 @@ def check_amazon_stock(product_name: str, variant_details: str, region: str = "U
         seller_name = best_match.get("seller") or best_match.get("source") or "Amazon"
         
         # Extract Image and URL
-        image_url = best_match.get("thumbnail") or best_match.get("image_url") or ""
-        # product_url = best_match.get("product_url") or best_match.get("link") or best_match.get("url") or ""
+        image_url = best_match.get("thumbnail") or best_match.get("image_url")
+        
+        # Guard against product URL being used as image URL (common in some DataForSEO blocks)
+        if image_url and ('amazon.' in image_url and ('/dp/' in image_url or '/gp/' in image_url)):
+            image_url = None
+            
         product_url = best_match.get("product_url") or best_match.get("link") or best_match.get("url") or ""
         
         rating_obj = best_match.get("rating") or {}
         rating = rating_obj.get("value")
-        rating_count = rating_obj.get("votes_count") or rating_obj.get("rating_count") or rating_obj.get("reviews_count") or 0
+        rating_count = (rating_obj.get("votes_count") or rating_obj.get("rating_count") or rating_obj.get("reviews_count") or 
+                        best_match.get("votes_count") or best_match.get("rating_count") or best_match.get("reviews_count") or 0)
         
         rating_str = f"Rating: {rating}⭐" if rating else ""
         if rating and rating_count:
@@ -528,11 +551,34 @@ def check_amazon_stock(product_name: str, variant_details: str, region: str = "U
         delivery_info = ""
         if "prime" in snippet.lower():
             delivery_info = " (Prime Delivery 🚚)"
+            
+        # Quality Marker
+        is_high_rating = rating and rating >= 4.0
+        has_enough_votes = rating_count and rating_count >= 5
         
-        return (f"✅ **In Stock ({config['name']})**\n"
+        if is_high_rating and has_enough_votes:
+            quality_marker = "✅ **High Quality Match**"
+        elif not rating or rating == 0 or not rating_count or rating_count == 0:
+            quality_marker = "⚠️ **Quality Unverified**"
+        else:
+            quality_marker = "⚠️ **Lower Quality Match**"
+
+        # Fetch reviews for the winner to pass to agent
+        reviews = []
+        asin = best_match.get("asin")
+        if not asin and product_url:
+            import re
+            match = re.search(r'/dp/([A-Z0-9]{10})', product_url)
+            if match: asin = match.group(1)
+        
+        if asin:
+            reviews = _fetch_amazon_reviews(asin, region=region)
+
+        return (f"{quality_marker} ({config['name']})\n"
                 f"Item: {title}\n"
                 f"Price: {price_str} (via {seller_name})\n"
                 f"{rating_str}{delivery_info}\n"
+                f"Reviews: {json.dumps(reviews)}\n"
                 f"Full Details:\n"
                 f"- Image URL: {image_url}\n"
                 f"- Product URL: {product_url}\n"
@@ -542,3 +588,112 @@ def check_amazon_stock(product_name: str, variant_details: str, region: str = "U
             return (f"⚠️ **Check Required**\n"
                     f"Status: Could not verify exact stock via API.\n"
                     f"Recommendation: High likelihood of availability on Amazon {config['name']}, but exact price unavailable.")
+def _fetch_amazon_reviews(asin: str, region: str = "UK") -> list:
+    """
+    Fetch up to 10 reviews for a specific Amazon ASID/ASIN.
+    """
+    if not DATAFORSEO_LOGIN or not DATAFORSEO_PASSWORD:
+        return []
+
+    config = AMAZON_REGIONS.get(region, AMAZON_REGIONS["UK"])
+    
+    endpoint = "https://api.dataforseo.com/v3/merchant/amazon/reviews/live"
+    payload = [{
+        "asin": asin,
+        "location_code": config["location_code"],
+        "language_code": "en"
+    }]
+    
+    headers = _get_auth_header()
+    try:
+        response = requests.post(endpoint, headers=headers, json=payload)
+        data = response.json()
+        
+        if data.get("status_code") == 20000:
+            tasks = data.get("tasks", [])
+            if tasks and tasks[0].get("result"):
+                items = tasks[0]["result"][0].get("items", [])
+                reviews = []
+                for item in items:
+                    reviews.append({
+                        "text": item.get("review_text", ""),
+                        "rating": item.get("rating", {}).get("value", 0),
+                        "title": item.get("review_title", ""),
+                        "author": item.get("user_name", "Anonymous")
+                    })
+                return reviews[:10]
+    except Exception as e:
+        logger.error(f"Failed to fetch reviews for ASIN {asin}: {e}")
+    
+    return []
+
+def search_amazon_with_reviews(query: str, region: str = "UK") -> str:
+    """
+    Searches for clothing/shoe items and returns a JSON block with candidates,
+    each including ratings and historical reviews.
+    Ordered by most ratings first, all above 4 stars.
+    """
+    candidates = _fetch_amazon_candidates(query, region=region)
+    config = AMAZON_REGIONS.get(region, AMAZON_REGIONS["UK"])
+    
+    if not candidates:
+        return f"No products found for '{query}'."
+
+    # Filter for 4+ stars and sort by rating count
+    valid_products = []
+    for cand in candidates:
+        rating_obj = cand.get("rating") or {}
+        rating = float(rating_obj.get("value") or 0)
+        votes = int(rating_obj.get("votes_count") or rating_obj.get("rating_count") or 0)
+        
+        if rating >= 4.0:
+            valid_products.append({
+                "title": cand.get("title", "Unknown"),
+                "price": cand.get("price", {}).get("value") or cand.get("price", {}).get("displayed_price") or "Price Check Required",
+                "rating": rating,
+                "rating_count": votes,
+                "url": cand.get("product_url") or cand.get("link") or cand.get("url"),
+                "thumbnail": cand.get("thumbnail") or cand.get("image_url"),
+                "asin": cand.get("asin"), # DataForSEO often provides ASIN in Merchant API
+                "type": cand.get("type")
+            })
+
+    # Sort by votes count descending
+    valid_products.sort(key=lambda x: x["rating_count"], reverse=True)
+    
+    logger.info(f"search_amazon_with_reviews: Found {len(valid_products)} valid products for '{query}'.")
+
+    # Take top 3-5 candidates and fetch reviews in parallel
+    from concurrent.futures import ThreadPoolExecutor
+    
+    results = []
+    candidates_to_fetch = valid_products[:5]
+    
+    def fetch_with_reviews(prod):
+        # If ASIN missing, try to extract from URL
+        asin = prod.get("asin")
+        if not asin and prod.get("url"):
+            import re
+            match = re.search(r'/dp/([A-Z0-9]{10})', prod["url"])
+            if match:
+                asin = match.group(1)
+        
+        reviews = []
+        if asin:
+            reviews = _fetch_amazon_reviews(asin, region=region)
+        
+        prod["reviews"] = reviews
+        # variants placeholder (could be enhanced if API supports)
+        prod["variants"] = [prod["thumbnail"]] if prod.get("thumbnail") else []
+        return prod
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        results = list(executor.map(fetch_with_reviews, candidates_to_fetch))
+
+    if not results:
+        logger.warning(f"search_amazon_with_reviews: No 4+ star results for '{query}'.")
+        return f"No 4+ star products found for '{query}'."
+
+    logger.info(f"search_amazon_with_reviews: Returning {len(results)} candidates for '{query}'.")
+    # Return as structured JSON for the agent to use with [PROPOSE_PRODUCTS]
+    return json.dumps(results)

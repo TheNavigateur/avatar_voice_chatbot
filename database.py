@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-DB_NAME = "app.db"
+DB_NAME = os.environ.get("DB_NAME", "app.db")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME)

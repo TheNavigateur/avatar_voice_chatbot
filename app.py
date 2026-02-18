@@ -74,7 +74,7 @@ async def update_profile_fact(request: ProfileFactRequest):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    user_id = "web_user" # Hardcoded for now, could be dynamic session_id if we want unique profiles per session
+    user_id = "web_user" 
     session_id = request.session_id or str(uuid.uuid4())
     
     if not request.message:
@@ -87,15 +87,40 @@ async def chat(request: ChatRequest):
         "session_id": session_id
     })
 
+@app.post("/chat_stream")
+async def chat_stream(request: ChatRequest):
+    from fastapi.responses import StreamingResponse
+    import json
+    
+    user_id = "web_user"
+    session_id = request.session_id or str(uuid.uuid4())
+    
+    if not request.message:
+        raise HTTPException(status_code=400, detail="Message is empty")
+
+    async def event_generator():
+        # Add initial event with session_id
+        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
+        
+        # We need to run the blocking process_message_stream in a thread or use an async version
+        # For now, let's use the generator and yield chunks
+        for chunk in voice_agent.process_message_stream(user_id, session_id, request.message, region=request.region):
+            if chunk:
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
 @app.get("/api/session/{session_id}/packages")
 async def get_packages(session_id: str):
     packages = BookingService.get_packages(session_id)
-    return [p.dict() for p in packages]
+    return [p.model_dump() for p in packages]
 
 @app.get("/api/user/{user_id}/packages")
 async def get_user_packages(user_id: str):
     packages = BookingService.get_user_packages(user_id)
-    return [p.dict() for p in packages]
+    return [p.model_dump() for p in packages]
 
 @app.post("/api/packages/{session_id}/{package_id}/book")
 async def book_package(session_id: str, package_id: str):
@@ -105,6 +130,13 @@ async def book_package(session_id: str, package_id: str):
     
     result = await BookingService.execute_booking(package)
     return result
+
+@app.delete("/api/packages/{session_id}/{package_id}/items/{item_id}")
+async def delete_package_item(session_id: str, package_id: str, item_id: str):
+    pkg = BookingService.remove_item_from_package(session_id, package_id, item_id)
+    if not pkg:
+        raise HTTPException(status_code=404, detail="Package or item not found")
+    return pkg.model_dump()
 
 @app.post("/tts")
 async def text_to_speech(request: TTSRequest):

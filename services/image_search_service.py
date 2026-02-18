@@ -249,3 +249,8 @@ class ImageSearchService:
         query = f"{airline} airline airplane flight" if airline else "commercial airplane flight"
         # Avoid Wikimedia for flights as it returns SVG logos
         return self.search_image_multi(query, num=num, prefer_google=False)
+
+    def get_product_image(self, product_name: str, num: int = 1) -> list:
+        """Get an image for a shopping product"""
+        # Improved query for products
+        return self.search_image_multi(f"{product_name} product", num=num, prefer_google=True)
