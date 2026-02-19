@@ -207,12 +207,145 @@
         .avatar-container {
             width: 100%;
             height: 100%;
+            position: relative;
             /* Canvas fills this */
         }
 
         #avatar-canvas {
             width: 100%;
             height: 100%;
+        }
+
+        /* Daydream Thinking Bubbles - Comic Style */
+        .daydream-bubble {
+            position: absolute;
+            width: 130px;
+            height: 130px;
+            border-radius: 40% 60% 60% 40% / 40% 40% 60% 60%;
+            overflow: hidden;
+            border: 4px solid rgba(255, 255, 255, 1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+            cursor: pointer;
+            z-index: 15;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s ease-in-out, transform 0.3s ease;
+            background: #fff;
+        }
+
+        .daydream-dot {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 1);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+            z-index: 14;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s ease-in-out;
+        }
+
+        .daydream-bubble.active,
+        .daydream-dot.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .daydream-bubble.active {
+            animation: floatLevel3 6s ease-in-out infinite;
+        }
+
+        .daydream-bubble.fading {
+            opacity: 0;
+            transition: opacity 1s ease-out;
+        }
+
+        .daydream-bubble:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .daydream-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Float Levels */
+        .float-l0 {
+            animation: floatLevel0 4s ease-in-out infinite;
+        }
+
+        .float-l1 {
+            animation: floatLevel1 4s ease-in-out infinite;
+        }
+
+        .float-l2 {
+            animation: floatLevel2 5s ease-in-out infinite;
+        }
+
+        .float-l3 {
+            animation: floatLevel3 6s ease-in-out infinite;
+        }
+
+        @keyframes fadeInDaydreamCloud {
+            0% {
+                opacity: 0;
+                transform: scale(0.3) translateY(20px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes floatLevel0 {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-0px);
+            }
+        }
+
+        @keyframes floatLevel1 {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-4px);
+            }
+        }
+
+        @keyframes floatLevel2 {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        @keyframes floatLevel3 {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-15px);
+            }
         }
 
         #avatar-loader {
@@ -1309,6 +1442,7 @@
     let animationId = null;
 
     // GLB/RPM Legacy Variables
+    window.daydreamCycleStarted = false;
     window.facialMeshes = [];
     window.blinkState = {
         isBlinking: false,
@@ -1496,6 +1630,12 @@
                 console.log("VRM loaded:", vrm);
                 // Start Unified Blink Loop
                 startBlinking();
+
+                // START DAYDREAM CYCLE (if not already started)
+                if (typeof startDaydreamCycle === 'function' && !window.daydreamCycleStarted) {
+                    startDaydreamCycle();
+                    window.daydreamCycleStarted = true;
+                }
             },
             (progress) => {
                 // console.log("Loading...", 100.0 * (progress.loaded / progress.total), "%");
@@ -1609,6 +1749,12 @@
 
             // Start Legacy Blink Loop
             startBlinking();
+
+            // START DAYDREAM CYCLE (if not already started)
+            if (typeof startDaydreamCycle === 'function' && !window.daydreamCycleStarted) {
+                startDaydreamCycle();
+                window.daydreamCycleStarted = true;
+            }
 
             if (avatarLoader) avatarLoader.classList.add('hidden');
         });
@@ -2170,6 +2316,7 @@
         let displayContent = text;
         let checklistHtml = '';
         let optionsHtml = '';
+        let navigateId = null;
 
         // Check for Shopping Checklist block
         if (text.includes('[SHOPPING_CHECKLIST]')) {
@@ -2186,9 +2333,9 @@
             }
         }
 
-        // Check for [OPTIONS: [...] ] or [RESPONSE_OPTIONS] [...]
-        if (displayContent.includes('[OPTIONS:') || displayContent.includes('[RESPONSE_OPTIONS]')) {
-            const optionsRegex = /\[(?:OPTIONS|RESPONSE_OPTIONS):?\]?\s*(\[[\s\S]*?\])\s*\]?/m;
+        // Check for [OPTIONS: [...] ] or [RESPONSE_OPTIONS: [...] ]
+        if (displayContent.includes('[OPTIONS') || displayContent.includes('[RESPONSE_OPTIONS')) {
+            const optionsRegex = /\[(?:OPTIONS|RESPONSE_OPTIONS):?\s*(\[[\s\S]*?\])\s*\]/m;
             const match = displayContent.match(optionsRegex);
             if (match) {
                 try {
@@ -2207,7 +2354,6 @@
                     }
                 } catch (e) {
                     console.error("Failed to parse options JSON. Raw:", match[1], e);
-                    displayContent = displayContent.replace(optionsRegex, '').trim();
                 }
             }
         }
@@ -2326,7 +2472,18 @@
             }
         }
 
-        return { displayContent, checklistHtml, optionsHtml };
+        // Check for [NAVIGATE_TO_PACKAGE: id]
+        if (displayContent.includes('[NAVIGATE_TO_PACKAGE')) {
+            const navRegex = /\[NAVIGATE_TO_PACKAGE:\s*([\s\S]*?)\]\s*/m;
+            const match = displayContent.match(navRegex);
+            if (match) {
+                navigateId = match[1].trim();
+                console.log(`[UI] Found navigateId: ${navigateId}`);
+                displayContent = displayContent.replace(navRegex, '').trim();
+            }
+        }
+
+        return { displayContent, checklistHtml, optionsHtml, navigateId };
     }
 
     function addMessage(sender, text) {
@@ -2337,7 +2494,20 @@
         const isUser = sender === 'You';
         div.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
 
-        const { displayContent, checklistHtml, optionsHtml } = parseProtocols(text);
+        const { displayContent, checklistHtml, optionsHtml, navigateId } = parseProtocols(text);
+
+        if (navigateId) {
+            console.log(`[UI] Navigation command received for package: ${navigateId}`);
+            setTimeout(async () => {
+                switchView('packages');
+                const packages = await updatePackages();
+                // Match by ID or Title (case-insensitive for robustness)
+                const pkg = packages.find(p => p.id === navigateId || (p.title && p.title.toLowerCase() === navigateId.toLowerCase()));
+                if (pkg) {
+                    showPackageDetails(pkg);
+                }
+            }, 1000);
+        }
 
         div.innerHTML = `
             <div class="message-bubble">
@@ -2841,12 +3011,12 @@
         const protocols = [
             'SHOPPING_CHECKLIST', 'OPTIONS', 'OPTIONS_MULTI',
             'OPTIONS_GROUPED', 'PROPOSE_PRODUCTS', 'RESPONSE_OPTIONS',
-            'SHOE_SIZE_SELECTOR'
+            'SHOE_SIZE_SELECTOR', 'NAVIGATE_TO_PACKAGE'
         ];
 
         protocols.forEach(p => {
-            // Match [PROTOCOL: data] or [PROTOCOL] [data]
-            const regex = new RegExp('\\[' + p + '\\]?:?\\s*(\\[[\\s\\S]*?\\])?', 'g');
+            // Match [PROTOCOL: data] or [PROTOCOL] [data] or [PROTOCOL]
+            const regex = new RegExp('\\[' + p + ':?\\s*(\\[[\\s\\S]*?\\]|[\\w-]*?)\\]\\s*', 'g');
             processedText = processedText.replace(regex, '');
             // Also handle closed tags if any (e.g. [/SHOPPING_CHECKLIST])
             const closeRegex = new RegExp('\\[\\/' + p + '\\]', 'g');
@@ -2944,53 +3114,64 @@
     }
 
     // --- Package Logic (List & Details) ---
+    let updatePackagesPromise = null;
+    let cachedPackages = [];
+
+    // --- Package Logic (List & Details) ---
     async function updatePackages() {
-        if (!sessionId) return [];
-        if (isUpdatingPackages) return [];
-        isUpdatingPackages = true;
-        console.log(`[UI] Updating packages for user: web_user`);
-        try {
-            const res = await fetch(`/api/user/web_user/packages`);
-            const packages = await res.json();
-            console.log(`[UI] Received ${packages.length} packages`);
-            const list = document.getElementById('packages-list');
+        if (!sessionId) return cachedPackages;
+        if (updatePackagesPromise) return updatePackagesPromise;
 
-            if (packages.length === 0) {
-                list.innerHTML = `<p style="color: #999; font-style: italic; text-align: center; margin-top: 50px;">No packages created yet.<br>Go to Chat to start planning!</p>`;
-                return [];
+        updatePackagesPromise = (async () => {
+            console.log(`[UI] Updating packages for user: web_user`);
+            try {
+                const res = await fetch(`/api/user/web_user/packages`);
+                const packages = await res.json();
+                console.log(`[UI] Received ${packages.length} packages`);
+                cachedPackages = packages;
+                const list = document.getElementById('packages-list');
+
+                if (!list) return packages;
+
+                if (packages.length === 0) {
+                    list.innerHTML = `<p style="color: #999; font-style: italic; text-align: center; margin-top: 50px;">No packages created yet.<br>Go to Chat to start planning!</p>`;
+                    return [];
+                }
+
+                list.innerHTML = '';
+
+                packages.forEach(pkg => {
+                    // Summary Card
+                    const card = document.createElement('div');
+                    card.style.cssText = "background: #f9f9f9; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);";
+                    card.onmouseover = () => card.style.transform = "translateY(-2px)";
+                    card.onmouseout = () => card.style.transform = "none";
+                    card.onclick = () => showPackageDetails(pkg);
+
+                    const itemCount = pkg.items.length;
+                    const statusIcon = pkg.status === 'booked' ? '✅' : '📝';
+
+                    card.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h3 style="margin:0; color:#333; font-size: 1.1rem;">${statusIcon} ${pkg.title}</h3>
+                            <span style="font-size:0.8rem; color:#666; background: #e0e0e0; padding: 2px 8px; border-radius: 10px;">${pkg.type}</span>
+                        </div>
+                        <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #666;">${itemCount} items &bull; Click to view details</p>
+                    `;
+                    list.appendChild(card);
+                });
+
+                return packages;
+
+            } catch (e) {
+                console.error("Failed to fetch packages", e);
+                return cachedPackages;
+            } finally {
+                updatePackagesPromise = null;
             }
+        })();
 
-            list.innerHTML = '';
-
-            packages.forEach(pkg => {
-                // Summary Card
-                const card = document.createElement('div');
-                card.style.cssText = "background: #f9f9f9; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);";
-                card.onmouseover = () => card.style.transform = "translateY(-2px)";
-                card.onmouseout = () => card.style.transform = "none";
-                card.onclick = () => showPackageDetails(pkg);
-
-                const itemCount = pkg.items.length;
-                const statusIcon = pkg.status === 'booked' ? '✅' : '📝';
-
-                card.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <h3 style="margin:0; color:#333; font-size: 1.1rem;">${statusIcon} ${pkg.title}</h3>
-                        <span style="font-size:0.8rem; color:#666; background: #e0e0e0; padding: 2px 8px; border-radius: 10px;">${pkg.type}</span>
-                    </div>
-                    <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #666;">${itemCount} items &bull; Click to view details</p>
-                `;
-                list.appendChild(card);
-            });
-
-            return packages;
-
-        } catch (e) {
-            console.error("Failed to fetch packages", e);
-            return [];
-        } finally {
-            isUpdatingPackages = false;
-        }
+        return await updatePackagesPromise;
     }
 
     // Store current package data for "Add All" logic context if needed
@@ -3896,6 +4077,31 @@
         }
     }
 
+    async function bookPackage(packageId) {
+        if (!sessionId) return;
+        setBotStatusMessage("Processing booking...", 'center');
+        try {
+            const res = await fetch(`/api/packages/${sessionId}/${packageId}/book`, {
+                method: 'POST'
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                alert("Success! " + data.message);
+                // Refresh list and reopening details
+                const pkgs = await updatePackages();
+                const p = pkgs.find(p => p.id === packageId);
+                if (p) showPackageDetails(p);
+            } else {
+                alert("Booking failed: " + data.message);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Booking error.");
+        } finally {
+            clearBotStatusMessage();
+        }
+    }
+
     // Expose globals
     window.sendChatMessage = sendChatMessage;
     window.continueShoppingConversation = continueShoppingConversation;
@@ -3908,6 +4114,8 @@
     window.toggleProfileEdit = toggleProfileEdit;
     window.showPackageDetails = showPackageDetails;
     window.closePackageDetails = closePackageDetails;
+    window.bookPackage = bookPackage;
+    window.removeItemFromPackage = removeItemFromPackage;
 
     window.openAllAmazonLinks = function (pkgId) {
         // Re-query links based on pkgId class
@@ -3917,6 +4125,153 @@
             links.forEach(link => window.open(link.href, '_blank'));
         }
     };
+
+    // --- Daydream Thinking Bubbles ---
+    const daydreamExperiences = [
+        {
+            title: "Luxury Overwater Villa",
+            image: "https://pixabay.com/get/g0e7c8600e64542e8ad747c368943e889c77ee3d54df7601daf4a4b06f334e7270f09cf63cef02872dbbaa18ecdda64677319ad4dab597043281483bd261e09e9_1280.jpg",
+            link: "https://www.visitmaldives.com"
+        },
+        {
+            title: "Romantic Beach Dinner",
+            image: "https://pixabay.com/get/ga7362ce3ab059cb846dbafc03ce2e2e77a49ff670cb37cea2aec817d9f53e0e2233461fa1fe8febd03fc9b02c894ae66af1478d3003f20c518141207c4678e1e_1280.jpg",
+            link: "https://www.tripadvisor.com"
+        },
+        {
+            title: "Crystal Clear Snorkeling",
+            image: "https://pixabay.com/get/g633520b77d53a0e01aba10b77293cf73e622fa22b5757b697026bcdf4bba8e74b6347769bda1d8fe755837dd6a82e9199f91423e6c0aeff4cd7e713f93dfc5ad_1280.jpg",
+            link: "https://www.padi.com"
+        },
+        {
+            title: "Stunning Infinity Pool",
+            image: "https://pixabay.com/get/g10cd8408f8b9c59254487af1f1a0950c19c16149297c304b1bd7dc4af78312b5fd9d8bafb34717629a22994d7c674231220276fcf735e7144be30e4c883abb95_1280.jpg",
+            link: "https://www.luxurytraveldiary.com"
+        },
+        {
+            title: "Relaxing Spa Retreat",
+            image: "https://pixabay.com/get/gd6ea0d5841fba7cce2a8642e844aacb38376e63e6bbc53b3cf93ce0fa6b3d0fc37f5ecc0a9826f766e7d9a5638c1e9e3dacdfd040e7ef30c7a83cf6be26229a2_1280.jpg",
+            link: "https://www.spafinder.com"
+        }
+    ];
+
+    let currentDaydreamIndex = 0;
+    let daydreamSide = 1; // 1 for right, -1 for left
+    let activeDaydreamElements = [];
+
+    function createDaydreamBubble() {
+        const container = document.querySelector('.avatar-container');
+        if (!container) return;
+
+        const experience = daydreamExperiences[currentDaydreamIndex];
+        currentDaydreamIndex = (currentDaydreamIndex + 1) % daydreamExperiences.length;
+
+        const rect = container.getBoundingClientRect();
+
+        // --- TUNABLE PARAMETERS ---
+        const trailStartY = 80;       // Vertical start (pixels from top)
+        const trailStartXOffset = 90;  // Horizontal start shift
+        const horizontalOffset = 180;  // Distance to main bubble center
+        const bubbleTop = 15;          // Bubble vertical position
+        const arcHeight = 10;          // Height of the curve peak
+        const bubbleRadius = 54;       // Distance from center to stop dots (edge)
+        const trailSpacingExp = 1.9;   // Spacing exponent (smaller = dots further from start)
+        const trailDotCount = 2;       // Number of trailing dots
+        const trailDotMinSize = 10;    // Size of the smallest dot
+        const trailDotMaxSize = 20;    // Size of the largest dot
+
+        // RESPONSIVE ANCHORING: Use offsets from head center (50%)
+        const mainCenterOffsetX = horizontalOffset * daydreamSide;
+        daydreamSide *= -1;
+
+        const mainCenterY = bubbleTop + 65;
+        const startOffsetX = trailStartXOffset * (mainCenterOffsetX > 0 ? 1 : -1);
+
+        const totalDist = Math.hypot(mainCenterOffsetX - startOffsetX, mainCenterY - trailStartY);
+        const edgeRatio = Math.max(0, (totalDist - bubbleRadius) / totalDist);
+
+        const newElements = [];
+
+        // Create trailing dots on an arc
+        for (let i = 0; i < trailDotCount; i++) {
+            const dot = document.createElement('div');
+
+            // Map i to float levels 0 to 2
+            const floatLevel = trailDotCount > 1 ? Math.floor((i / (trailDotCount - 1)) * 2) : 1;
+            dot.className = `daydream-dot float-l${floatLevel}`;
+
+            // Proportional scaling with exponential bias, but stop at the bubble edge
+            const ratio = Math.pow((i + 1) / (trailDotCount + 1), trailSpacingExp) * edgeRatio;
+
+            // Quadratic arc path scaling from startOffsetX to mainCenterOffsetX
+            const dotOffsetX = startOffsetX + (mainCenterOffsetX - startOffsetX) * ratio;
+            const dotY = trailStartY + (mainCenterY - trailStartY) * ratio - (arcHeight * Math.sin(Math.PI * ratio));
+
+            // Dynamic size calculation (interpolated between min and max)
+            const dotSize = trailDotMinSize + ((trailDotMaxSize - trailDotMinSize) * (i / (trailDotCount - 1 || 1)));
+            dot.style.width = `${dotSize}px`;
+            dot.style.height = `${dotSize}px`;
+
+            // Anchor to 50% and shift by offset
+            dot.style.left = `calc(50% + ${dotOffsetX - dotSize / 2}px)`;
+            dot.style.top = `${dotY - dotSize / 2}px`;
+
+            container.appendChild(dot);
+            newElements.push(dot);
+        }
+
+        // Create MAIN bubble
+        const bubble = document.createElement('div');
+        bubble.className = 'daydream-bubble float-l3';
+        bubble.title = experience.title;
+
+        const targetLeftOffset = mainCenterOffsetX - 65;
+        bubble.style.left = `calc(50% + ${targetLeftOffset}px)`;
+        bubble.style.top = `${bubbleTop}px`;
+
+        const img = document.createElement('img');
+        img.src = experience.image;
+        img.className = 'daydream-image';
+        img.alt = experience.title;
+
+        bubble.appendChild(img);
+        container.appendChild(bubble);
+        newElements.push(bubble);
+
+        // --- CROSSFADE LOGIC ---
+        // Fade out previous elements
+        const oldElements = activeDaydreamElements;
+        oldElements.forEach(el => {
+            el.classList.remove('active');
+            el.classList.add('fading');
+        });
+
+        // Set a timeout to remove old elements
+        setTimeout(() => {
+            oldElements.forEach(el => el.remove());
+        }, 1500);
+
+        // Fade in new elements
+        activeDaydreamElements = newElements;
+        newElements.forEach((el, idx) => {
+            setTimeout(() => el.classList.add('active'), idx * 100);
+        });
+
+        bubble.onclick = () => {
+            window.open(experience.link, '_blank');
+        };
+    }
+
+    function startDaydreamCycle() {
+        console.log("Starting Daydream Cycle...");
+        // Start IMMEDIATELY
+        createDaydreamBubble();
+        // Cycle every 10 seconds (allowing 2s overlap with lifetime/fade)
+        setInterval(createDaydreamBubble, 10000);
+    }
+    window.startDaydreamCycle = startDaydreamCycle;
+
+    // Trigger daydream cycle moved to avatar load success callbacks
 
 </script>
 
