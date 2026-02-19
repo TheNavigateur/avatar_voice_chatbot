@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 DB_NAME = os.environ.get("DB_NAME", "app.db")
 
 def get_db_connection():
+    logger.info(f"Connecting to database: {os.path.abspath(DB_NAME)}")
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn

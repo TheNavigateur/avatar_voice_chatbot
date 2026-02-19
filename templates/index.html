@@ -3855,6 +3855,7 @@
                 body: JSON.stringify({
                     session_id: sessionId,
                     text: `[SYSTEM EVENT: ${text}]`,
+                    package_id: currentPackageDetails?.id,
                     region: window.currentRegion || 'US'
                 })
             });
@@ -3910,6 +3911,10 @@
     }
 
     async function sendChatMessage(textOverride) {
+        // STOP DAYDREAMING
+        if (typeof window.stopDaydreamCycle === 'function') {
+            window.stopDaydreamCycle();
+        }
         initAudio();
         const input = document.getElementById('chat-input');
         const text = (textOverride !== undefined ? textOverride : input.value).trim();
@@ -3946,6 +3951,7 @@
                 body: JSON.stringify({
                     message: text,
                     session_id: sessionId,
+                    package_id: currentPackageDetails?.id,
                     region: window.currentRegion || 'UK'
                 })
             });
@@ -4157,7 +4163,8 @@
 
     let currentDaydreamIndex = 0;
     let daydreamSide = 1; // 1 for right, -1 for left
-    let activeDaydreamElements = [];
+    window.daydreamInterval = null;
+    window.activeDaydreamElements = [];
 
     function createDaydreamBubble() {
         const container = document.querySelector('.avatar-container');
@@ -4240,7 +4247,7 @@
 
         // --- CROSSFADE LOGIC ---
         // Fade out previous elements
-        const oldElements = activeDaydreamElements;
+        const oldElements = window.activeDaydreamElements;
         oldElements.forEach(el => {
             el.classList.remove('active');
             el.classList.add('fading');
@@ -4252,7 +4259,7 @@
         }, 1500);
 
         // Fade in new elements
-        activeDaydreamElements = newElements;
+        window.activeDaydreamElements = newElements;
         newElements.forEach((el, idx) => {
             setTimeout(() => el.classList.add('active'), idx * 100);
         });
@@ -4267,9 +4274,23 @@
         // Start IMMEDIATELY
         createDaydreamBubble();
         // Cycle every 10 seconds (allowing 2s overlap with lifetime/fade)
-        setInterval(createDaydreamBubble, 10000);
+        window.daydreamInterval = setInterval(createDaydreamBubble, 10000);
     }
     window.startDaydreamCycle = startDaydreamCycle;
+
+    function stopDaydreamCycle() {
+        if (window.daydreamInterval) {
+            console.log("Stopping Daydream Cycle...");
+            clearInterval(window.daydreamInterval);
+            window.daydreamInterval = null;
+        }
+        // Remove active elements immediately
+        if (window.activeDaydreamElements.length > 0) {
+            window.activeDaydreamElements.forEach(el => el.remove());
+            window.activeDaydreamElements = [];
+        }
+    }
+    window.stopDaydreamCycle = stopDaydreamCycle;
 
     // Trigger daydream cycle moved to avatar load success callbacks
 

@@ -19,8 +19,9 @@ class BookingService:
         for row in rows:
             pkg_id = row['id']
             # Get items for this package
-            c.execute("SELECT * FROM package_items WHERE package_id = ?", (pkg_id,))
-            item_rows = c.fetchall()
+            c2 = conn.cursor()
+            c2.execute("SELECT * FROM package_items WHERE package_id = ?", (pkg_id,))
+            item_rows = c2.fetchall()
             items = []
             for item in item_rows:
                 try:
@@ -69,8 +70,9 @@ class BookingService:
         for row in rows:
             pkg_id = row['id']
             # Get items for this package
-            c.execute("SELECT * FROM package_items WHERE package_id = ?", (pkg_id,))
-            item_rows = c.fetchall()
+            c2 = conn.cursor()
+            c2.execute("SELECT * FROM package_items WHERE package_id = ?", (pkg_id,))
+            item_rows = c2.fetchall()
             items = []
             for item in item_rows:
                 try:
@@ -410,30 +412,69 @@ class BookingService:
         if not packages:
             return "You don't have any packages saved yet."
             
-        booked = [p for p in packages if p.status == BookingStatus.BOOKED]
-        drafts = [p for p in packages if p.status == BookingStatus.DRAFT]
-        
-        summary = f"I found {len(packages)} packages in total. "
-        
-        if booked:
-            booked_titles = [f"'{p.title}'" for p in booked[:3]]
-            summary += f"You have {len(booked)} booked collections, including {', '.join(booked_titles)}. "
+        summary = f"I found {len(packages)} packages in total:\n"
+        for p in packages:
+            # Create a brief content summary
+            flights = len([i for i in p.items if i.item_type == 'flight'])
+            hotels = len([i for i in p.items if i.item_type == 'hotel'])
+            activities = len([i for i in p.items if i.item_type == 'activity'])
+            products = len([i for i in p.items if i.item_type == 'product'])
             
-        if drafts:
-            draft_titles = [f"'{p.title}'" for p in drafts[:3]]
-            summary += f"You also have {len(drafts)} drafts you were working on, like {', '.join(draft_titles)}. "
+            contents = []
+            if flights: contents.append(f"{flights} flight{'s' if flights > 1 else ''}")
+            if hotels: contents.append(f"{hotels} hotel{'s' if hotels > 1 else ''}")
+            if activities: contents.append(f"{activities} activit{'ies' if activities > 1 else 'y'}")
+            if products: contents.append(f"{products} product{'s' if products > 1 else ''}")
             
-        summary += "Would you like me to show you the details for any of these, or should we search for something specific by date or place?"
+            content_str = f" ({', '.join(contents)})" if contents else " (Empty)"
+            
+            # Simple date extraction for the package from first item
+            pkg_date = "No dates set"
+            for item in p.items:
+                d = item.metadata.get('date') or item.metadata.get('check_in')
+                if d:
+                    pkg_date = d
+                    break
+                    
+            summary += f"- '{p.title}' (INTERNAL_ID: {p.id}) Status: {p.status.value.capitalize()}, Date: {pkg_date}{content_str}\n"
+            
+        summary += "\n(Note to Agent: The 'INTERNAL_ID' is for your tool calls only. DO NOT speak or print it in your response.)\n"
+        summary += "Which one would you like to open? You can ask for more details on any draft or booked trip."
         return summary
 
     @staticmethod
     def get_package_by_title(user_id: str, title: str) -> Optional[Package]:
         """
-        Finds a package for a user by its title (partial match).
+        Finds a package for a user by its title, status keyword, or date month.
         """
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT id, session_id FROM packages WHERE (user_id = ? OR user_id IS NULL OR user_id = '') AND title LIKE ? ORDER BY rowid DESC LIMIT 1", (user_id, f"%{title}%"))
+        
+        query_lower = title.lower()
+        words = query_lower.replace("'", "").replace('"', "").replace(",", "").replace(".", "").split()
+        
+        status_filter = None
+        if "booked" in words: status_filter = 'booked'
+        elif "draft" in words: status_filter = 'draft'
+        elif "failed" in words: status_filter = 'failed'
+        
+        # Strip keywords for cleaner title match
+        ignore_keywords = {"booked", "draft", "failed", "package", "trip", "holiday", "open", "the", "a", "show", "me", "my", "our", "please", "can", "you", "details", "for", "with", "about", "at", "to", "in", "of"}
+        search_words = [w for w in words if w not in ignore_keywords]
+        search_title = " ".join(search_words)
+        
+        if not search_title and status_filter:
+             sql = "SELECT id, session_id FROM packages WHERE (user_id = ? OR user_id IS NULL OR user_id = '') AND status = ? ORDER BY rowid DESC LIMIT 1"
+             params = (user_id, status_filter)
+        elif status_filter:
+             sql = "SELECT id, session_id FROM packages WHERE (user_id = ? OR user_id IS NULL OR user_id = '') AND title LIKE ? AND status = ? ORDER BY rowid DESC LIMIT 1"
+             params = (user_id, f"%{search_title}%", status_filter)
+        else:
+             sql = "SELECT id, session_id FROM packages WHERE (user_id = ? OR user_id IS NULL OR user_id = '') AND title LIKE ? ORDER BY rowid DESC LIMIT 1"
+             params = (user_id, f"%{search_title}%")
+        
+        c.execute(sql, params)
+             
         row = c.fetchone()
         conn.close()
         
@@ -460,7 +501,8 @@ class BookingService:
         if not pkg:
             return "Package not found."
             
-        summary = f"### {pkg.title}\n"
+        summary = f"(INTERNAL_ID: {pkg.id})\n"
+        summary += f"### {pkg.title}\n"
         summary += f"**Status**: {pkg.status.value.capitalize()}\n"
         summary += f"**Total Price**: ${pkg.total_price:.2f}\n\n"
         

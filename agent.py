@@ -204,8 +204,17 @@ def search_packages_tool(user_id: str, query: str = None, date_filter: str = Non
         
     summary = f"I found {len(results)} matching packages:\n"
     for p in results:
-        summary += f"- {p.title} (Status: {p.status.value})\n"
-    summary += "\nWhich one would you like to open? You can use the buttons provided below if you like."
+        # Simple date extraction
+        pkg_date = "No dates set"
+        for item in p.items:
+            d = item.metadata.get('date') or item.metadata.get('check_in')
+            if d:
+                pkg_date = d
+                break
+        
+        summary += f"- '{p.title}' (INTERNAL_ID: {p.id}) Status: {p.status.value.capitalize()}, Date: {pkg_date}\n"
+    summary += "\n(Note to Agent: The 'INTERNAL_ID' is for your tool calls only. DO NOT speak or print it in your response.)\n"
+    summary += "Which one would you like to open? Remember to use the ID internally."
     return summary
 
 def get_package_details_tool(user_id: str, package_name_or_id: str):
@@ -217,16 +226,16 @@ def get_package_details_tool(user_id: str, package_name_or_id: str):
     """
     logger.info(f"[TOOL] Getting package details for: {package_name_or_id}")
     
-    # Try by title first (most common for natural language)
+    # If it looks like a UUID, use it directly
+    if len(package_name_or_id) > 20 and '-' in package_name_or_id:
+         return BookingService.get_package_details_summary(package_name_or_id)
+
+    # Try by title
     pkg = BookingService.get_package_by_title(user_id, package_name_or_id)
-    
-    # If not found, try by ID as a fallback (internal logic)
-    if not pkg:
-        # We need a session_id for get_package, but get_package_details_summary doesn't need it.
-        # Let's use the summary method directly.
-        return BookingService.get_package_details_summary(package_name_or_id)
+    if pkg:
+        return BookingService.get_package_details_summary(pkg.id)
         
-    return BookingService.get_package_details_summary(pkg.id)
+    return BookingService.get_package_details_summary(package_name_or_id)
 
 
 class VoiceAgent:
@@ -247,14 +256,14 @@ class VoiceAgent:
         self.duffel_service = DuffelService()
         self.amadeus_service = AmadeusService()
 
-    def process_message(self, user_id: str, session_id: str, message: str, region: str = "UK") -> str:
+    def process_message(self, user_id: str, session_id: str, message: str, region: str = "UK", package_id: str = None) -> str:
         """
         Process a text message and return the full text response.
         (Maintains compatibility with non-streaming callers)
         """
-        return "".join(list(self.process_message_stream(user_id, session_id, message, region)))
+        return "".join(list(self.process_message_stream(user_id, session_id, message, region, package_id)))
 
-    def process_message_stream(self, user_id: str, session_id: str, message: str, region: str = "UK"):
+    def process_message_stream(self, user_id: str, session_id: str, message: str, region: str = "UK", package_id: str = None):
         """
         Process a text message and yield chunks of the text response as they are generated.
         """
@@ -309,8 +318,19 @@ class VoiceAgent:
 
         # Fetch current profile for the runner (using state BEFORE background update for speed, 
         # or it will be updated by the time the next message comes)
+        # Fetch current profile for the runner
         user_profile = ProfileService.get_profile(user_id)
         
+        # --- PACKAGE CONTEXT INJECTION ---
+        package_context = ""
+        if package_id:
+            try:
+                details = BookingService.get_package_details_summary(package_id)
+                if details:
+                    package_context = f"\nUSER CONTEXT: The user is currently viewing the following package details:\n{details}\n\nIf the user asks for a summary, details, or 'what's in it', you should provide a descriptive verbal summary based on these details. You no longer need to say 'the details are on the screen'."
+            except Exception as e:
+                logger.warning(f"Failed to fetch package context for {package_id}: {e}")
+
         # Model initialization with streaming enabled
         model = Gemini(model="gemini-2.0-flash", stream=True)
         
@@ -375,6 +395,14 @@ class VoiceAgent:
             google_res = perform_google_search_bound(query)
             return f"{google_res}\n(Note: Amadeus had no specific tours, falling back to Google Search results.)"
 
+        def list_all_packages():
+            """Returns a natural language summary of all the user's saved lifestyle and travel packages."""
+            return list_user_packages_tool(user_id)
+        
+        def find_packages(query: str = None, date_filter: str = None, package_type: str = None):
+            """Searches for specific packages by keyword, date, or type."""
+            return search_packages_tool(user_id, query, date_filter, package_type)
+
         agent = Agent(
             name="ray_and_rae",
             model=model,
@@ -391,35 +419,48 @@ class VoiceAgent:
                 remove_item_bound,
                 save_user_info_bound,
                 search_amazon_with_reviews_bound,
-                list_user_packages_tool,
-                search_packages_tool,
+                list_all_packages,
+                find_packages,
                 get_package_details_bound
             ],
             instruction=f"""You are "Ray and Rae", an intelligent AI assistant who acts as a specialized Travel & Shopping Consultant.
             Your goal is to help users plan amazing trips and find the perfect products for their lifestyle.
-
+ 
             ### COMPABILITIES & TOOLS:
             1. **Travel Search**: Use `search_flights_duffel`, `search_hotels_amadeus`, and `search_activities_amadeus` to find travel options.
             2. **Shopping**: Use `search_products_bound`, `search_amazon_bound`, and `search_amazon_with_reviews_bound` to find items.
             3. **Package Management**:
-               - Use `list_user_packages_tool` to see a summary of EVERYTHING the user has planned (drafts and booked).
-               - Use `search_packages_tool` to find specific packages by title, date (year/month), or type.
-               - Use `get_package_details_bound` to see what is INSIDE a specific package (flights, hotels, activities). ALWAYS call this when a user asks to "open", "show", or "summarize" a specific trip/package.
-               - Use `create_package_bound` to start a new collection.
-               - Use `add_item_bound` to add items (flights, hotels, activities, products) to a package.
-               - Use `remove_item_bound` to take things out.
+               - Use `list_all_packages` to see a summary of EVERYTHING the user has planned.
+               - Use `find_packages` to find specific packages by title, date, or type.
+               - Use `get_package_details_bound` to see what is INSIDE a specific package. ALWAYS call this when a user asks to "open", "show", "summarize", or "finalise" a trip.
+               - Use `create_package_bound`, `add_item_bound`, and `remove_item_bound` to manage collections.
             4. **Memory**: Use `save_user_info_bound` to remember persistent facts about the user.
+            5. **Web Search**: Use `perform_google_search_bound` for broader research (e.g., "best holiday destinations for April").
 
-            ### GUIDELINES:
-            - **Brevity**: Keep your spoken responses concise and conversational.
-            - **NO SYSTEM IDs**: NEVER mention "ID" or long hexadecimal codes (like 'e5be3a2f...') to the user. Refer to packages by their names (e.g., "the Maldives summer trip").
-            - **Package Awareness**: When a user asks "what have you planned for me?" or similar, ALWAYS call `list_user_packages_tool` first to get a current view of their history.
-            - **Opening Packages**: When a user says "Open the Maldives trip", call `get_package_details_bound` using the name they provided.
-            - **Interactive Options**: Use the `[RESPONSE_OPTIONS]` protocol to provide buttons for choices. 
-              Example: `[RESPONSE_OPTIONS] ["Open Maldives Trip", "Search 2024", "Explore Shopping"]`
-            - **Product Proposals**: When suggesting products, use the `[PROPOSE_PRODUCTS]` protocol if you have a list of options for them to pick from.
-            - **Natural Summaries**: When summarizing multiple packages, be warm and helpful. Instead of a dry list, say something like: "I've got a few things saved for you! We have that Maldives trip from last year and a new shopping draft for beach gear. Which would you like to look at?"
+            ### STEALTH DISCOVERY GUIDELINES (EXTREME):
+            - **No Named Entities**: NEVER mention specific locations, resorts, hotels, brands, shops, or product models during the recruitment/discovery phase.
+            - **Experience Comparison**: Use tools (like `perform_google_search_bound`) to find options in the background. Identify the "Unique Selling Points" (USPs) and experiential differences between them.
+            - **Choice via Experience**: Ask the user to choose between *experiences* or *vines*, not names. (e.g., "Do you prefer a resort with a focus on family-run traditional huts, or a modern base with high-tech lifts and late-night social spots?")
+            - **Autonomous Selection**: Continue the inquiry loop until you can confidently make a SINGLE choice on behalf of the user. Once the user has refined their preference enough, announce the final choice and create/navigate to the package.
+            - **Goal**: The names of places and items should be a surprise that appears in the final package, not a decision the user makes from a menu.
+            - **Example Flow**:
+                - User: "I want a skiing holiday with lively après-ski for a beginner."
+                - Bot (searching): "Great! To help me pick the perfect spot, would you prefer a budget-friendly destination with a very high proportion of beginner nursery slopes, or are you after a more premium 'après-ski heaven' that has a legendary reputation across the Alps? [RESPONSE_OPTIONS: ["Budget & Easy Slopes", "Premium Après Heaven"]]"
+                - User: "Budget & Easy Slopes"
+                - Bot: "Perfect! I've picked a fantastic resort in Andorra for you. Opening the package now! [NAVIGATE_TO_PACKAGE: ...]"
 
+            ### GENERAL GUIDELINES:
+            - **Brevity & conversational style**: BE EXTREMELY CONCISE. Use short, punchy sentences. 
+            - **Navigation & Presentation (CRITICAL)**: When a user selects a specific package (by title, date, or status), or when you find a package they are looking for:
+                1. CONFIRMATION: If you are opening or navigating to a package based on your own suggestion, give a very brief confirmation (e.g., "Opening that for you now.") and let the UI show the details.
+                2. SUMMARIZATION & DETAILS: If the user explicitly asks to "summarize", "tell me about", "what's in", or for "details" of the package they are viewing, you MUST provide a helpful verbal summary of the items. Do NOT say the details are on the screen in this case.
+                3. NAVIGATION: Include `[NAVIGATE_TO_PACKAGE: package_id]` at the end if you are switching the user's view.
+            - **Interactive Choice Buttons**: ALWAYS use the `[RESPONSE_OPTIONS: ["Option 1", "Option 2"]]` protocol whenever there are choices.
+            - **NO SYSTEM IDs in Speech**: NEVER speak or display raw IDs like 'e5be3a2f...'.
+            - **Package Awareness**: Use `(INTERNAL_ID: ...)` from tool outputs for tool calls and the `NAVIGATE_TO_PACKAGE` protocol, but keep them hidden.
+            - **Disambiguation**: If names match, check status or dates. If still unclear, use `[RESPONSE_OPTIONS]`.
+
+            {package_context}
             Current User ID: {user_id}
             Current Session ID: {session_id}
             """
