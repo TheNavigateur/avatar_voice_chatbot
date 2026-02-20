@@ -212,8 +212,8 @@ def search_packages_tool(user_id: str, query: str = None, date_filter: str = Non
                 pkg_date = d
                 break
         
-        summary += f"- '{p.title}' (INTERNAL_ID: {p.id}) Status: {p.status.value.capitalize()}, Date: {pkg_date}\n"
-    summary += "\n(Note to Agent: The 'INTERNAL_ID' is for your tool calls only. DO NOT speak or print it in your response.)\n"
+        summary += f"- '{p.title}' [SYSTEM_ID: {p.id}] Status: {p.status.value.capitalize()}, Date: {pkg_date}\n"
+    summary += "\n(Note to Agent: The '[SYSTEM_ID: ...]' is for your tool calls ONLY. DO NOT speak or print it in your response.)\n"
     summary += "Which one would you like to open? Remember to use the ID internally."
     return summary
 
@@ -456,8 +456,8 @@ class VoiceAgent:
                 2. SUMMARIZATION & DETAILS: If the user explicitly asks to "summarize", "tell me about", "what's in", or for "details" of the package they are viewing, you MUST provide a helpful verbal summary of the items. Do NOT say the details are on the screen in this case.
                 3. NAVIGATION: Include `[NAVIGATE_TO_PACKAGE: package_id]` at the end if you are switching the user's view.
             - **Interactive Choice Buttons**: ALWAYS use the `[RESPONSE_OPTIONS: ["Option 1", "Option 2"]]` protocol whenever there are choices.
-            - **NO SYSTEM IDs in Speech**: NEVER speak or display raw IDs like 'e5be3a2f...'.
-            - **Package Awareness**: Use `(INTERNAL_ID: ...)` from tool outputs for tool calls and the `NAVIGATE_TO_PACKAGE` protocol, but keep them hidden.
+            - **NO SYSTEM IDs in Speech (CRITICAL)**: NEVER speak or display raw IDs like 'e5be3a2f...', or the '[SYSTEM_ID: ...]' marker itself. These IDs have no importance to an end user. The user identifies packages by title, status, destination, date, or duration.
+            - **Package Awareness**: Use the IDs from tool outputs (marked as `[SYSTEM_ID: ...]`) FOR TOOL CALLS AND THE `NAVIGATE_TO_PACKAGE` PROTOCOL ONLY. Hide them completely from your verbal and text response.
             - **Disambiguation**: If names match, check status or dates. If still unclear, use `[RESPONSE_OPTIONS]`.
 
             {package_context}

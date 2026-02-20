@@ -436,9 +436,9 @@ class BookingService:
                     pkg_date = d
                     break
                     
-            summary += f"- '{p.title}' (INTERNAL_ID: {p.id}) Status: {p.status.value.capitalize()}, Date: {pkg_date}{content_str}\n"
+            summary += f"- '{p.title}' [SYSTEM_ID: {p.id}] Status: {p.status.value.capitalize()}, Date: {pkg_date}{content_str}\n"
             
-        summary += "\n(Note to Agent: The 'INTERNAL_ID' is for your tool calls only. DO NOT speak or print it in your response.)\n"
+        summary += " (Note to Agent: The '[SYSTEM_ID: ...]' is for your tool calls ONLY. DO NOT speak or print it in your response.)\n"
         summary += "Which one would you like to open? You can ask for more details on any draft or booked trip."
         return summary
 
@@ -501,7 +501,7 @@ class BookingService:
         if not pkg:
             return "Package not found."
             
-        summary = f"(INTERNAL_ID: {pkg.id})\n"
+        summary = f"[SYSTEM_ID: {pkg.id}]\n"
         summary += f"### {pkg.title}\n"
         summary += f"**Status**: {pkg.status.value.capitalize()}\n"
         summary += f"**Total Price**: ${pkg.total_price:.2f}\n\n"
