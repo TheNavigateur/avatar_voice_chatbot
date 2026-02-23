@@ -33,6 +33,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     package_id: Optional[str] = None
+    avatar_name: Optional[str] = None
     region: str = "UK" # Default to UK
 
 class TTSRequest(BaseModel):
@@ -81,7 +82,9 @@ async def chat(request: ChatRequest):
     if not request.message:
         raise HTTPException(status_code=400, detail="Message is empty")
 
-    response_text = voice_agent.process_message(user_id, session_id, request.message, region=request.region, package_id=request.package_id)
+    from datetime import datetime
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    response_text = voice_agent.process_message(user_id, session_id, request.message, region=request.region, package_id=request.package_id, avatar_name=request.avatar_name, current_time=current_time)
     
     return JSONResponse(content={
         "response": response_text,
@@ -103,11 +106,14 @@ async def chat_stream(request: ChatRequest):
         # Add initial event with session_id
         yield f"data: {json.dumps({'session_id': session_id})}\n\n"
         
+        from datetime import datetime
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         # We need to run the blocking process_message_stream in a thread or use an async version
         # For now, let's use the generator and yield chunks
-        for chunk in voice_agent.process_message_stream(user_id, session_id, request.message, region=request.region, package_id=request.package_id):
-            if chunk:
-                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+        for event_type, content in voice_agent.process_message_stream(user_id, session_id, request.message, region=request.region, package_id=request.package_id, avatar_name=request.avatar_name, current_time=current_time):
+            if event_type == "text" and content:
+                yield f"data: {json.dumps({'chunk': content})}\n\n"
         
         yield "data: [DONE]\n\n"
 

@@ -256,14 +256,18 @@ class VoiceAgent:
         self.duffel_service = DuffelService()
         self.amadeus_service = AmadeusService()
 
-    def process_message(self, user_id: str, session_id: str, message: str, region: str = "UK", package_id: str = None) -> str:
+    def process_message(self, user_id: str, session_id: str, message: str, region: str = "UK", package_id: str = None, avatar_name: str = None, current_time: str = None) -> str:
         """
         Process a text message and return the full text response.
         (Maintains compatibility with non-streaming callers)
         """
-        return "".join(list(self.process_message_stream(user_id, session_id, message, region, package_id)))
+        full_text = []
+        for event_type, content in self.process_message_stream(user_id, session_id, message, region, package_id, avatar_name, current_time):
+            if event_type == "text":
+                full_text.append(content)
+        return "".join(full_text)
 
-    def process_message_stream(self, user_id: str, session_id: str, message: str, region: str = "UK", package_id: str = None):
+    def process_message_stream(self, user_id: str, session_id: str, message: str, region: str = "UK", package_id: str = None, avatar_name: str = None, current_time: str = None):
         """
         Process a text message and yield chunks of the text response as they are generated.
         """
@@ -321,15 +325,34 @@ class VoiceAgent:
         # Fetch current profile for the runner
         user_profile = ProfileService.get_profile(user_id)
         
-        # --- PACKAGE CONTEXT INJECTION ---
-        package_context = ""
+        # --- LATEST PACKAGE CONTENT CONTEXT (FOR CURRENT VIEW) ---
+        package_view_context = ""
         if package_id:
             try:
                 details = BookingService.get_package_details_summary(package_id)
                 if details:
-                    package_context = f"\nUSER CONTEXT: The user is currently viewing the following package details:\n{details}\n\nIf the user asks for a summary, details, or 'what's in it', you should provide a descriptive verbal summary based on these details. You no longer need to say 'the details are on the screen'."
+                    package_view_context = f"\nUSER CONTEXT: The user is currently viewing the following package details:\n{details}\n\nIf the user asks for a summary, details, or 'what's in it', you should provide a descriptive verbal summary based on these details. You no longer need to say 'the details are on the screen'."
             except Exception as e:
                 logger.warning(f"Failed to fetch package context for {package_id}: {e}")
+
+        # --- GLOBAL USER CONTEXT (PACKAGES & PROFILE) ---
+        all_packages_summary = ""
+        try:
+            all_packages_summary = BookingService.get_user_packages_summary(user_id)
+            logger.info(f"Retrieved {len(all_packages_summary)} characters of package summary for {user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch all packages summary: {e}")
+
+        global_context = f"""
+        ### USER LIFESTYLE & PLANNED PACKAGES:
+        You have direct access to the user's saved profile and planned packages. Do not claim you don't know what they have planned.
+        
+        **User Profile (About Me):**
+        {user_profile or 'No profile information available yet.'}
+
+        **Current Packages Summary:**
+        {all_packages_summary}
+        """
 
         # Model initialization with streaming enabled
         model = Gemini(model="gemini-2.0-flash", stream=True)
@@ -366,7 +389,24 @@ class VoiceAgent:
             return search_amazon_with_reviews(query, region=region)
 
         def search_flights_duffel(origin: str, destination: str, date: str, end_date: str = None):
-            return self.duffel_service.search_flights_formatted(origin, destination, date, end_date)
+            """Searches for flights between an origin and destination on a specific date. 
+            Origin and Destination can be IATA codes (LHR, JFK) or city names (London, New York).
+            Date and End Date must be in YYYY-MM-DD format.
+            """
+            if not origin or not destination or not date:
+                return "Error: Origin, destination, and date are required for flight search."
+            
+            target_origin = origin
+            if len(origin) != 3 or not origin.isupper():
+                resolved_origin = self.duffel_service.resolve_place(origin)
+                if resolved_origin: target_origin = resolved_origin
+            
+            target_destination = destination
+            if len(destination) != 3 or not destination.isupper():
+                resolved_destination = self.duffel_service.resolve_place(destination)
+                if resolved_destination: target_destination = resolved_destination
+                
+            return self.duffel_service.search_flights_formatted(target_origin, target_destination, date, end_date)
 
         def search_hotels_amadeus(city_code_or_name: str, check_in: str, check_out: str):
             target_code = city_code_or_name
@@ -423,44 +463,57 @@ class VoiceAgent:
                 find_packages,
                 get_package_details_bound
             ],
-            instruction=f"""You are "Ray and Rae", an intelligent AI assistant who acts as a specialized Travel & Shopping Consultant.
-            Your goal is to help users plan amazing trips and find the perfect products for their lifestyle.
- 
-            ### COMPABILITIES & TOOLS:
-            1. **Travel Search**: Use `search_flights_duffel`, `search_hotels_amadeus`, and `search_activities_amadeus` to find travel options.
-            2. **Shopping**: Use `search_products_bound`, `search_amazon_bound`, and `search_amazon_with_reviews_bound` to find items.
-            3. **Package Management**:
-               - Use `list_all_packages` to see a summary of EVERYTHING the user has planned.
-               - Use `find_packages` to find specific packages by title, date, or type.
-               - Use `get_package_details_bound` to see what is INSIDE a specific package. ALWAYS call this when a user asks to "open", "show", "summarize", or "finalise" a trip.
-               - Use `create_package_bound`, `add_item_bound`, and `remove_item_bound` to manage collections.
-            4. **Memory**: Use `save_user_info_bound` to remember persistent facts about the user.
-            5. **Web Search**: Use `perform_google_search_bound` for broader research (e.g., "best holiday destinations for April").
+            instruction=f"""
+            ### TIME AWARENESS (FORCEFUL):
+            - **Current Date & Time**: {current_time or 'Unknown'}
+            - **Relative Date Surmising**: Use the current year for any month mention (e.g. "March" -> "March 2027" if it's currently Feb 2026). NEVER ask for the year if it can be surmised.
+  
+            ### STEALTH DISCOVERY WORKFLOW (PRIORITY 1 - FOLLOW STRICTLY):
+            1. **Universal Contrast-Based Discovery (LEVEL 4 - PURE STYLE)**:
+                - **Internalized Candidates (GROUNDING)**: You MUST call search tools *internally* to identify a pool of 5-10 real, high-quality candidates (e.g. 4.5+ star hotels, iconic sites, vibrant cities) BEFORE asking discovery questions.
+                - **General-First Discovery (LEVEL 5 - OPEN ONLY)**: Your primary goal is to understand the *nature* of the experience the user envisions. ALWAYS start with broad, open-ended questions (e.g. "What kind of atmosphere are you envisioning for this trip?"). 
+                - **Ban Binary Phrasing**: NEVER use "Either/Or" structures or the word "or" to present discrete stylistic paths in your speech (e.g. BANNED: "Do you prefer A or B?"). Instead, ask open inquiries: "Tell me about the pace you envision," or "What kind of setting do you picture for your stay?".
+                - **Lifestyle Synthesis (STRICT)**: Use your internal pool of 5-10 real candidates to ground your questions, but ask about the *qualities* the user cares about.
+                - **Option Buttons as Last Resort**: Use `[RESPONSE_OPTIONS]` ONLY when you have narrowed the internal pool to a few high-quality candidates and need a final selection to proceed.
+                - **The Anonymity Rule (TOTAL)**: Absolute ban on naming *any* specific spot, entity, city, or region during discovery. NO "Bali", NO "Caribbean", NO "St. Lucia". 
+                    - **Strictest Rule**: NEVER name the resolved location even when asking about a hotel or activity (e.g. BANNED: "Shall we add a hotel in St. Lucia?").
+                - **Iterative Filtering**: Use the user's free-text vision to filter your internal pool. If >1 candidate remains, ask another open-ended question about the next lifestyle dimension.
+                - **Reveal at the End**: Only reveal entities via the `[NAVIGATE_TO_PACKAGE]` protocol once the ITINERARY is complete or the user asks to see it.
+            2. **Foundation Initiation**: Once an experience is clear to you, call `create_package_bound` and search tools silently.
+            3. **Process Results (SILENTLY)**:
+                - **Absolute Silence (STRICT)**: If a search succeeds, call `add_item_bound` immediately. NEVER narrate success.
+                - **Failure Reporting**: ONLY speak if a search returns "No results found".
+            4. **Sequential Build**: After internally choosing a location/flight (stay silent!), move DIRECTLY to the *nature* of the next item (e.g. "What kind of setting do you envision for local exploration: something deeply secluded or at the heart of the action?"). Build Day 1, Day 2, etc. sequentially.
+            
+            ### CRITICAL NEGATIVE CONSTRAINTS (ZERO TOLERANCE):
+            - **No Narration**: NEVER say "I've started crafting", "I've created a package", "I am searching...", "I have added...", "I've updated the departure...".
+            - **No Metadata Labels**: NEVER prefix your speech with "text," or any other label. Speak in pure natural language.
+            - **No Confirmation Steps**: NEVER ask "Shall we...?", "Is that all right?", "Shall we proceed?", "Do you want to add...?". Move directly to the next stylistic inquiry.
+            - **No Echoing/Leakage**: NEVER echo the resolved location, region, or entity (e.g. BANNED: "A hotel in Barbados?").
+            - **Sentence Integrity**: Every speech response MUST begin with a fresh, complete, capitalized sentence. NEVER start with fragments like "and", "so", or acknowledgment crumbs like "got it" or "OK" if it leads into a fragment.
+            - **No Banned Phrases**: NEVER use "Now that your...", "Is that all correct?".
+            - **No Meta-Talk**: NEVER explain internal logic or tool usage.
 
-            ### UNIVERSAL STEALTH DISCOVERY GUIDELINES (CRITICAL):
-            - **Zero Entity Leaks**: NEVER mention specific names of locations, resorts, hotels, flights, brands, shops, restaurants, or product models during the recruitment/discovery phase.
-            - **History Neutralization**: Even if names were mentioned in previous turns or are present in the chat history, you MUST cease using them immediately. If a user asks to "choose between" previously named options, pivot back to their experiential differences without repeating the names.
-            - **Implicit Quality Filter**: ALWAYS assume the user wants the highest-rated options that match their other criteria. Do not ask if they want quality—it is the default.
-            - **Budget Intelligence**: If the user's budget is unknown or cannot be inferred from context, you MUST ask for a budget range or preference (e.g., "What's our budget for this stay?").
-            - **Choice via Experience & Features**: Narrow all choices (including sub-choices like hotels) by their most important differentiating features (e.g., "Ski-in/ski-out access" vs "Central boutique vibe") or budget alignment.
-            - **Autonomous Selection**: Continue the inquiry loop until you can confidently make a SINGLE choice (location + hotel + flight + activities) on behalf of the user. Once the user has refined their preferences enough, announce the final choice and navigate to the package.
-            - **Goal**: Names and items should be a surprise in the final package, not a decision from a menu.
-            - **Example History Pivot**:
-                - User: "Help me choose between those hotels we talked about."
-                - Bot (recognizing names in history): "To help me pick the absolute best one for you, tell me: would you prefer being right on the slopes for early access, or closer to the village center for the nightlife? [RESPONSE_OPTIONS: ["Slope-side Access", "Village Center"]]"
+            ### IDENTITY & GOAL:
+            You are "{avatar_name or 'Ray and Rae'}", a specialized Travel & Shopping Consultant.
+            You are a team of two: Ray and Rae. Use "we" for the service.
+            Your goal: A multi-day surprise itinerary built one day at a time without narrating the process.
+  
+            ### COMPABILITIES & TOOLS:
+            1. **Travel Search**: `search_flights_duffel`, `search_hotels_amadeus`, `search_activities_amadeus`.
+            2. **Shopping**: `search_products_bound`, `search_amazon_bound`.
+            3. **Package Management**: `list_all_packages`, `find_packages`, `get_package_details_bound`, `create_package_bound`, `add_item_bound`, `remove_item_bound`.
+            4. **Memory**: `save_user_info_bound`.
+            5. **Web Search**: `perform_google_search_bound`.
 
             ### GENERAL GUIDELINES:
-            - **Brevity & conversational style**: BE EXTREMELY CONCISE. Use short, punchy sentences. 
-            - **Navigation & Presentation (CRITICAL)**: When a user selects a specific package (by title, date, or status), or when you find a package they are looking for:
-                1. CONFIRMATION: If you are opening or navigating to a package based on your own suggestion, give a very brief confirmation (e.g., "Opening that for you now.") and let the UI show the details.
-                2. SUMMARIZATION & DETAILS: If the user explicitly asks to "summarize", "tell me about", "what's in", or for "details" of the package they are viewing, you MUST provide a helpful verbal summary of the items. Do NOT say the details are on the screen in this case.
-                3. NAVIGATION: Include `[NAVIGATE_TO_PACKAGE: package_id]` at the end if you are switching the user's view.
-            - **Interactive Choice Buttons**: ALWAYS use the `[RESPONSE_OPTIONS: ["Option 1", "Option 2"]]` protocol whenever there are choices.
-            - **NO SYSTEM IDs in Speech (CRITICAL)**: NEVER speak or display raw IDs like 'e5be3a2f...', or the '[SYSTEM_ID: ...]' marker itself. These IDs have no importance to an end user. The user identifies packages by title, status, destination, date, or duration.
-            - **Package Awareness**: Use the IDs from tool outputs (marked as `[SYSTEM_ID: ...]`) FOR TOOL CALLS AND THE `NAVIGATE_TO_PACKAGE` PROTOCOL ONLY. Hide them completely from your verbal and text response.
-            - **Disambiguation**: If names match, check status or dates. If still unclear, use `[RESPONSE_OPTIONS]`.
+            - **Brevity**: BE EXTREMELY CONCISE.
+            - **Navigation**: SUMMARIZE items when asked to open/show a package. Do NOT say details are on screen.
+            - **Choice Buttons**: ALWAYS use `[RESPONSE_OPTIONS: ["Option 1", "Option 2"]]`.
+            - **NO SYSTEM IDs in Speech**.
 
-            {package_context}
+            {package_view_context}
+            {global_context}
             Current User ID: {user_id}
             Current Session ID: {session_id}
             """
@@ -504,20 +557,17 @@ class VoiceAgent:
                 
                 if chunk:
                     accumulated_text += chunk
-                    yield chunk
+                    yield ("text", chunk)
 
                 if hasattr(event, 'tool_calls') and event.tool_calls:
                     for tc in event.tool_calls:
                         if hasattr(tc, 'name'):
-                            tool_calls_made.append(tc.name)
-
-            if not accumulated_text.strip() and tool_calls_made:
-                tool_names = ", ".join(set(tool_calls_made))
-                yield f"I have executed the following actions: {tool_names}. Is there anything else?"
-
+                            tool_called = tc.name
+                            tool_calls_made.append(tool_called)
+                            yield ("tool", tool_called)
         except Exception as e:
             logger.error(f"Error running agent stream: {e}", exc_info=True)
-            yield f"Error: {str(e)}"
+            yield ("error", str(e))
 
 # Global instance
 voice_agent = VoiceAgent()

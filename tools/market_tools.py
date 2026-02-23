@@ -161,7 +161,10 @@ def search_hotels(location: str, check_in: str, check_out: str, requirements: st
                 # Sometimes looks like "£120" in parsing
                 if str(price).isdigit(): price = f"£{price}"
                 
-                rating = hi.get("rating", {}).get("value", "N/A")
+                rating_obj = hi.get("rating")
+                rating = "N/A"
+                if rating_obj and isinstance(rating_obj, dict):
+                    rating = rating_obj.get("value", "N/A")
                 desc = hi.get("description", "")
                 summary += f"- {name} (~{price}) ⭐ {rating}\n  *Details: {desc}*\n"
             return summary # Return early if we found the pack

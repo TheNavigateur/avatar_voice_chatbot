@@ -36,6 +36,24 @@ class DuffelService:
             logger.error(f"Duffel Request Failed: {e}")
             return {}
 
+    def resolve_place(self, query: str) -> Optional[str]:
+        """
+        Resolves a place name (city, airport) to an IATA code using Duffel's suggestions API.
+        """
+        if not self.token: return None
+        url = f"{self.BASE_URL}/places/suggestions?query={query}"
+        try:
+            resp = requests.get(url, headers=self.headers)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                if data:
+                    # Return the first result's IATA code
+                    # Usually 'icao_code' or 'iata_code'
+                    return data[0].get("iata_code")
+        except Exception as e:
+            logger.error(f"Duffel Place Resolution Failed: {e}")
+        return None
+
     def search_flights_oneway(self, origin: str, destination: str, date: str) -> List[Dict]:
         """
         Search for one-way flights using raw API.
