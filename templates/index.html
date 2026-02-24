@@ -877,6 +877,42 @@
             white-space: pre-wrap;
         }
 
+        /* Thinking Trace */
+        .thinking-trace {
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: #666;
+            border-left: 3px solid #6366f1;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .thinking-trace.active {
+            display: flex;
+        }
+
+        .trace-toggle {
+            font-size: 0.7rem;
+            color: #6366f1;
+            cursor: pointer;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .trace-item {
+            font-family: monospace;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding-bottom: 2px;
+        }
+
         .message {
             margin-bottom: 12px;
             display: flex;
@@ -2959,7 +2995,7 @@
         return { displayContent, checklistHtml, optionsHtml, navigateId };
     }
 
-    function addMessage(sender, text) {
+    function addMessage(sender, text, thinkingTrace = []) {
         if (sender === 'You') {
             clearBotStatusMessage();
         }
@@ -2982,12 +3018,27 @@
             }, 1000);
         }
 
+        let traceHtml = '';
+        if (thinkingTrace && thinkingTrace.length > 0) {
+            console.log("[UI] Rendering thinking trace with", thinkingTrace.length, "items");
+            const traceId = 'trace-' + Math.random().toString(36).substr(2, 9);
+            traceHtml = `
+                <div class="trace-toggle" onclick="document.getElementById('${traceId}').classList.toggle('active')">
+                    <i class="ph ph-brain"></i> Show Thinking Trace
+                </div>
+                <div id="${traceId}" class="thinking-trace">
+                    ${thinkingTrace.map(item => `<div class="trace-item">${item}</div>`).join('')}
+                </div>
+            `;
+        }
+
         div.innerHTML = `
             <div class="message-bubble">
                 <div class="bubble-sender">${sender}</div>
                 <div class="${sender === 'Bot' ? 'bot-content-text' : ''}">${displayContent}</div>
                 <div class="bot-protocol-checklist">${checklistHtml}</div>
                 <div class="bot-protocol-options">${optionsHtml}</div>
+                ${traceHtml}
             </div>
         `;
         const tDiv = document.getElementById('transcript');
@@ -4439,6 +4490,7 @@
         isProcessing = true;
         hasStartedSpeakingThisResponse = false; // Reset for new response
         currentFullResponse = ""; // Reset stream tracker
+        let currentThinkingTrace = [];
         currentBotMsgDiv = null;  // Reset placeholder tracker
         startProcessingStatus(text);
 
@@ -4481,6 +4533,12 @@
                                 if (data.session_id) {
                                     sessionId = data.session_id;
                                     localStorage.setItem('chat_session_id', sessionId);
+                                    continue;
+                                }
+
+                                if (data.thinking) {
+                                    console.log("[Stream] Thinking event received:", data.thinking);
+                                    currentThinkingTrace.push(data.thinking);
                                     continue;
                                 }
 
@@ -4534,13 +4592,13 @@
             // Re-render full bot response for protocols
             if (currentBotMsgDiv) {
                 // Speech happened, replace the dynamic placeholder with the final rendered one
-                addMessage('Bot', currentFullResponse);
+                addMessage('Bot', currentFullResponse, currentThinkingTrace);
                 currentBotMsgDiv.remove();
                 currentBotMsgDiv = null;
                 currentBotMsgContentEl = null;
             } else if (currentFullResponse.trim()) {
                 // No speech happened (or no text to speak) but we have content/protocols
-                addMessage('Bot', currentFullResponse);
+                addMessage('Bot', currentFullResponse, currentThinkingTrace);
             }
 
             updatePackages();

@@ -177,7 +177,7 @@ def search_hotels(location: str, check_in: str, check_out: str, requirements: st
             link = item.get("url", "#")
             summary += f"- {title} ({link})\n"
             count += 1
-            if count >= 5: break
+            if count >= 15: break
             
     return summary
 

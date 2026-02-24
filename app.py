@@ -9,7 +9,12 @@ from agent import voice_agent
 from google.cloud import texttospeech
 import base64
 import requests
+import logging
 from openai import OpenAI
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -114,6 +119,9 @@ async def chat_stream(request: ChatRequest):
         for event_type, content in voice_agent.process_message_stream(user_id, session_id, request.message, region=request.region, package_id=request.package_id, avatar_name=request.avatar_name, current_time=current_time):
             if event_type == "text" and content:
                 yield f"data: {json.dumps({'chunk': content})}\n\n"
+            elif event_type == "thinking" and content:
+                logger.info(f"[Stream] Sending thinking event: {content[:50]}...")
+                yield f"data: {json.dumps({'thinking': content})}\n\n"
         
         yield "data: [DONE]\n\n"
 
