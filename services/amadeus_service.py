@@ -43,8 +43,8 @@ class AmadeusService:
             if not hotels_response.data:
                 return []
                 
-            # Get first 5-10 hotel IDs to check offers for
-            hotel_ids = [h['hotelId'] for h in hotels_response.data[:5]]
+            # Get first 20 hotel IDs to check offers for
+            hotel_ids = [h['hotelId'] for h in hotels_response.data[:20]]
             
             if not hotel_ids:
                 return []
@@ -78,6 +78,9 @@ class AmadeusService:
                         "price": f"{currency} {amount}",
                         "hotel_id": hotel_id,
                         "offer_id": offer_id,
+                        "address": hotel.get('address', {}),
+                        "latitude": hotel.get('latitude'),
+                        "longitude": hotel.get('longitude'),
                         "details": f"{name} ({currency} {amount})"
                     })
                     
@@ -92,9 +95,101 @@ class AmadeusService:
             logger.error(f"Amadeus Service Error: {e}")
             return []
 
+    def search_hotels_by_location(self, latitude: float, longitude: float, radius: int = 10) -> List[Dict]:
+        """
+        Search for hotels within a radius of given coordinates.
+        """
+        if not self.amadeus: return []
+        
+        try:
+            logger.info(f"Searching Amadeus hotels near ({latitude}, {longitude}) radius={radius}km...")
+            
+            # 1. Search by Geocode
+            hotels_response = self.amadeus.reference_data.locations.hotels.by_geocode.get(
+                latitude=latitude,
+                longitude=longitude,
+                radius=radius,
+                radiusUnit='KM'
+            )
+            
+            if not hotels_response.data:
+                return []
+                
+            hotel_ids = [h['hotelId'] for h in hotels_response.data[:20]]
+            
+            # 2. Get Offers
+            offers_response = self.amadeus.shopping.hotel_offers_search.get(
+                hotelIds=','.join(hotel_ids),
+                adults=1
+            )
+            
+            if not offers_response.data:
+                return []
+                
+            results = []
+            for offer in offers_response.data:
+                hotel = offer.get('hotel', {})
+                name = hotel.get('name', 'Unknown Hotel')
+                hotel_id = hotel.get('hotelId')
+                
+                # Fetch distance if available - not directly in Multi-Hotel but sometimes in search results
+                # For Multi-Hotel search, we'd need to cross-ref with the by_geocode response if we want distance
+                dist = "N/A"
+                for h_ref in hotels_response.data:
+                    if h_ref['hotelId'] == hotel_id:
+                        dist_val = h_ref.get('distance', {}).get('value')
+                        dist_unit = h_ref.get('distance', {}).get('unit', 'KM')
+                        if dist_val: dist = f"{dist_val} {dist_unit}"
+                        break
+
+                for offer_item in offer.get('offers', [])[:1]:
+                    price_obj = offer_item.get('price', {})
+                    currency = price_obj.get('currency', 'EUR')
+                    amount = price_obj.get('total', '0.00')
+                    offer_id = offer_item.get('id')
+                    
+                    results.append({
+                        "name": name,
+                        "price": f"{currency} {amount}",
+                        "hotel_id": hotel_id,
+                        "offer_id": offer_id,
+                        "distance": dist,
+                        "address": hotel.get('address', {}),
+                        "latitude": hotel.get('latitude'),
+                        "longitude": hotel.get('longitude'),
+                        "details": f"{name} ({currency} {amount}) - {dist} away"
+                    })
+                    
+            return results
         except Exception as e:
-            logger.error(f"Amadeus Service Error: {e}")
+            logger.error(f"Amadeus Geo Hotel Search Error: {e}")
             return []
+
+    def get_hotel_sentiments(self, hotel_ids: List[str]) -> Dict[str, Dict]:
+        """
+        Fetches itemized sentiments (ratings) for a list of hotel IDs.
+        """
+        if not self.amadeus or not hotel_ids: return {}
+        
+        try:
+            logger.info(f"Fetching sentiments for {len(hotel_ids)} hotels...")
+            response = self.amadeus.ereputation.hotel_sentiments.get(
+                hotelIds=','.join(hotel_ids)
+            )
+            
+            sentiments_by_id = {}
+            if response.data:
+                for item in response.data:
+                    h_id = item.get('hotelId')
+                    # Overall score and sub-scores
+                    sentiments_by_id[h_id] = {
+                        "overall": item.get('overallRating'),
+                        "scores": item.get('sentiments', {})
+                    }
+            return sentiments_by_id
+        except Exception as e:
+            logger.warning(f"Failed to fetch sentiments: {e}")
+            return {}
 
     def resolve_city_to_iata(self, place_name: str) -> Optional[str]:
         """
@@ -260,19 +355,68 @@ class AmadeusService:
             
         return summary
 
-    def search_hotels_formatted(self, city_code: str) -> str:
+    def search_hotels_formatted(self, city_code_or_name: str = None, latitude: float = None, longitude: float = None, radius: int = 10) -> str:
         """
-        Agent-friendly string output.
-        Note: city_code must be IATA (e.g. 'LON', 'NYC').
+        Agent-friendly string output with bookability, rankings, and distance.
         """
-        offers = self.search_hotels_by_city(city_code)
+        if latitude is not None and longitude is not None:
+             offers = self.search_hotels_by_location(latitude, longitude, radius)
+             loc_desc = f"near ({latitude}, {longitude})"
+        elif city_code_or_name:
+             # Try to resolve to IATA first
+             city_code = city_code_or_name
+             if len(city_code) != 3 or not city_code.isupper():
+                  resolved = self.resolve_city_to_iata(city_code_or_name)
+                  if resolved: city_code = resolved
+             offers = self.search_hotels_by_city(city_code)
+             loc_desc = city_code
+        else:
+             return "Error: City code or coordinates required for hotel search."
         
         if not offers:
-            return f"No hotel offers found in {city_code} via Amadeus."
+            return f"No bookable hotel offers found in {loc_desc} via Amadeus."
             
-        summary = f"🏨 **Amadeus Hotel Results ({city_code})**\n"
+        hotel_ids = [o['hotel_id'] for o in offers]
+        sentiments = self.get_hotel_sentiments(hotel_ids)
+            
+        summary = f"🏨 **Amadeus Bookable Hotel Results ({loc_desc})**\n"
+        # Sort by proximity if distance is available (and floatable)
+        try:
+             def dist_key(o):
+                  d_str = o.get('distance', '999')
+                  try: return float(d_str.split()[0])
+                  except: return 999.0
+             offers.sort(key=dist_key)
+        except: pass
+
         for offer in offers:
+            h_id = offer['hotel_id']
             summary += f"- **{offer['name']}** | {offer['price']}\n"
-            summary += f"  *Hotel ID: `{offer['hotel_id']}`*\n"
+            
+            # Distance
+            dist = offer.get('distance')
+            if dist and dist != 'N/A':
+                 summary += f"  📍 Distance: {dist} from anchor spot\n"
+
+            # Location info
+            addr = offer.get('address', {})
+            if addr:
+                city = addr.get('cityName', '')
+                summary += f"  Loc: {city}\n"
+            
+            if h_id in sentiments:
+                s = sentiments[h_id]
+                overall = s.get('overall', 'N/A')
+                scores = s.get('scores', {})
+                summary += f"  ⭐ Sentiment: {overall}/100\n"
+                if scores:
+                    itemized = []
+                    for k, v in scores.items():
+                        # Map internal categories to user-friendly labels
+                        label = k.replace('Quality', '').capitalize()
+                        itemized.append(f"{label}: {v}")
+                    summary += f"  *Ratings: {', '.join(itemized[:4])}*\n"
+            
+            summary += f"  *Hotel ID: `{h_id}`*\n"
             
         return summary

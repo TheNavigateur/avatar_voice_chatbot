@@ -324,22 +324,27 @@ class VoiceAgent:
         # or it will be updated by the time the next message comes)
         # Fetch current profile for the runner
         user_profile = ProfileService.get_profile(user_id)
+        yield ("thinking", f"Retrieved User Profile for {user_id}: {user_profile[:200]}...")
         
         # --- LATEST PACKAGE CONTENT CONTEXT (FOR CURRENT VIEW) ---
         package_view_context = ""
         if package_id:
             try:
+                yield ("thinking", f"Accessing current package view context for ID: {package_id}")
                 details = BookingService.get_package_details_summary(package_id)
                 if details:
                     package_view_context = f"\nUSER CONTEXT: The user is currently viewing the following package details:\n{details}\n\nIf the user asks for a summary, details, or 'what's in it', you should provide a descriptive verbal summary based on these details. You no longer need to say 'the details are on the screen'."
+                    yield ("thinking", f"Using Package Context: {details[:200]}...")
             except Exception as e:
                 logger.warning(f"Failed to fetch package context for {package_id}: {e}")
 
         # --- GLOBAL USER CONTEXT (PACKAGES & PROFILE) ---
         all_packages_summary = ""
         try:
+            yield ("thinking", "Retrieving summary of all user packages...")
             all_packages_summary = BookingService.get_user_packages_summary(user_id)
             logger.info(f"Retrieved {len(all_packages_summary)} characters of package summary for {user_id}")
+            yield ("thinking", f"Found existing packages: {all_packages_summary[:200]}...")
         except Exception as e:
             logger.warning(f"Failed to fetch all packages summary: {e}")
 
@@ -357,42 +362,80 @@ class VoiceAgent:
         # Model initialization with streaming enabled
         model = Gemini(model="gemini-2.0-flash", stream=True, api_key=self.api_key)
         
+        yield ("thinking", "Initializing Agent (Gemini-2.0-Flash)...")
+
         # Tools binding
         def create_package_bound(title: str, package_type: str = "mixed"):
-            return create_new_package_tool(session_id, user_id, title, package_type)
+            # yield_thinking(f"Tool Call: create_package_bound(title='{title}', type='{package_type}')") # Handled by runner.run loop
+            res = create_new_package_tool(session_id, user_id, title, package_type)
+            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
+            return res
             
         def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None):
-            return add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description, image_url, product_url, day, date, rating, review_link, reviews, images)
+            # yield_thinking(f"Tool Call: add_item_bound(item='{item_name}', type='{item_type}', package='{package_id}')") # Handled by runner.run loop
+            res = add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description, image_url, product_url, day, date, rating, review_link, reviews, images)
+            # yield_thinking(f"Tool Result: Added {item_name}") # Handled by runner.run loop
+            return res
 
         def remove_item_bound(package_id: str, item_id: str):
-            return remove_item_from_package_tool(session_id, package_id, item_id)
+            # yield_thinking(f"Tool Call: remove_item_from_package(item='{item_id}', package='{package_id}')") # Handled by runner.run loop
+            res = remove_item_from_package_tool(session_id, package_id, item_id)
+            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
+            return res
 
         def save_user_info_bound(fact: str):
-            return update_profile_memory_tool(user_id, fact)
+            # yield_thinking(f"Tool Call: save_user_info(fact='{fact}')") # Handled by runner.run loop
+            res = update_profile_memory_tool(user_id, fact)
+            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
+            return res
         
         def get_package_details_bound(package_name_or_id: str):
-            return get_package_details_tool(user_id, package_name_or_id)
+            # yield_thinking(f"Tool Call: get_package_details(query='{package_name_or_id}')") # Handled by runner.run loop
+            res = get_package_details_tool(user_id, package_name_or_id)
+            # yield_thinking(f"Tool Result: Retrieved details for {package_name_or_id}") # Handled by runner.run loop
+            return res
+
+        def log_reasoning(thought: str):
+            """
+            Logs internal reasoning, logic, and planning steps to the transparency trace.
+            Use this at the start of every turn and before/after tool calls to explain your process.
+            This information is ONLY visible in the 'Thinking' trace, NOT in your speech.
+            """
+            logger.info(f"[LOG_REASONING] Model says: {thought}")
+            return f"Reasoning logged: {thought}"
 
         def perform_google_search_bound(query: str):
-            return perform_google_search(query, region=region)
+            # yield_thinking(f"Tool Call: perform_google_search(query='{query}')") # Handled by runner.run loop
+            res = perform_google_search(query, region=region)
+            # yield_thinking(f"Tool Result: Search returned {len(res)} results.") # Handled by runner.run loop
+            return res
 
         def search_products_bound(query: str):
-            return search_products(query, region=region)
+            # yield_thinking(f"Tool Call: search_products(query='{query}')") # Handled by runner.run loop
+            res = search_products(query, region=region)
+            # yield_thinking(f"Tool Result: Found {res.count('Title:') if hasattr(res, 'count') else 'multiple'} products.") # Handled by runner.run loop
+            return res
             
         def check_amazon_stock_bound(product_name: str, variant_details: str):
-            return check_amazon_stock(product_name, variant_details, region=region)
+            # yield_thinking(f"Tool Call: check_amazon_stock(product='{product_name}')") # Handled by runner.run loop
+            res = check_amazon_stock(product_name, variant_details, region=region)
+            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
+            return res
             
         def search_amazon_bound(query: str):
-            return search_amazon(query, region=region)
+            # yield_thinking(f"Tool Call: search_amazon(query='{query}')") # Handled by runner.run loop
+            res = search_amazon(query, region=region)
+            # yield_thinking(f"Tool Result: Found Amazon listings.") # Handled by runner.run loop
+            return res
 
         def search_amazon_with_reviews_bound(query: str):
-            return search_amazon_with_reviews(query, region=region)
+            # yield_thinking(f"Tool Call: search_amazon_with_reviews(query='{query}')") # Handled by runner.run loop
+            res = search_amazon_with_reviews(query, region=region)
+            # yield_thinking(f"Tool Result: Found listings with reviews.") # Handled by runner.run loop
+            return res
 
         def search_flights_duffel(origin: str, destination: str, date: str, end_date: str = None):
-            """Searches for flights between an origin and destination on a specific date. 
-            Origin and Destination can be IATA codes (LHR, JFK) or city names (London, New York).
-            Date and End Date must be in YYYY-MM-DD format.
-            """
+            # yield_thinking(f"Tool Call: search_flights_duffel(from='{origin}', to='{destination}', on='{date}')") # Handled by runner.run loop
             if not origin or not destination or not date:
                 return "Error: Origin, destination, and date are required for flight search."
             
@@ -406,46 +449,60 @@ class VoiceAgent:
                 resolved_destination = self.duffel_service.resolve_place(destination)
                 if resolved_destination: target_destination = resolved_destination
                 
-            return self.duffel_service.search_flights_formatted(target_origin, target_destination, date, end_date)
+            res = self.duffel_service.search_flights_formatted(target_origin, target_destination, date, end_date)
+            # yield_thinking(f"Tool Result: Found flight options.") # Handled by runner.run loop
+            return res
 
-        def search_hotels_amadeus(city_code_or_name: str, check_in: str, check_out: str):
-            target_code = city_code_or_name
-            if len(city_code_or_name) > 3 or not city_code_or_name.isupper():
-                resolved = self.amadeus_service.resolve_city_to_iata(city_code_or_name)
-                if resolved: target_code = resolved
-            if len(target_code) == 3 and target_code.isupper():
-                result = self.amadeus_service.search_hotels_formatted(target_code)
-                if result and "No hotel offers found" not in result and "disabled" not in result:
-                     return result
-            return search_hotels(city_code_or_name, check_in, check_out)
+        def search_hotels_amadeus(city_code_or_name: str = None, check_in: str = None, check_out: str = None, latitude: float = None, longitude: float = None, radius: int = 10):
+            """
+            Search for bookable hotel offers via Amadeus API.
+            Supports searching by City Code (e.g., 'MLE') or specific coordinates (latitude/longitude).
+            """
+            res = self.amadeus_service.search_hotels_formatted(
+                city_code_or_name=city_code_or_name,
+                latitude=latitude,
+                longitude=longitude,
+                radius=radius
+            )
+            return res
 
         def search_activities_amadeus(location: str, keyword: str = ""):
+            # yield_thinking(f"Tool Call: search_activities_amadeus(at='{location}', keyword='{keyword}')") # Handled by runner.run loop
             search_keyword = keyword
             if keyword.lower() in ["family", "kids", "children"]:
                 search_keyword = "family friendly"
             amadeus_res = self.amadeus_service.search_activities_formatted(location, search_keyword)
             if "No activities found" not in amadeus_res:
+                # yield_thinking(f"Tool Result: Found activities via Amadeus.") # Handled by runner.run loop
                 return amadeus_res
             if search_keyword:
                 broad_res = self.amadeus_service.search_activities_formatted(location)
                 if "No activities found" not in broad_res:
+                    # yield_thinking(f"Tool Result: Found activities via Amadeus (broad).") # Handled by runner.run loop
                     return f"{broad_res}\n(Note: No specific matches for '{keyword}', showing general activities.)"
             query = f"Things to do in {location}"
             if keyword: query = f"{keyword} in {location}"
             google_res = perform_google_search_bound(query)
+            # yield_thinking(f"Tool Result: Found activities via Google Search.") # Handled by runner.run loop
             return f"{google_res}\n(Note: Amadeus had no specific tours, falling back to Google Search results.)"
 
         def list_all_packages():
-            """Returns a natural language summary of all the user's saved lifestyle and travel packages."""
-            return list_user_packages_tool(user_id)
+            # yield_thinking("Tool Call: list_all_packages") # Handled by runner.run loop
+            res = list_user_packages_tool(user_id)
+            # yield_thinking(f"Tool Result: Found {res.count('-') if hasattr(res, 'count') else 'multiple'} packages.") # Handled by runner.run loop
+            return res
         
         def find_packages(query: str = None, date_filter: str = None, package_type: str = None):
-            """Searches for specific packages by keyword, date, or type."""
-            return search_packages_tool(user_id, query, date_filter, package_type)
+            # yield_thinking(f"Tool Call: find_packages(query='{query}')") # Handled by runner.run loop
+            res = search_packages_tool(user_id, query, date_filter, package_type)
+            # yield_thinking(f"Tool Result: Found matching packages.") # Handled by runner.run loop
+            return res
 
         def delete_package_bound(package_id: str):
-            """Deletes a package and its items. Use this to clear conflicting drafts."""
-            return BookingService.delete_package(package_id) or f"Deleted package {package_id}."
+            # yield_thinking(f"Tool Call: delete_package(id='{package_id}')") # Handled by runner.run loop
+            res = BookingService.delete_package(package_id) or f"Deleted package {package_id}."
+            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
+            return res
 
         agent = Agent(
             name="ray_and_rae",
@@ -466,88 +523,56 @@ class VoiceAgent:
                 list_all_packages,
                 find_packages,
                 get_package_details_bound,
-                delete_package_bound
+                delete_package_bound,
+                log_reasoning
             ],
             instruction=f"""
-            ### CRITICAL DISCOVERY MANDATES (SANDWICH ENFORCEMENT - TOP):
-            - **Mandatory Phase 0**: The VERY FIRST response to any new trip request MUST be PHASE 0 (Triage).
-            - **Absolute Silence**: Zero tolerance for narrating tool execution. NEVER say "I will find...", "Looking for...", "Next, I will...", or "Days often begin...".
-            - **Phase Gating**: MUST complete Phases 0-4 before calling ANY item-search tools (Flight, Hotel, Activity).
-            - **Expert Role**: You are the decision-maker. NEVER ask "Where would you like to go?".
-            - **Hard-Ban "Where"**: Zero tolerance for asking about destination preferences, regions, or cities during discovery.
-            - **Absolute Anonymity**: NEVER name any specific location, entity, or spot until the itinerary is complete.
-            - **Narration Ban**: NEVER say "I will find...", "Searching for...", "I'm adding...", or "Next, I will...". TOOL USAGE MUST BE INVISIBLE.
+            ### CRITICAL MANDATES (SANDWICH ENFORCEMENT - TOP):
+            1. **Thinking Transparency (MANDATORY)**: You MUST call `log_reasoning` as the VERY FIRST tool at the start of EVERY turn. Explain your current phase, your logic, and your next steps.
+            2. **Consultant Selection Logic**:
+                - **Hotel Selection First**: Before selecting flights, you MUST first search for and select the **Hotel**. This is your sanctuary—the primary anchor of the experience.
+                - **Location Anchoring**: Determine the "ideal spot" for the desired experience (e.g., "near the reef"). You MUST log this choice via `log_reasoning` including the coordinates and a descriptive name for the spot (e.g., "Identified [Spot Name] at [Lat/Lon] as the ideal anchor").
+                - **Stealth Deep Discovery**: NEVER ask formulaic questions. Instead, use evocative, "soulful" questions to uncover what the user truly wants to *experience*.
+                - **Experience-Driven Search**: Call `search_hotels_amadeus` ONLY after the anchor spot is identified. Use the anchor spot to find the best-located sanctuary.
+                - **Proximity Selection**: Prioritize hotels closest to your identified "ideal spot" that meet budget and rating standards.
+                - **Flight Selection Second**: Only *after* the hotel is selected should you search for flights. Use the hotel's location to determine the most convenient or nearest airport.
+                - **Audit Trail**: The `log_reasoning` call MUST list 2-3 discarded candidates and explain why the "Winner" was selected (specifically citing distance from the anchor spot).
+            3. **Absolute Anonymity (ZERO TOLERANCE)**: You are FORBIDDEN from naming the destination, city, region, or specific hotel in your verbal speech. If asked, refuse to say.
+            4. **Conversational Flow**: ALWAYS end your response with a question to move the discovery forward.
+            5. **Silence**: Never narrate process or tool usage in speech.
 
             ### IDENTITY & GOAL:
             You are "{avatar_name or 'Ray and Rae'}", a specialized Travel & Shopping Consultant.
-            You are a team of two: Ray and Rae. Use "we" for the service.
-            Your goal: A multi-day surprise itinerary built one day at a time without narrating the process.
+            Use "we" for the service. Your goal is a multi-day surprise itinerary built one day at a time.
   
-            ### COMPABILITIES & TOOLS:
-            1. **Travel Search**: `search_flights_duffel`, `search_hotels_amadeus`, `search_activities_amadeus`.
-            2. **Shopping**: `search_products_bound`, `search_amazon_bound`.
-            3. **Package Management**: `list_all_packages`, `find_packages`, `get_package_details_bound`, `create_package_bound`, `add_item_bound`, `remove_item_bound`, `delete_package_bound`.
-            4. **Memory**: `save_user_info_bound`.
-            5. **Web Search**: `perform_google_search_bound`.
-
-            ### GENERAL GUIDELINES:
-            - **Brevity**: BE EXTREMELY CONCISE. One or two sentences max.
-            - **Navigation**: SUMMARIZE items when asked to open/show a package.
-            - **Choice Buttons**: Use `[RESPONSE_OPTIONS: ["Option 1", "Option 2"]]` sparingly. ONLY use them to resolve specific ambiguities or binary path conflicts. AVOID using them for generic logistics or open-ended vision questions.
-            - **NO SYSTEM IDs in Speech**.
-
-            ### TIME AWARENESS:
-            - **Current Date & Time**: {current_time or 'Unknown'}
-            - **Relative Date Surmising**: Use the current year for any month mention.
-
+            ### TOOLS:
+            `search_flights_duffel`, `search_hotels_amadeus`, `search_activities_amadeus`, `create_package_bound`, `add_item_bound`, `perform_google_search_bound`, `log_reasoning`.
+ 
+            ### STEALTH DISCOVERY WORKFLOW:
             {package_view_context}
-            ### HISTORICAL REFERENCE (REFER ONLY - DO NOT REPEAT OR CONTINUE):
             {global_context}
-            Current User ID: {user_id}
-            Current Session ID: {session_id}
 
-            ### STEALTH DISCOVERY WORKFLOW (PRIORITY 1 - FINAL MANDATE - BOTTOM):
-            1. **Consultant-First Discovery (LEVEL 8 - TRIAGE & CLASH)**:
-                - **PHASE 0 (Triage)**: MANDATORY. For any trip request, first clarify if this is a "New Escape" or continuing an existing plan.
-                - **New Escape Mandate**: If starting a NEW trip, you MUST go through Phase 1-4 from scratch. NEVER assume the vibe from the profile; ask fresh Phase 3 questions.
-                - **The Expert Mandate**: You are the decision-maker. YOUR job is to select the destination, not the user's.
-                - **Hard-Ban "Where" (ZERO TOLERANCE)**: NEVER ask "Where would you like to go?", "Do you have a location in mind?", or seeking any destination preference.
-                - **Strict Discovery Hierarchy**: You MUST resolve these phases in order:
-                    - **PHASE 1 (Logistics)**: Resolve Departure Date, Return Date (or duration), and Origin.
-                    - **PHASE 1.5 (Clash Detection)**: Check `global_context` for date overlaps. If a clash exists, you MUST say: "I noticed a conflict with your [Title] trip on those dates. Shall we clear that draft so we can proceed with this new escape?" [RESPONSE_OPTIONS: ["Yes, clear it", "No, let me check"]]
-                    - **Conflict Resolution Mandate**: If the user confirms with "Yes, clear it", you MUST call `delete_package_bound` for the conflicting package before proceeding to any other phase.
-                    - **RESUME PHASE 1**: If Origin was not resolved before the clash, you MUST resolve it immediately after conflict resolution.
-                    - **PHASE 2 (Economy)**: Resolve Budget. 
-                    - **PHASE 3 (Vision)**: Engaging in qualitative discovery. AVOID buttons and avoid asking about "Pace", "Intensity" or "Nature" by name. Instead, ask evocative questions that help you understand the *soul* of the trip (e.g., "What's the one thing that would make this feel like a true escape?").
-                    - **Weather Sensitivity**: If climate preference is unknown, you MUST weave a question about their ideal weather (e.g. "Are we thinking tropical warmth or a crisp, cool adventure?") into your discovery.
-                    - **PHASE 3.5 (Weather Validation)**: MANDATORY. You MUST call `perform_google_search_bound` for the weather in 3 candidate destinations for the target month/dates. Compare against the "About Me" profile (e.g., preference for mild vs extreme heat).
-                    - **PHASE 4 (Internal Selection & Anchoring)**: Use logistics, economy, vision, and weather to internally select the best destination.
-                - **HARD-GATE**: You are strictly FORBIDDEN from calling `create_package_bound` or searching items until PHASE 4 is complete.
-                - **The Expert Role**: Identify the stylistic dimensions yourself; do not ask the user to categorize their trip.
-                - **Ban Binary Phrasing**: NEVER use "Either/Or" structures or the word "or" to present discrete stylistic paths.
-                - **The Anonymity Rule (TOTAL)**: Absolute ban on naming *any* specific spot, entity, city, or region.
-                - **STRICT ITINERARY ISOLATION (LEVEL 7)**: Every NEW surprise itinerary MUST start at Day 1.
-                - **No Hallucination**: NEVER ask "Day X...?" until you have added the base Flight/Hotel to the NEW package.
-            2. **Foundation Initiation & Anchoring**: Once PHASE 4 is complete:
-                - Call `create_package_bound` silently.
-                - Call `search_flights_duffel` and `search_hotels_amadeus` silently.
-                - CALL `add_item_bound` IMMEDIATELY for the successful flight and hotel to "anchor" the package.
-            3. **Sequential Build & Expanded Retrieval (SILENTLY)**:
-                - **Absolute Silence**: If search succeeds, add immediately. ZERO tolerance for process talk.
-                - **Diverse Retrieval (Day 1+)**: Use `search_activities_amadeus` (broad) AND `perform_google_search_bound` (for "hidden gems" or "vibrant options").
-                - **Proceed to Day 1 (Verbal Richness)**: Immediately after anchoring the foundation, you MUST describe the *feeling* of arriving and the nature of Day 1. Offer a diverse set of paths that cover the *full range* of the location's character (e.g., culture, relaxation, and adventure combined).
-            4. **Sequential Build**: Move DIRECTLY to the *nature* of Day 1, then Day 2, etc. sequentially.
-            
-            ### CRITICAL NEGATIVE CONSTRAINTS (HIGHEST PRIORITY):
-            - **No robotic categorizations**: NEVER use the words "Pace", "Intensity", "Nature", "Whirlwind", "Balanced", "Urban", "Thrilling", or "Restorative" to describe a trip's characteristics. These are offensive to our luxury brand.
-            - **No discovery buttons**: You are FORBIDDEN from using `[RESPONSE_OPTIONS]` for Phase 1 (Logistics) or Phase 3 (Vision). User MUST provide these via speech/text.
-            - **No Narration**: NEVER say "I've started crafting", "I will find...", "Next, I will...", "Searching...", "I'm adding...", or "Days often begin...". Process must be invisible.
-            - **No Metadata Labels**: NEVER prefix your speech with "text," or any other label.
-            - **No Confirmation Steps**: NEVER ask "Shall we...?", "Is that all right?", "Shall we proceed?" (except for clash resolution).
-            - **No Echoing/Leakage**: NEVER echo the resolved location, region, or entity.
-            - **Sentence Integrity**: EVERY speech response MUST begin with a fresh, complete, capitalized sentence. No leading spaces or fragments like " it is.".
-            - **No Banned Phrases**: NEVER use "Now that your...", "Is that all correct?".
-            - **No Meta-Talk**: NEVER explain internal logic or tool usage.
+            1. **Phase 0 (Triage)**: Mandatory check if New or Continuing.
+            2. **Phase 1 (Logistics)**: Confirm Origin and Duration.
+            3. **Phase 2 (Budget)**: Establish clear budget range (specifically for accommodation).
+            4. **Phase 3 (Stealth Deep Discovery & Experience Anchor)**: 
+                - Use evocative questions to uncover the user's desired "soulful" experiences.
+                - Use `log_reasoning` to EXPLICITLY name and coordinate-map these experiences to an internally identified "ideal spot" (e.g., "LOG: Anchor spot identified at [Lat/Lon] for [Experience Name]").
+            5. **Phase 4 (Hotel Selection)**:
+                - Call `search_hotels_amadeus` with specific coordinates for the "ideal spot".
+                - LOG reasoning with comparison (distance and rating).
+                - Pick the highest rated/best located hotel and add to package SILENTLY.
+            6. **Phase 4.5 (Flight Selection)**:
+                - Identify the airport nearest to the selected hotel.
+                - Search for flights and add the best option to package SILENTLY.
+            7. **Phase 5 (Reveal & Sensory)**: Describe the SENSORY experience for Day 1 (Sensory only, NO NAMES).
+
+            ### CRITICAL NEGATIVE CONSTRAINTS (SANDWICH ENFORCEMENT - BOTTOM):
+            - **NO DESTINATION NAMES**: Bali, Paris, London, etc., are BANNED from speech.
+            - **BUDGET & VISION FIRST**: Never anchor before Phase 2 & 3.
+            - **HIGH QUALITY ONLY**: Always justify your choice as the premier option in the log.
+            - **END WITH A QUESTION**: Every speech response MUST end with a question (CTA).
+            - **REASONING FIRST**: Call `log_reasoning` before anything else.
             """
         )
         
@@ -561,14 +586,73 @@ class VoiceAgent:
             session_service=self.session_service
         )
         
+        # Helper to yield thinking events from within tools
+        # We need to bridge the gap between tools and the generator
+        # Since tools are called synchronously by the runner, we can't easily yield from them directly
+        # without changing the ADK. But we can use a queue or just log it for now?
+        # Actually, let's just use the 'thinking' events we already have.
+        # But wait, how do I get the tool calls *as they happen* into the stream?
+        # The runner.run loop catches tool calls.
+        
+        # We can pass a callback to our tools if we want, but better to handle it in the loop.
+        
         from google.genai.types import Content, Part
         msg = Content(role="user", parts=[Part(text=message)])
         
-        tool_calls_made = []
-        accumulated_text = ""
+        # The yield_thinking helper function is not needed here as the runner.run loop
+        # will handle yielding 'thinking' events for tool calls and outputs.
+        # The instruction's proposed yield_thinking inside each tool function won't work
+        # directly as `yield` can only be used in a generator function.
+        # The ADK's runner.run already yields tool_calls and tool_outputs events.
+        # We will process those events in the main loop.
+        def yield_thinking(txt):
+             pass # This placeholder is no longer needed.
 
         try:
             for event in runner.run(user_id=user_id, session_id=session_id, new_message=msg):
+                # Broadly check for tool interactions in the event
+                # ADK/Gemini 2.0 uses function_call and function_response
+                content = getattr(event, 'content', None)
+                if content:
+                    parts = getattr(content, 'parts', [])
+                    for part in parts:
+                        # Check for function_call (model requesting a tool)
+                        fc = getattr(part, 'function_call', None)
+                        if fc:
+                            tool_called = getattr(fc, 'name', 'unknown')
+                            tool_args = getattr(fc, 'args', {})
+                            if tool_called == "log_reasoning":
+                                thought = tool_args.get("thought", "")
+                                yield ("thinking", f"LOG: {thought}")
+                            else:
+                                yield ("thinking", f"Agent decided to call: {tool_called}({tool_args})")
+                        
+                        # Check for function_response (tool returning data)
+                        fr = getattr(part, 'function_response', None)
+                        if fr:
+                            res_val = getattr(fr, 'response', {})
+                            # Often response is a dict with 'result' or similar
+                            res_str = str(res_val.get('result', res_val)) if isinstance(res_val, dict) else str(res_val)
+                            yield ("thinking", f"Tool returned: {res_str[:200]}...")
+
+                # Fallback for events that have .tool_calls directly (older ADK or different event types)
+                tool_calls = getattr(event, 'tool_calls', None)
+                if tool_calls:
+                    for tc in tool_calls:
+                        tool_called = getattr(tc, 'name', 'unknown')
+                        tool_args = getattr(tc, 'args', {})
+                        if tool_called == "log_reasoning":
+                            thought = tool_args.get("thought", "")
+                            yield ("thinking", f"LOG: {thought}")
+                        else:
+                            yield ("thinking", f"Agent decided to call: {tool_called}({tool_args})")
+
+                tool_outputs = getattr(event, 'tool_outputs', None)
+                if tool_outputs:
+                    for to in tool_outputs:
+                         res_summary = str(getattr(to, 'content', ''))[:200]
+                         yield ("thinking", f"Tool returned: {res_summary}...")
+
                 event_author = getattr(event, 'author', None)
                 event_role = getattr(event, 'role', None)
                 is_model_event = (event_author and event_author != 'user') or (event_role and event_role == 'model') or event_author == 'ray_and_rae'
@@ -585,19 +669,11 @@ class VoiceAgent:
                                 if hasattr(part, 'text') and part.text:
                                     chunk += part.text
                         elif hasattr(event.content, 'text') and event.content.text:
-                            chunk = event.content.text
+                                chunk = event.content.text
                 
                 if chunk:
-                    accumulated_text += chunk
                     yield ("text", chunk)
 
-                if hasattr(event, 'tool_calls') and event.tool_calls:
-                    for tc in event.tool_calls:
-                        if hasattr(tc, 'name'):
-                            tool_called = tc.name
-                            tool_args = getattr(tc, 'args', {})
-                            tool_calls_made.append(tool_called)
-                            yield ("tool", f"{tool_called}({tool_args})")
         except Exception as e:
             logger.error(f"Error running agent stream: {e}", exc_info=True)
             yield ("error", str(e))
