@@ -24,10 +24,10 @@ class AmadeusService:
                 logger.error(f"Failed to initialize Amadeus Client: {e}")
                 self.amadeus = None
 
-    def search_hotels_by_city(self, city_code: str) -> List[Dict]:
+    def search_hotels_by_city(self, city_code: str, check_in: str = None, check_out: str = None) -> List[Dict]:
         """
         Search for hotels in a city (using IATA city/airport code like 'LON', 'PAR').
-        Returns list of hotel offers.
+        Returns list of hotel offers for the given dates.
         """
         if not self.amadeus: return []
         
@@ -51,11 +51,16 @@ class AmadeusService:
                 
             # 2. Get Offers for specific hotels
             # Hotel Offers API (Multi-Hotel)
-            logger.info(f"Checking offers for {len(hotel_ids)} hotels...")
-            offers_response = self.amadeus.shopping.hotel_offers_search.get(
-                hotelIds=','.join(hotel_ids),
-                adults=1
-            )
+            logger.info(f"Checking offers for {len(hotel_ids)} hotels (Dates: {check_in} to {check_out})...")
+            
+            params = {
+                "hotelIds": ','.join(hotel_ids),
+                "adults": 1
+            }
+            if check_in: params["checkInDate"] = check_in
+            if check_out: params["checkOutDate"] = check_out
+
+            offers_response = self.amadeus.shopping.hotel_offers_search.get(**params)
             
             if not offers_response.data:
                 return []
@@ -95,9 +100,9 @@ class AmadeusService:
             logger.error(f"Amadeus Service Error: {e}")
             return []
 
-    def search_hotels_by_location(self, latitude: float, longitude: float, radius: int = 10) -> List[Dict]:
+    def search_hotels_by_location(self, latitude: float, longitude: float, radius: int = 10, check_in: str = None, check_out: str = None) -> List[Dict]:
         """
-        Search for hotels within a radius of given coordinates.
+        Search for hotels within a radius of given coordinates for specific dates.
         """
         if not self.amadeus: return []
         
@@ -118,10 +123,14 @@ class AmadeusService:
             hotel_ids = [h['hotelId'] for h in hotels_response.data[:20]]
             
             # 2. Get Offers
-            offers_response = self.amadeus.shopping.hotel_offers_search.get(
-                hotelIds=','.join(hotel_ids),
-                adults=1
-            )
+            params = {
+                "hotelIds": ','.join(hotel_ids),
+                "adults": 1
+            }
+            if check_in: params["checkInDate"] = check_in
+            if check_out: params["checkOutDate"] = check_out
+
+            offers_response = self.amadeus.shopping.hotel_offers_search.get(**params)
             
             if not offers_response.data:
                 return []
@@ -355,12 +364,12 @@ class AmadeusService:
             
         return summary
 
-    def search_hotels_formatted(self, city_code_or_name: str = None, latitude: float = None, longitude: float = None, radius: int = 10) -> str:
+    def search_hotels_formatted(self, city_code_or_name: str = None, check_in: str = None, check_out: str = None, latitude: float = None, longitude: float = None, radius: int = 10) -> str:
         """
         Agent-friendly string output with bookability, rankings, and distance.
         """
         if latitude is not None and longitude is not None:
-             offers = self.search_hotels_by_location(latitude, longitude, radius)
+             offers = self.search_hotels_by_location(latitude, longitude, radius, check_in=check_in, check_out=check_out)
              loc_desc = f"near ({latitude}, {longitude})"
         elif city_code_or_name:
              # Try to resolve to IATA first
@@ -368,7 +377,7 @@ class AmadeusService:
              if len(city_code) != 3 or not city_code.isupper():
                   resolved = self.resolve_city_to_iata(city_code_or_name)
                   if resolved: city_code = resolved
-             offers = self.search_hotels_by_city(city_code)
+             offers = self.search_hotels_by_city(city_code, check_in=check_in, check_out=check_out)
              loc_desc = city_code
         else:
              return "Error: City code or coordinates required for hotel search."
