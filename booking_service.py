@@ -406,13 +406,24 @@ class BookingService:
     @staticmethod
     def get_user_packages_summary(user_id: str) -> str:
         """
-        Returns a concise natural language summary of the user's packages.
+        Returns a concise natural language summary of the user's packages, 
+        pruning old entries to save context space.
         """
-        packages = BookingService.get_user_packages(user_id)
-        if not packages:
+        all_packages = BookingService.get_user_packages(user_id)
+        if not all_packages:
             return "You don't have any packages saved yet."
             
-        summary = f"I found {len(packages)} packages in total:\n"
+        # Limit detailed summary to most recent 10 packages
+        recent_limit = 10
+        packages = all_packages[:recent_limit]
+        older_count = len(all_packages) - recent_limit
+        
+        summary = f"I found {len(all_packages)} packages in total"
+        if older_count > 0:
+            summary += f" (showing the {recent_limit} most recent):\n"
+        else:
+            summary += ":\n"
+
         for p in packages:
             # Create a brief content summary
             flights = len([i for i in p.items if i.item_type == 'flight'])
@@ -438,7 +449,11 @@ class BookingService:
                     
             summary += f"- '{p.title}' [SYSTEM_ID: {p.id}] Status: {p.status.value.capitalize()}, Date: {pkg_date}{content_str}\n"
             
-        summary += " (Note to Agent: The '[SYSTEM_ID: ...]' is for your tool calls ONLY. DO NOT speak or print it in your response.)\n"
+        if older_count > 0:
+            older_titles = [f"'{p.title}'" for p in all_packages[recent_limit:recent_limit+5]]
+            summary += f"- ... and {older_count} older packages (including: {', '.join(older_titles)})\n"
+
+        summary += " (Note to Agent: The '[SYSTEM_ID: ...]' is for your tool calls ONLY. DO NOT speak or print it.)\n"
         summary += "Which one would you like to open? You can ask for more details on any draft or booked trip."
         return summary
 
@@ -539,3 +554,16 @@ class BookingService:
             summary += "\n"
             
         return summary
+
+    @staticmethod
+    def delete_package(package_id: str):
+        """
+        Deletes a package and all its associated items.
+        """
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM package_items WHERE package_id = ?", (package_id,))
+        c.execute("DELETE FROM packages WHERE id = ?", (package_id,))
+        conn.commit()
+        conn.close()
+        logger.info(f"Deleted package {package_id} and all its items.")
