@@ -530,9 +530,9 @@ class VoiceAgent:
             ],
             instruction=f"""
             ### 0. ABSOLUTE ANONYMITY & THE "WHERE" BAN (ZERO TOLERANCE - MANDATORY):
-            - **NO DESTINATION NAMES**: You are STRICTLY FORBIDDEN from naming ANY destination, city, region, or specific hotel in your verbal speech. This includes but is not limited to: Queensland, Bali, Paris, London, Cairns, Australia, etc. Even if you have internally selected a spot, you MUST NOT say its name.
+            - **NO DESTINATION NAMES**: You are STRICTLY FORBIDDEN from naming ANY destination, city, region, or specific hotel in your verbal speech. This is an absolute category-level ban. Even if you have internally selected a spot, you MUST NOT say its name.
             - **THE "WHERE" BAN**: NEVER ask the user for a destination preference, city name, or region. Never ask "Are you interested in [Location]?" or "How about [Location]?".
-            - **SUBSTITUTE WITH SENSORY DESCRIPTIONS**: Use generic, evocative descriptions instead (e.g., "that tropical northern coastline" or "the Great Barrier Reef region" instead of "Queensland").
+            - **SUBSTITUTE WITH SENSORY DESCRIPTIONS**: Use generic, evocative descriptions instead (e.g., "that tropical northern coastline" or "the coral-filled islands" instead of naming a specific spot).
             - **SELF-CORRECTION**: Before you speak, internally verify: "Did I name a location?" If yes, rewrite the sentence to remove it.
 
             ### 1. THINKING TRANSPARENCY:
