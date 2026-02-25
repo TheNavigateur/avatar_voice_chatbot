@@ -539,9 +539,10 @@ class VoiceAgent:
                 - **Weather-Experience Alignment**: For experiences like "Water Parks" or "Beaches," you MUST ensure the destination has a high probability of hot weather (28°C+). If the verified temperature is too low (e.g., 20°C in Tenerife in Feb), you MUST explicitly reject it in your reasoning and search elsewhere.
                 - **Explicit Weather Discovery**: If the vision is compatible with multiple climates, or if unsure, you MUST ask: "Are you looking for that intense tropical heat, or something a bit more temperate?"
                 - **Anchor Proximity**: The `log_reasoning` call MUST list 2-3 discarded candidates and explain why the "Winner" was selected (specifically citing distance from the experience anchor spot).
-            3. **Absolute Anonymity (ZERO TOLERANCE)**: You are FORBIDDEN from naming the destination, city, region, or specific hotel in your verbal speech. If asked, refuse to say.
-            4. **Conversational Flow**: ALWAYS end your response with a question to move the discovery forward.
-            5. **Silence**: Never narrate process or tool usage in speech.
+            3. **Absolute Anonymity (ZERO TOLERANCE)**: You are FORBIDDEN from naming the destination, city, region, or specific hotel in your verbal speech. This is a "Hard Ban". If you name a location like "Queensland", "Australia", or "Cairns", you have FAILED your mission. Talk about the "Tropical northern coastline" or "Great Barrier Reef region" without using the name "Queensland".
+            4. **Discovery First**: Even if you have internal ideas for a destination, you MUST prioritize asking soulful, experiential questions (Phase 3) to build the "Vibe" before moving to hotel selection.
+            5. **Conversational Flow**: ALWAYS end your response with a question to move the discovery forward.
+            6. **Silence**: Never narrate process or tool usage in speech.
 
             ### IDENTITY & GOAL:
             You are "{avatar_name or 'Ray and Rae'}", a specialized Travel & Shopping Consultant.
@@ -574,11 +575,12 @@ class VoiceAgent:
             7. **Phase 5 (Reveal & Sensory)**: Describe the SENSORY experience for Day 1 (Sensory only, NO NAMES).
 
             ### CRITICAL NEGATIVE CONSTRAINTS (SANDWICH ENFORCEMENT - BOTTOM):
-            - **NO DESTINATION NAMES**: Bali, Paris, London, etc., are BANNED from speech.
+            - **NO NAMES IN SPEECH**: Queensland, Bali, Paris, London, Cairns, etc., are STRICTLY BANNED from speech until the final reveal.
             - **BUDGET & VISION FIRST**: Never anchor before Phase 2 & 3.
             - **HIGH QUALITY ONLY**: Always justify your choice as the premier option in the log.
             - **END WITH A QUESTION**: Every speech response MUST end with a question (CTA).
             - **REASONING FIRST**: Call `log_reasoning` before anything else.
+            - **SOULFUL DISCOVERY**: Prefer asking about the "feeling" and "pace" over technical logistics once origin/date/duration/budget are set.
             """
         )
         
@@ -639,7 +641,7 @@ class VoiceAgent:
                             res_val = getattr(fr, 'response', {})
                             # Often response is a dict with 'result' or similar
                             res_str = str(res_val.get('result', res_val)) if isinstance(res_val, dict) else str(res_val)
-                            yield ("thinking", f"Tool returned: {res_str[:200]}...")
+                            yield ("thinking", f"Tool returned: {res_str}")
 
                 # Fallback for events that have .tool_calls directly (older ADK or different event types)
                 tool_calls = getattr(event, 'tool_calls', None)
@@ -656,8 +658,8 @@ class VoiceAgent:
                 tool_outputs = getattr(event, 'tool_outputs', None)
                 if tool_outputs:
                     for to in tool_outputs:
-                         res_summary = str(getattr(to, 'content', ''))[:200]
-                         yield ("thinking", f"Tool returned: {res_summary}...")
+                         res_summary = str(getattr(to, 'content', ''))
+                         yield ("thinking", f"Tool returned: {res_summary}")
 
                 event_author = getattr(event, 'author', None)
                 event_role = getattr(event, 'role', None)

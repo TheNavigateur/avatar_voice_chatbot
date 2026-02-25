@@ -878,17 +878,26 @@
         }
 
         /* Thinking Trace */
+        .thinking-trace-standalone {
+            align-self: flex-start;
+            width: 90%;
+            margin: 12px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
         .thinking-trace {
-            margin-top: 8px;
-            padding: 8px;
-            background: rgba(0, 0, 0, 0.03);
-            border-radius: 6px;
-            font-size: 0.8rem;
-            color: #666;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.04);
+            border-radius: 12px;
+            font-size: 0.85rem;
+            color: #64748b;
             border-left: 3px solid #6366f1;
             display: none;
             flex-direction: column;
-            gap: 4px;
+            gap: 6px;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
         .thinking-trace.active {
@@ -896,21 +905,35 @@
         }
 
         .trace-toggle {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             color: #6366f1;
             cursor: pointer;
-            margin-top: 4px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            justify-content: flex-start;
+            gap: 6px;
             font-weight: 600;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: #f1f5f9;
+            width: fit-content;
+            margin: 0;
+            transition: all 0.2s ease;
+        }
+
+        .trace-toggle:hover {
+            background: #e2e8f0;
+            transform: translateY(-1px);
         }
 
         .trace-item {
             font-family: monospace;
             border-bottom: 1px solid rgba(0, 0, 0, 0.05);
             padding-bottom: 2px;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
 
         .message {
@@ -2630,6 +2653,7 @@
     let currentBotMsgContentEl = null; // Track the active bot message container
     let currentBotMsgDiv = null;      // Track the active bot message bubble element
     let currentFullResponse = "";      // Track the response as it streams
+    let currentChatAbortController = null; // To allow interrupting fetch/stream
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -2799,15 +2823,17 @@
         hiBtn.textContent = '"Hi"'; // In quotes as requested
         hiBtn.onclick = startConversationMode;
 
-        const speakBtn = document.createElement('button');
-        speakBtn.className = 'action-btn start-btn';
-        const currentAvatarName = document.getElementById('avatarSelector')?.value?.replace('glb_', '').replace('vrm_', '');
-        const displayName = currentAvatarName ? (currentAvatarName.charAt(0).toUpperCase() + currentAvatarName.slice(1)) : 'Ray';
-        speakBtn.textContent = `Tell ${displayName} what you want`;
-        speakBtn.onclick = window.startVoiceConversationMode;
-
         container.appendChild(hiBtn);
-        container.appendChild(speakBtn);
+
+        if (SpeechRecognition) {
+            const speakBtn = document.createElement('button');
+            speakBtn.className = 'action-btn start-btn';
+            const currentAvatarName = document.getElementById('avatarSelector')?.value?.replace('glb_', '').replace('vrm_', '');
+            const displayName = currentAvatarName ? (currentAvatarName.charAt(0).toUpperCase() + currentAvatarName.slice(1)) : 'Ray';
+            speakBtn.textContent = `Tell ${displayName} what you want`;
+            speakBtn.onclick = window.startVoiceConversationMode;
+            container.appendChild(speakBtn);
+        }
 
         const tDiv = document.getElementById('transcript');
         const isNearBottom = tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100;
@@ -2995,6 +3021,27 @@
         return { displayContent, checklistHtml, optionsHtml, navigateId };
     }
 
+    function renderThinkingTraceHtml(thinkingTrace, stableId = null) {
+        if (!thinkingTrace || thinkingTrace.length === 0) return '';
+
+        // Only show items starting with "Tool returned: "
+        const filteredTrace = thinkingTrace
+            .filter(item => item.startsWith('Tool returned: '))
+            .map(item => item.replace('Tool returned: ', ''));
+
+        if (filteredTrace.length === 0) return '';
+
+        const traceId = stableId || ('trace-' + Math.random().toString(36).substr(2, 9));
+        return `
+            <div class="trace-toggle" onclick="document.getElementById('${traceId}').classList.toggle('active')">
+                <i class="ph ph-brain"></i> Thinking Trace
+            </div>
+            <div id="${traceId}" class="thinking-trace">
+                ${filteredTrace.map(item => `<div class="trace-item">${item}</div>`).join('')}
+            </div>
+        `;
+    }
+
     function addMessage(sender, text, thinkingTrace = []) {
         if (sender === 'You') {
             clearBotStatusMessage();
@@ -3018,29 +3065,35 @@
             }, 1000);
         }
 
+        // Thinking trace is now handled as a standalone element
         let traceHtml = '';
         if (thinkingTrace && thinkingTrace.length > 0) {
-            console.log("[UI] Rendering thinking trace with", thinkingTrace.length, "items");
-            const traceId = 'trace-' + Math.random().toString(36).substr(2, 9);
-            traceHtml = `
-                <div class="trace-toggle" onclick="document.getElementById('${traceId}').classList.toggle('active')">
-                    <i class="ph ph-brain"></i> Show Thinking Trace
+            traceHtml = renderThinkingTraceHtml(thinkingTrace);
+        }
+
+        if (sender === 'Bot' && traceHtml) {
+            div.innerHTML = `
+                <div class="thinking-trace-standalone">
+                    ${traceHtml}
                 </div>
-                <div id="${traceId}" class="thinking-trace">
-                    ${thinkingTrace.map(item => `<div class="trace-item">${item}</div>`).join('')}
+                <div class="message-bubble">
+                    <div class="bubble-sender">${sender}</div>
+                    <div class="${sender === 'Bot' ? 'bot-content-text' : ''}">${displayContent}</div>
+                    <div class="bot-protocol-checklist">${checklistHtml}</div>
+                    <div class="bot-protocol-options">${optionsHtml}</div>
+                </div>
+            `;
+        } else {
+            div.innerHTML = `
+                <div class="message-bubble">
+                    <div class="bubble-sender">${sender}</div>
+                    <div class="${sender === 'Bot' ? 'bot-content-text' : ''}">${displayContent}</div>
+                    <div class="bot-protocol-checklist">${checklistHtml}</div>
+                    <div class="bot-protocol-options">${optionsHtml}</div>
+                    ${sender === 'You' ? traceHtml : ''}
                 </div>
             `;
         }
-
-        div.innerHTML = `
-            <div class="message-bubble">
-                <div class="bubble-sender">${sender}</div>
-                <div class="${sender === 'Bot' ? 'bot-content-text' : ''}">${displayContent}</div>
-                <div class="bot-protocol-checklist">${checklistHtml}</div>
-                <div class="bot-protocol-options">${optionsHtml}</div>
-                ${traceHtml}
-            </div>
-        `;
         const tDiv = document.getElementById('transcript');
         const isNearBottom = tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100;
         tDiv.appendChild(div);
@@ -3049,6 +3102,48 @@
             return div;
         }
         return div;
+    }
+
+    function interruptBot() {
+        console.log('[UI] interruptBot() called.');
+
+        // 1. Stop audio/speech synthesis
+        if (window.audioElement) {
+            window.audioElement.pause();
+            window.audioElement.currentTime = 0;
+            // Also nullify src to ensure it stops loading?
+            // window.audioElement.src = ""; 
+        }
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+        if (typeof stopSpeaking === 'function') {
+            stopSpeaking(); // Vocalizer animation/state
+        }
+
+        // 2. Reset speech queue
+        speechQueue = [];
+        isPlayingQueue = false;
+
+        // 3. Reset states
+        isBotSpeaking = false;
+        isProcessing = false;
+
+        // 4. Abort ongoing network request if any
+        if (currentChatAbortController) {
+            console.log('[UI] Aborting active chat stream.');
+            currentChatAbortController.abort();
+            currentChatAbortController = null;
+        }
+
+        // 5. Clear UI indicators
+        stopProcessingStatus();
+        clearBotStatusMessage();
+
+        // 6. Stop recognition to avoid collisions
+        if (recognition) {
+            try { recognition.stop(); } catch (e) { }
+        }
     }
 
     window.handleOptionClick = function (btn, text) {
@@ -3064,18 +3159,7 @@
 
         console.log('[UI] Option clicked:', text);
 
-        // Interruption logic (similar to user voice interruption)
-        if (isBotSpeaking || isProcessing) {
-            console.log('[UI] Interruption detected via option click! Stopping bot speech.');
-            if (window.audioElement) {
-                window.audioElement.pause();
-                window.audioElement.currentTime = 0;
-            }
-            stopSpeaking();
-            isBotSpeaking = false;
-            isProcessing = false;
-            clearBotStatusMessage();
-        }
+        interruptBot();
 
         // Send message
         if (recognition) {
@@ -3150,18 +3234,7 @@
 
         console.log('[UI] Multi-options submitted:', text);
 
-        // Interruption logic (similar to user voice interruption)
-        if (isBotSpeaking || isProcessing) {
-            console.log('[UI] Interruption detected via multi-submit! Stopping bot speech.');
-            if (window.audioElement) {
-                window.audioElement.pause();
-                window.audioElement.currentTime = 0;
-            }
-            stopSpeaking();
-            isBotSpeaking = false;
-            isProcessing = false;
-            clearBotStatusMessage();
-        }
+        interruptBot();
 
         // Send message
         if (recognition) {
@@ -3249,10 +3322,7 @@
 
     function continueShoppingConversation(optionalMessage) {
         const msg = optionalMessage || "I've updated the checklist. Let's continue.";
-        if (recognition) {
-            try { recognition.stop(); } catch (e) { }
-        }
-        clearBotStatusMessage();
+        interruptBot();
         sendChatMessage(msg);
     }
 
@@ -3314,10 +3384,7 @@
         console.log('[UI] Shoe size selected:', selectionText);
 
         // Send to chat
-        if (recognition) {
-            try { recognition.stop(); } catch (e) { }
-        }
-        clearBotStatusMessage();
+        interruptBot();
         sendChatMessage(selectionText);
     };
 
@@ -4448,9 +4515,7 @@
         });
 
         // Render start buttons after DOM is ready
-        if (SpeechRecognition) {
-            renderStartButton();
-        }
+        renderStartButton();
     }
 
     // For module scripts, check if DOM is already ready
@@ -4462,22 +4527,11 @@
     }
 
     async function sendChatMessage(textOverride) {
-        // STOP DAYDREAMING
-        if (typeof window.stopDaydreamCycle === 'function') {
-            window.stopDaydreamCycle();
-        }
-        initAudio();
+        interruptBot();
+
         const input = document.getElementById('chat-input');
         const text = (textOverride !== undefined ? textOverride : input.value).trim();
         if (!text) return;
-
-        if (isProcessing && textOverride !== undefined) {
-            console.log('[Chat] Explicit interaction override during processing.');
-            isProcessing = false;
-            stopProcessingStatus();
-        }
-
-        if (isProcessing) return;
 
         input.value = '';
         addMessage('You', text);
@@ -4491,15 +4545,19 @@
         hasStartedSpeakingThisResponse = false; // Reset for new response
         currentFullResponse = ""; // Reset stream tracker
         let currentThinkingTrace = [];
+        let currentThinkingDiv = null;
         currentBotMsgDiv = null;  // Reset placeholder tracker
         startProcessingStatus(text);
 
         let currentChunk = "";
 
+        currentChatAbortController = new AbortController();
+
         try {
             const response = await fetch('/chat_stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: currentChatAbortController.signal,
                 body: JSON.stringify({
                     message: text,
                     session_id: sessionId,
@@ -4539,6 +4597,22 @@
                                 if (data.thinking) {
                                     console.log("[Stream] Thinking event received:", data.thinking);
                                     currentThinkingTrace.push(data.thinking);
+
+                                    if (!currentThinkingDiv) {
+                                        currentThinkingDiv = document.createElement('div');
+                                        currentThinkingDiv.className = 'thinking-trace-standalone';
+                                        currentThinkingDiv.id = 'current-thinking-' + Math.random().toString(36).substr(2, 9);
+                                        const tDiv = document.getElementById('transcript');
+                                        tDiv.appendChild(currentThinkingDiv);
+                                    }
+                                    currentThinkingDiv.innerHTML = renderThinkingTraceHtml(currentThinkingTrace, currentThinkingDiv.id + '-inner');
+
+                                    // Auto-expand first item? No, let's keep it collapsed as requested "collapsed thinking trace"
+
+                                    const tDiv = document.getElementById('transcript');
+                                    if (tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100) {
+                                        tDiv.scrollTop = tDiv.scrollHeight;
+                                    }
                                     continue;
                                 }
 
@@ -4592,22 +4666,31 @@
             // Re-render full bot response for protocols
             if (currentBotMsgDiv) {
                 // Speech happened, replace the dynamic placeholder with the final rendered one
-                addMessage('Bot', currentFullResponse, currentThinkingTrace);
+                // We pass an empty thinkingTrace if it was already rendered in currentThinkingDiv
+                addMessage('Bot', currentFullResponse, currentThinkingDiv ? [] : currentThinkingTrace);
                 currentBotMsgDiv.remove();
                 currentBotMsgDiv = null;
                 currentBotMsgContentEl = null;
             } else if (currentFullResponse.trim()) {
                 // No speech happened (or no text to speak) but we have content/protocols
-                addMessage('Bot', currentFullResponse, currentThinkingTrace);
+                addMessage('Bot', currentFullResponse, currentThinkingDiv ? [] : currentThinkingTrace);
             }
 
             updatePackages();
 
         } catch (e) {
+            if (e.name === 'AbortError') {
+                console.log('[Chat] Stream aborted (interrupted by user).');
+                return;
+            }
             console.error("Chat message failed:", e);
             isProcessing = false;
             stopProcessingStatus();
             clearBotStatusMessage();
+        } finally {
+            if (currentChatAbortController && !currentChatAbortController.signal.aborted) {
+                currentChatAbortController = null;
+            }
         }
     }
 
