@@ -115,7 +115,7 @@ def search_flights(origin: str, destination: str, date: str) -> str:
             desc = item.get("description", "")
             link = item.get("url", "#")
             # Heuristic to find price in description/title
-            summary += f"- {title} ({link})\n  *{desc[:100]}...*\n"
+            summary += f"- {title} ({link})\n  *{desc}*\n"
             found_any = True
             
     if not found_any:
