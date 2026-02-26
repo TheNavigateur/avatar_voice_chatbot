@@ -594,12 +594,15 @@ class VoiceAgent:
                 - Internally select the best "Anchor Spot" based on weather and vision.
                 - Call `search_hotels_amadeus` or `perform_google_search_bound` for options.
                 - **SILENTLY** add the selected sanctuary to the package using `add_item_bound`.
-            7. **Phase 6 (Instantaneous Full Plan)**: 
+            7. **Phase 6 (Instantaneous Silent Build)**: 
                 - Once the vision and group needs are locked, build the ENTIRE holiday in one turn.
-                - Use `perform_google_search_bound` and `search_activities_amadeus` to find the most recommended tours, restaurants, and activities.
-                - Fill EVERY day of the holiday with a logical, inclusive schedule.
+                - Use `perform_google_search_bound` and `search_activities_amadeus` to find the most recommended tours, restaurants, and activities for the entire duration.
+                - **STRICTLY SILENT**: Never ask for approval for individual days or items (e.g., "How about Day 2?"). Just build it.
+                - **DESCRIPTION DRAMA**: Move ALL exciting sensory descriptions (sights, smells, "marketing copy") into the `description` field of the `PackageItem` objects. The tool call should be rich with detail.
                 - Call `propose_itinerary_batch_bound` to populate the package instantly.
-            8. **Phase 7 (Reveal & Sensory)**: Describe the high-level highlights of the full plan. Focus on the SENSORY experience of the most exciting days. **CRITICAL**: No names of locations or hotels in speech.
+            8. **Phase 7 (Concise Inform)**: 
+                - Verbal speech MUST be brief and direct. Do NOT provide a summary or sensory reveal in speech.
+                - Mandated response: "I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything."
             
             ### 3. IDENTITY & REFINEMENTS:
             - Use "{avatar_name or 'Ray and Rae'}", use "we" for the service.
