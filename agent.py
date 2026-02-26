@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from datetime import datetime, timedelta
 from google.adk import Agent, Runner
@@ -506,6 +507,46 @@ class VoiceAgent:
             # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
             return res
 
+        def propose_itinerary_batch_bound(items_json: str):
+            """
+            Adds a batch of itinerary items to a package in one go.
+            Args:
+                items_json: A JSON string representing a list of items.
+                Each item should have: name, item_type (flight/hotel/activity/restaurant), price, description, day (int), date (string), image_url (optional).
+            """
+            try:
+                items_data = json.loads(items_json)
+                package_items = []
+                for data in items_data:
+                    pkg_item = PackageItem(
+                        name=data.get('name', 'Unknown Item'),
+                        item_type=data.get('item_type', 'activity'),
+                        price=float(data.get('price', 0.0)),
+                        description=data.get('description', '')
+                    )
+                    # Merge additional metadata
+                    pkg_item.metadata.update({
+                        'day': data.get('day'),
+                        'date': data.get('date'),
+                        'image_url': data.get('image_url'),
+                        'product_url': data.get('product_url'),
+                        'rating': data.get('rating')
+                    })
+                    package_items.append(pkg_item)
+                
+                # Fetch latest package if package_id is not explicitly provided or known
+                # In this context, we usually have package_id from the session or previous turns
+                # For now, we'll try to find the active package for this session
+                active_pkg = BookingService.get_latest_session_package(session_id)
+                if not active_pkg:
+                    return "Error: No active package found to add items to. Create a package first."
+                
+                res = BookingService.add_items_to_package(session_id, active_pkg.id, package_items)
+                return f"Successfully added {len(package_items)} items to package '{active_pkg.title}'."
+            except Exception as e:
+                logger.error(f"Error in propose_itinerary_batch_bound: {e}")
+                return f"Error adding batch items: {str(e)}"
+
         agent = Agent(
             name="ray_and_rae",
             model=model,
@@ -526,7 +567,8 @@ class VoiceAgent:
                 find_packages,
                 get_package_details_bound,
                 delete_package_bound,
-                log_reasoning
+                log_reasoning,
+                propose_itinerary_batch_bound
             ],
             instruction=f"""
             ### 0. ABSOLUTE ANONYMITY & THE "WHERE" BAN (ZERO TOLERANCE - MANDATORY):
@@ -543,14 +585,22 @@ class VoiceAgent:
             2. **Phase 1 (Logistics)**: Confirm Origin, Duration, and Month. Do NOT ask again if already in `Current Packages Summary`.
             3. **Phase 2 (Budget)**: Establish clear budget range.
             4. **Phase 3 (Soulful Discovery)**: 
-                - You MUST spend at least 2-3 turns on "Soulful Discovery" (Phase 3) before moving to hotel selection. Ask about the "Vibe", "Pace", and "Nature" of the desired experience.
+                - You MUST spend at least 2 turns on "Soulful Discovery" (Phase 3). Ask about the "Vibe", "Pace", and "Nature" of the desired experience.
                 - **Weather-Experience Anchor**: Verify climate via `perform_google_search_bound`. If heat (28°C+) is requested but the spot is temperate (20°C), you MUST reject it in your log and look elsewhere.
-            5. **Phase 4 (Silent Selection)**: 
+            5. **Phase 3.5 (Group Discovery)**: 
+                - You MUST establish WHO is traveling. Ask about age groups, mobility requirements, and any specific preferences or constraints for children or seniors.
+                - Ensure the vision is inclusive of all travelers' requirements.
+            6. **Phase 4 (Silent Selection)**: 
                 - Internally select the best "Anchor Spot" based on weather and vision.
                 - Call `search_hotels_amadeus` or `perform_google_search_bound` for options.
                 - **SILENTLY** add the selected sanctuary to the package using `add_item_bound`.
-            6. **Phase 5 (Reveal & Sensory)**: Describe the SENSORY experience for Day 1. **CRITICAL**: No names of locations or hotels in speech.
-
+            7. **Phase 6 (Instantaneous Full Plan)**: 
+                - Once the vision and group needs are locked, build the ENTIRE holiday in one turn.
+                - Use `perform_google_search_bound` and `search_activities_amadeus` to find the most recommended tours, restaurants, and activities.
+                - Fill EVERY day of the holiday with a logical, inclusive schedule.
+                - Call `propose_itinerary_batch_bound` to populate the package instantly.
+            8. **Phase 7 (Reveal & Sensory)**: Describe the high-level highlights of the full plan. Focus on the SENSORY experience of the most exciting days. **CRITICAL**: No names of locations or hotels in speech.
+            
             ### 3. IDENTITY & REFINEMENTS:
             - Use "{avatar_name or 'Ray and Rae'}", use "we" for the service.
             - Always end your response with a question to move the discovery forward.

@@ -217,22 +217,29 @@ class BookingService:
 
     @staticmethod
     def add_item_to_package(session_id: str, package_id: str, item: PackageItem) -> Optional[Package]:
+        return BookingService.add_items_to_package(session_id, package_id, [item])
+
+    @staticmethod
+    def add_items_to_package(session_id: str, package_id: str, items: List[PackageItem]) -> Optional[Package]:
         conn = get_db_connection()
         c = conn.cursor()
         
-        # Verify package exists (using package_id which is unique)
-        c.execute("SELECT id FROM packages WHERE id = ?", (package_id,))
-        if not c.fetchone():
+        # Verify package exists
+        c.execute("SELECT id, session_id FROM packages WHERE id = ?", (package_id,))
+        pkg_row = c.fetchone()
+        if not pkg_row:
             conn.close()
             return None
             
-        c.execute("""
-            INSERT INTO package_items (id, package_id, name, item_type, price, status, description, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (item.id, package_id, item.name, item.item_type, item.price, item.status, item.description, json.dumps(item.metadata)))
+        actual_session_id = pkg_row['session_id']
+
+        for item in items:
+            c.execute("""
+                INSERT INTO package_items (id, package_id, name, item_type, price, status, description, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (item.id, package_id, item.name, item.item_type, item.price, item.status, item.description, json.dumps(item.metadata)))
         
         # Update total price of package
-        # Simplified: sum query
         c.execute("SELECT sum(price) as total FROM package_items WHERE package_id = ?", (package_id,))
         res = c.fetchone()
         new_total = res['total'] if res['total'] else 0.0
@@ -240,14 +247,6 @@ class BookingService:
         c.execute("UPDATE packages SET total_price = ? WHERE id = ?", (new_total, package_id))
         
         conn.commit()
-        conn.close()
-        
-        # Note: We still return based on the NEW session_id if we want, but get_package uses session_id for filtering.
-        # So we should probably find the actual session_id of the package to return it.
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT session_id FROM packages WHERE id = ?", (package_id,))
-        actual_session_id = c.fetchone()['session_id']
         conn.close()
         
         return BookingService.get_package(actual_session_id, package_id)
