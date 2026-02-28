@@ -233,11 +233,23 @@ class BookingService:
             
         actual_session_id = pkg_row['session_id']
 
+        # Get existing items for de-duplication check
+        c.execute("SELECT name, price, description FROM package_items WHERE package_id = ?", (package_id,))
+        existing_items = {(r['name'], r['price'], r['description']) for r in c.fetchall()}
+
         for item in items:
+            # Skip if exact match already exists (safety net)
+            if (item.name, item.price, item.description) in existing_items:
+                logger.info(f"[SERVICE] Skipping duplicate item: {item.name}")
+                continue
+                
             c.execute("""
                 INSERT INTO package_items (id, package_id, name, item_type, price, status, description, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (item.id, package_id, item.name, item.item_type, item.price, item.status, item.description, json.dumps(item.metadata)))
+            
+            # Add to set to prevent duplicates within the same batch
+            existing_items.add((item.name, item.price, item.description))
         
         # Update total price of package
         c.execute("SELECT sum(price) as total FROM package_items WHERE package_id = ?", (package_id,))
@@ -452,8 +464,8 @@ class BookingService:
             older_titles = [f"'{p.title}'" for p in all_packages[recent_limit:recent_limit+5]]
             summary += f"- ... and {older_count} older packages (including: {', '.join(older_titles)})\n"
 
-        summary += " (Note to Agent: The '[SYSTEM_ID: ...]' is for your tool calls ONLY. DO NOT speak or print it.)\n"
-        summary += "Which one would you like to open? You can ask for more details on any draft or booked trip."
+        summary += " (Note to Agent: The '[SYSTEM_ID: ...]' is for your tool calls ONLY. DO NOT speak or print it. If you want to open one, use the ID with '[NAVIGATE_TO_PACKAGE: id]')\n"
+        summary += "Which one would you like to show? Use the navigation protocol to open it for them."
         return summary
 
     @staticmethod
@@ -515,7 +527,7 @@ class BookingService:
         if not pkg:
             return "Package not found."
             
-        summary = f"[SYSTEM_ID: {pkg.id}]\n"
+        summary = f"[SYSTEM_ID: {pkg.id}] (Note to Agent: Use '[NAVIGATE_TO_PACKAGE: {pkg.id}]' if asked to open this view)\n"
         summary += f"### {pkg.title}\n"
         summary += f"**Status**: {pkg.status.value.capitalize()}\n"
         summary += f"**Total Price**: ${pkg.total_price:.2f}\n\n"

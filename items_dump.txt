@@ -1,0 +1,28 @@
+Family-friendly Paradise Resort | hotel | 3000.0
+Wet'n'Wild Gold Coast | activity | 80.0
+Gold Coast Scenic Bike Tour | activity | 50.0
+Gold Coast Sightseeing Tour | activity | 60.0
+Another Gold Coast Water Park | activity | 75.0
+Coastal Bike Ride | activity | 40.0
+Coastal Sightseeing | activity | 55.0
+Water Park Fun Day | activity | 70.0
+Guided Bike Tour | activity | 45.0
+Landmark Sightseeing | activity | 65.0
+Last Water Park Day | activity | 85.0
+Beachfront Bike Ride | activity | 35.0
+Explore at Your Pace | activity | 60.0
+Free Day | activity | 0.0
+Unknown Item | hotel | 3000.0
+Unknown Item | activity | 80.0
+Unknown Item | activity | 50.0
+Unknown Item | activity | 60.0
+Unknown Item | activity | 75.0
+Unknown Item | activity | 40.0
+Unknown Item | activity | 55.0
+Unknown Item | activity | 70.0
+Unknown Item | activity | 45.0
+Unknown Item | activity | 65.0
+Unknown Item | activity | 85.0
+Unknown Item | activity | 35.0
+Unknown Item | activity | 60.0
+Unknown Item | activity | 0.0

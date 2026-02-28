@@ -1,0 +1,28 @@
+Name: Family-friendly Paradise Resort | Price: 3000.0 | Desc: A stunning resort nestled near a beautiful, family-friendly beach, offering a vibrant atmosphere wit
+Name: Wet'n'Wild Gold Coast | Price: 80.0 | Desc: A thrilling water park with slides, pools, and attractions for all ages. Experience adrenaline-pumpi
+Name: Gold Coast Scenic Bike Tour | Price: 50.0 | Desc: Explore the Gold Coast on two wheels with a scenic bike tour. Discover hidden gems, picturesque land
+Name: Gold Coast Sightseeing Tour | Price: 60.0 | Desc: Discover the iconic landmarks and attractions of the Gold Coast with a sightseeing tour. Visit Surfe
+Name: Another Gold Coast Water Park | Price: 75.0 | Desc: Spend a day at another amazing water park with thrilling slides and attractions. Enjoy a fun-filled 
+Name: Coastal Bike Ride | Price: 40.0 | Desc: Take a relaxing bike ride along the coast and enjoy the stunning views. Pack a picnic and make it a 
+Name: Coastal Sightseeing | Price: 55.0 | Desc: Visit some more sightseeing spots along the coast. Explore new areas and take in the beauty of the r
+Name: Water Park Fun Day | Price: 70.0 | Desc: Another day, another water park! Enjoy the different attractions and make new memories.
+Name: Guided Bike Tour | Price: 45.0 | Desc: Explore the area with a guided bike tour. Discover more about the region and its hidden secrets.
+Name: Landmark Sightseeing | Price: 65.0 | Desc: Visit famous landmarks and attractions, capturing memories that will last a lifetime.
+Name: Last Water Park Day | Price: 85.0 | Desc: A final day of water park adventures! Enjoy the sun and water with your family.
+Name: Beachfront Bike Ride | Price: 35.0 | Desc: Relax and enjoy a leisurely bike ride along the beachfront. Soak in the sun and enjoy the ocean bree
+Name: Explore at Your Pace | Price: 60.0 | Desc: Revisit your favorite sightseeing spots or discover new ones. A day to explore at your own pace.
+Name: Free Day | Price: 0.0 | Desc: Free day to enjoy the resort or do some last-minute shopping.
+Name: Unknown Item | Price: 3000.0 | Desc: A stunning resort nestled near a beautiful, family-friendly beach, offering a vibrant atmosphere wit
+Name: Unknown Item | Price: 80.0 | Desc: A thrilling water park with slides, pools, and attractions for all ages. Experience adrenaline-pumpi
+Name: Unknown Item | Price: 50.0 | Desc: Explore the Gold Coast on two wheels with a scenic bike tour. Discover hidden gems, picturesque land
+Name: Unknown Item | Price: 60.0 | Desc: Discover the iconic landmarks and attractions of the Gold Coast with a sightseeing tour. Visit Surfe
+Name: Unknown Item | Price: 75.0 | Desc: Spend a day at another amazing water park with thrilling slides and attractions. Enjoy a fun-filled 
+Name: Unknown Item | Price: 40.0 | Desc: Take a relaxing bike ride along the coast and enjoy the stunning views. Pack a picnic and make it a 
+Name: Unknown Item | Price: 55.0 | Desc: Visit some more sightseeing spots along the coast. Explore new areas and take in the beauty of the r
+Name: Unknown Item | Price: 70.0 | Desc: Another day, another water park! Enjoy the different attractions and make new memories.
+Name: Unknown Item | Price: 45.0 | Desc: Explore the area with a guided bike tour. Discover more about the region and its hidden secrets.
+Name: Unknown Item | Price: 65.0 | Desc: Visit famous landmarks and attractions, capturing memories that will last a lifetime.
+Name: Unknown Item | Price: 85.0 | Desc: A final day of water park adventures! Enjoy the sun and water with your family.
+Name: Unknown Item | Price: 35.0 | Desc: Relax and enjoy a leisurely bike ride along the beachfront. Soak in the sun and enjoy the ocean bree
+Name: Unknown Item | Price: 60.0 | Desc: Revisit your favorite sightseeing spots or discover new ones. A day to explore at your own pace.
+Name: Unknown Item | Price: 0.0 | Desc: Free day to enjoy the resort or do some last-minute shopping.

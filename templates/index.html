@@ -10,7 +10,8 @@
     <title>Ray and Rae - Holidays and More...</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fontdiner+Swanky&family=Lateef:wght@800&display=swap"
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lateef:wght@200;300;400;500;600;700;800;900&family=Fontdiner+Swanky&family=Space+Mono:wght@400;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
@@ -877,63 +878,217 @@
             white-space: pre-wrap;
         }
 
-        /* Thinking Trace */
+        /* Train of Thought (Refined Minimalist Layout) */
         .thinking-trace-standalone {
             align-self: flex-start;
-            width: 90%;
-            margin: 12px 0;
+            width: 100%;
+            margin: 15px 0 10px 0;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            position: relative;
         }
 
-        .thinking-trace {
-            padding: 10px 15px;
-            background: rgba(0, 0, 0, 0.04);
-            border-radius: 12px;
-            font-size: 0.85rem;
-            color: #64748b;
-            border-left: 3px solid #6366f1;
-            display: none;
-            flex-direction: column;
-            gap: 6px;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-        }
-
-        .thinking-trace.active {
+        .thinking-bubble {
+            background: transparent;
+            border-radius: 0;
+            box-shadow: none;
+            backdrop-filter: none;
+            padding: 0;
+            transition: all 0.5s ease;
             display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         }
 
-        .trace-toggle {
-            font-size: 0.75rem;
-            color: #6366f1;
+        .thinking-bubble::before,
+        .thinking-bubble::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 120px;
+            /* Unified Spectrum */
+            background: linear-gradient(90deg, #ff4d4d, #ff944d, #ffd64d, #4dff88, #4dffff, #4d88ff, #944dff, #ff4dff, #ff4d4d);
+            background-size: 3600px 100%;
+            pointer-events: none;
+            z-index: 11;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+            -webkit-mask-size: 3600px 120px;
+            mask-size: 3600px 120px;
+            animation: aurora-slide 27s linear infinite;
+
+            /* 
+               The --aurora-mask-url is updated live by the script at the bottom.
+               It defaults to a visible placeholder if the variable is missing.
+            */
+            -webkit-mask-image: var(--aurora-mask-url);
+            mask-image: var(--aurora-mask-url);
+        }
+
+        .thinking-bubble::before {
+            top: 0;
+        }
+
+        .thinking-bubble::after {
+            bottom: 0;
+            transform: scaleY(-1);
+        }
+
+        @keyframes wave-shift {
+            0% {
+                -webkit-mask-position: 0 0;
+                mask-position: 0 0;
+            }
+
+            100% {
+                -webkit-mask-position: -400px 0;
+                mask-position: -400px 0;
+            }
+        }
+
+        @keyframes aurora-slide {
+            0% {
+                background-position: 0 0;
+                -webkit-mask-position: 0 0;
+                mask-position: 0 0;
+            }
+
+            100% {
+                background-position: -3600px 0;
+                -webkit-mask-position: -3600px 0;
+                mask-position: -3600px 0;
+            }
+        }
+
+        .thinking-bubble-header {
+            padding: 4px 5px;
             cursor: pointer;
             display: flex;
-            align-items: center;
             justify-content: flex-start;
-            gap: 6px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 6px 12px;
-            border-radius: 20px;
-            background: #f1f5f9;
-            width: fit-content;
-            margin: 0;
-            transition: all 0.2s ease;
+            /* Align to the left to keep icon near title */
+            align-items: center;
+            user-select: none;
+            background: transparent;
         }
 
-        .trace-toggle:hover {
-            background: #e2e8f0;
-            transform: translateY(-1px);
+        .thinking-bubble-title {
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: 0.1em;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            font-size: 0.725rem;
+
+            /* Shimmer Effect Base */
+            background: linear-gradient(120deg,
+                    #1a1a1a 30%,
+                    #4285f4 45%,
+                    #10b981 50%,
+                    #4285f4 55%,
+                    #1a1a1a 70%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: text-shimmer 4s linear infinite;
+        }
+
+        @keyframes text-shimmer {
+            to {
+                background-position: 200% center;
+            }
+        }
+
+        .thinking-bubble-header .toggle-icon {
+            font-size: 1.1rem;
+            color: #64748b;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .thinking-bubble.expanded .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .thinking-bubble-title i {
+            font-size: 1.1rem;
+            color: #4285f4;
+        }
+
+        .thinking-dots {
+            position: absolute;
+            top: -22px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            z-index: 5;
+            display: none;
+            /* Hide dots for cleaner look if preferred, but user didn't specify removal. I'll hide for now as borders are the focus. */
+        }
+
+        .thinking-dot {
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .dot-s {
+            width: 8px;
+            height: 8px;
+        }
+
+        .dot-m {
+            width: 14px;
+            height: 14px;
+        }
+
+        .dot-l {
+            width: 22px;
+            height: 22px;
+        }
+
+        /* Removed old thinking-bubble-header/title styles to avoid conflict with Minimalist Layout above */
+
+        .thinking-bubble-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            padding: 0 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .thinking-bubble.expanded .thinking-bubble-content {
+            max-height: 500px;
+            opacity: 1;
+            padding: 10px 5px 20px 5px;
+            overflow-y: auto;
         }
 
         .trace-item {
-            font-family: monospace;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-            padding-bottom: 2px;
+            font-family: 'Space Mono', monospace;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+            padding-bottom: 8px;
             white-space: pre-wrap;
             word-break: break-all;
+            line-height: 1.5;
+            font-size: 0.85rem;
+            color: #475569;
+            font-style: normal;
+        }
+
+        .trace-item:last-child {
+            border-bottom: none;
         }
 
         .message {
@@ -2622,7 +2777,6 @@
 
     // const startBtn = document.getElementById('startBtn'); // Removed static ref
     const statusDiv = document.getElementById('status'); // This element might also be gone if we removed container?
-    // Wait, statusDiv was in interaction-container too?
     // I previously removed interaction-container in chunk 1.
     // statusDiv is used for "Web Speech API not supported" message.
     // I should create statusDiv dynamically too if needed or put it back in HTML?
@@ -2768,6 +2922,11 @@
                 source.connect(window.analyser);
                 window.analyser.connect(window.audioContext.destination);
             }
+        } else if (window.audioContext && window.audioContext.state === 'suspended') {
+            // Browsers often suspend the context until a user gesture occurs
+            window.audioContext.resume().then(() => {
+                console.log("[Audio] AudioContext resumed successfully.");
+            });
         }
     }
 
@@ -3021,23 +3180,38 @@
         return { displayContent, checklistHtml, optionsHtml, navigateId };
     }
 
-    function renderThinkingTraceHtml(thinkingTrace, stableId = null) {
+    function renderThinkingTraceHtml(thinkingTrace, stableId = null, isProcessing = false) {
         if (!thinkingTrace || thinkingTrace.length === 0) return '';
 
-        // Only show items starting with "Tool returned: "
-        const filteredTrace = thinkingTrace
-            .filter(item => item.startsWith('Tool returned: '))
-            .map(item => item.replace('Tool returned: ', ''));
+        // Only show curated items (Tool results/outcomes)
+        const curatedTrace = thinkingTrace
+            .filter(item => item.startsWith('Tool returned: ') || item.startsWith('Tool outcome: '))
+            .map(item => {
+                let processed = item;
+                processed = processed.replace(/^Tool returned: /i, '');
+                processed = processed.replace(/^Tool outcome: /i, '');
+                return processed;
+            })
+            .filter(item => item.trim().length > 0);
 
-        if (filteredTrace.length === 0) return '';
+        if (curatedTrace.length === 0) return '';
 
-        const traceId = stableId || ('trace-' + Math.random().toString(36).substr(2, 9));
+        const wrapperId = stableId || ('trace-container-' + Math.random().toString(36).substr(2, 9));
+        const innerBubbleId = 'bubble-' + Math.random().toString(36).substr(2, 9);
+
+        // Use 'is-processing' class to trigger aurora animation
+        // Use 'expanded' class by default for the new layout
         return `
-            <div class="trace-toggle" onclick="document.getElementById('${traceId}').classList.toggle('active')">
-                <i class="ph ph-brain"></i> Thinking Trace
-            </div>
-            <div id="${traceId}" class="thinking-trace">
-                ${filteredTrace.map(item => `<div class="trace-item">${item}</div>`).join('')}
+            <div id="${innerBubbleId}" class="thinking-bubble expanded ${isProcessing ? 'is-processing' : ''}">
+                <div class="thinking-bubble-header" onclick="document.getElementById('${innerBubbleId}').classList.toggle('expanded'); setTimeout(scrollTranscriptToBottom, 50);">
+                    <div class="thinking-bubble-title">
+                        <i class="ph ph-brain"></i> Train of Thought
+                        <i class="ph ph-caret-down toggle-icon"></i>
+                    </div>
+                </div>
+                <div class="thinking-bubble-content">
+                    ${curatedTrace.map(item => `<div class="trace-item">${item}</div>`).join('')}
+                </div>
             </div>
         `;
     }
@@ -3051,6 +3225,14 @@
         div.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
 
         const { displayContent, checklistHtml, optionsHtml, navigateId } = parseProtocols(text);
+
+        if (sender === 'Bot') {
+            // Find and collapse any expanded thinking bubbles when a bot message appears
+            document.querySelectorAll('.thinking-bubble').forEach(bubble => {
+                bubble.classList.remove('expanded');
+                bubble.classList.remove('is-processing');
+            });
+        }
 
         if (navigateId) {
             console.log(`[UI] Navigation command received for package: ${navigateId}`);
@@ -3097,11 +3279,14 @@
         const tDiv = document.getElementById('transcript');
         const isNearBottom = tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100;
         tDiv.appendChild(div);
-        if (isNearBottom) {
-            tDiv.scrollTop = tDiv.scrollHeight;
-            return div;
-        }
+        scrollTranscriptToBottom();
         return div;
+    }
+
+    function scrollTranscriptToBottom() {
+        const tDiv = document.getElementById('transcript');
+        if (!tDiv) return;
+        tDiv.scrollTop = tDiv.scrollHeight;
     }
 
     function interruptBot() {
@@ -4070,80 +4255,8 @@
         }
 
         // 2. Shopping List Section (EXISTING - for draft packages with mixed items)
-        // This is the old shopping section that appears for non-booked packages
-        if (productItems.length > 0 && pkg.status !== 'booked') {
-            // Add All Logic
-            let asinParams = '';
-            let asinCount = 0;
-            productItems.forEach((item) => {
-                const pUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : '';
-                let asinMatch = pUrl.match(/(?:\/dp\/|\/gp\/product\/|\/d\/)([A-Z0-9]{10})/);
-                if (!asinMatch) asinMatch = pUrl.match(/[?&]ASIN=([A-Z0-9]{10})/);
-
-                if (asinMatch) {
-                    asinCount++;
-                    asinParams += `&ASIN.${asinCount}=${asinMatch[1]}&Quantity.${asinCount}=1`;
-                }
-            });
-
-            let actionBtnHtml = '';
-            if (asinCount > 0 && isSupported) {
-                const addAllUrl = `https://www.amazon.${tld}/gp/aws/cart/add.html?AssociateTag=${tag}${asinParams}`;
-                const btnText = (asinCount === productItems.length) ? `Add All to Cart 🛒` : `Add ${asinCount} to Cart 🛒`;
-                actionBtnHtml = `<a href="${addAllUrl}" target="_blank" class="action-btn small" style="text-decoration:none;">${btnText}</a>`;
-            } else if (!isSupported) {
-                actionBtnHtml = `<span style="font-size:0.8rem; color:#999;">(Local cart not supported)</span>`;
-            } else {
-                actionBtnHtml = `<button onclick="openAllAmazonLinks('${pkg.id}')" class="action-btn small secondary">Open All Tabs ↗</button>`;
-            }
-
-            html += `
-                <div style="background:#fdfdfd; border:1px solid #eee; border-radius:10px; padding:15px; margin-bottom:20px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px dashed #ddd; padding-bottom:5px;">
-                        <h3 style="margin:0; font-size:1.1rem;">🛍️ Shopping List (${regionLabel})</h3>
-                        ${actionBtnHtml}
-                    </div>
-                    <ul style="list-style:none; padding:0; margin:0;">
-            `;
-
-            productItems.forEach(item => {
-                const imageUrl = (item.metadata && item.metadata.image_url) ? item.metadata.image_url : null;
-                const images = (item.metadata && item.metadata.images) ? item.metadata.images : (imageUrl ? [imageUrl] : []);
-                const directUrl = (item.metadata && item.metadata.product_url) ? item.metadata.product_url : null;
-                const amzLink = directUrl || `https://www.amazon.${tld}/s?k=${encodeURIComponent(item.name)}&tag=${tag}`;
-                const rating = (item.metadata && item.metadata.rating) ? item.metadata.rating : null;
-                const ratingCount = (item.metadata && item.metadata.rating_count) ? item.metadata.rating_count : null;
-
-                const reviewLink = (item.metadata && item.metadata.review_link) ? item.metadata.review_link : null;
-                const reviews = (item.metadata && item.metadata.reviews) ? item.metadata.reviews : null;
-                const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
-
-                html += `
-                    <div class="package-item-responsive" style="border-left:4px solid #ff9900; overflow: hidden; padding:0;">
-                         ${renderImageSlider(images, item.name)}
-                        <div class="package-item-details" style="padding:12px;">
-                            <div style="font-weight:600; color:#333; font-size:1rem; margin-bottom:4px;">${item.name}</div>
-                            ${item.description ? `<div style="font-size:0.85rem; color:#666; margin-top:4px;">${item.description}</div>` : ''}
-                            <div style="font-size:0.9rem; color:#333; margin-top:6px; font-weight:600;">
-                                ~${sym}${item.price}
-                            </div>
-                            ${rating ? `
-                                <div style="font-size:0.85rem; color:#f39c12; margin-top:4px;">
-                                    ⭐ ${rating} ${ratingCount ? `<span style="color:#999;">(${ratingCount})</span>` : ''}
-                                </div>` : ''}
-                            <div style="margin-top:10px; display:flex; align-items:center; gap:15px;">
-                                <a href="${amzLink}" class="amz-link-${pkg.id}" target="_blank" style="color:#ff9900; text-decoration:none; font-size:0.85rem; font-weight:600;">Buy ↗</a>
-                                <button onclick="removeItemFromPackage('${pkg.id}', '${item.id}')" style="background:none; border:none; color:#ef4444; font-size:0.8rem; cursor:pointer; padding:0; font-weight:600;">Remove</button>
-                            </div>
-                            ${reviewCarouselHtml}
-                        </div>
-                    </div>
-                `;
-            });
-            html += `</ul>
-                <div style="text-align:right; font-weight:bold; margin-top:10px; color:#555;">Est. Cost: ${sym}${productTotal}</div>
-            </div>`;
-        }
+        // REMOVED: Redundant with Phase 1 section above which is more premium.
+        // This was previously causing double-rendering of product items.
 
         // 2. Itinerary Section (Travel)
         if (travelItems.length > 0) {
@@ -4527,6 +4640,7 @@
     }
 
     async function sendChatMessage(textOverride) {
+        initAudio(); // Crucial: Initialize audio on every user interaction
         interruptBot();
 
         const input = document.getElementById('chat-input');
@@ -4543,6 +4657,7 @@
         isConversationActive = true;
         isProcessing = true;
         hasStartedSpeakingThisResponse = false; // Reset for new response
+        let responseStarted = false; // Flag to track if bot response has started
         currentFullResponse = ""; // Reset stream tracker
         let currentThinkingTrace = [];
         let currentThinkingDiv = null;
@@ -4598,25 +4713,31 @@
                                     console.log("[Stream] Thinking event received:", data.thinking);
                                     currentThinkingTrace.push(data.thinking);
 
-                                    if (!currentThinkingDiv) {
-                                        currentThinkingDiv = document.createElement('div');
-                                        currentThinkingDiv.className = 'thinking-trace-standalone';
-                                        currentThinkingDiv.id = 'current-thinking-' + Math.random().toString(36).substr(2, 9);
-                                        const tDiv = document.getElementById('transcript');
-                                        tDiv.appendChild(currentThinkingDiv);
-                                    }
-                                    currentThinkingDiv.innerHTML = renderThinkingTraceHtml(currentThinkingTrace, currentThinkingDiv.id + '-inner');
+                                    const thinkingHtml = renderThinkingTraceHtml(currentThinkingTrace, currentThinkingDiv ? currentThinkingDiv.id : null, !responseStarted);
 
-                                    // Auto-expand first item? No, let's keep it collapsed as requested "collapsed thinking trace"
-
-                                    const tDiv = document.getElementById('transcript');
-                                    if (tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100) {
-                                        tDiv.scrollTop = tDiv.scrollHeight;
+                                    // ONLY transition when we have actual renderable content
+                                    if (thinkingHtml) {
+                                        if (!currentThinkingDiv) {
+                                            stopProcessingStatus();
+                                            currentThinkingDiv = document.createElement('div');
+                                            currentThinkingDiv.className = 'thinking-trace-standalone';
+                                            const stableId = 'trace-container-' + Math.random().toString(36).substr(2, 9);
+                                            currentThinkingDiv.id = stableId;
+                                            const tDiv = document.getElementById('transcript');
+                                            tDiv.appendChild(currentThinkingDiv);
+                                        }
+                                        currentThinkingDiv.innerHTML = thinkingHtml;
                                     }
+
+                                    scrollTranscriptToBottom();
                                     continue;
                                 }
 
                                 if (data.chunk) {
+                                    if (!responseStarted) {
+                                        responseStarted = true;
+                                        // Animation stop is now handled in addMessage() when the Bot bubble physically appears
+                                    }
                                     currentFullResponse += data.chunk;
                                     currentChunk += data.chunk;
 
@@ -4936,6 +5057,59 @@
 
     // Trigger daydream cycle moved to avatar load success callbacks
 
+</script>
+<!-- 
+        ==========================================================================
+        AURORA TUNING ASSETS (UNIFIED)
+        ==========================================================================
+        Tweak these values and they will apply to BOTH Top and Bottom borders.
+        
+        1. BLUR: 
+           Change 'stdDeviation="8"' in the filter below. 
+
+        2. AMPLITUDE (Height):
+           In the <path d="..."> look for "q-12.5 40". 
+           The "40" is the wave peak height. 
+
+        3. FREQUENCY (Width):
+           The "q-12.5" and "-25" control the width (25px cycles).
+    -->
+<!-- Hidden container so the tuning SVG can be 'clean' for serialization -->
+<div style="display: none;" aria-hidden="true">
+    <svg id="aurora-tuning-svg" xmlns="http://www.w3.org/2000/svg" width="3600" height="120" viewBox="0 0 3600 120"
+        preserveAspectRatio="none">
+        <defs>
+            <filter id="aurora-blur-unified">
+                <feGaussianBlur stdDeviation="8" />
+            </filter>
+            <linearGradient id="grad-unified" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="white" />
+                <stop offset="100%" stop-color="transparent" />
+            </linearGradient>
+        </defs>
+        <path
+            d="M0 0 v5 q 30 30 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 h 3600 V0 Z"
+            fill="url(#grad-unified)" filter="url(#aurora-blur-unified)" />
+    </svg>
+</div>
+
+<style id="aurora-dynamic-style"></style>
+
+<script>
+    const tuningSvg = document.getElementById('aurora-tuning-svg');
+    const styleTag = document.getElementById('aurora-dynamic-style');
+
+    const updateAuroraMask = () => {
+        // Serialize and correctly encode for Data URI (works better than base64 for SVGs with refs)
+        const svgData = new XMLSerializer().serializeToString(tuningSvg);
+        const maskUrl = `url("data:image/svg+xml,${encodeURIComponent(svgData)}")`;
+
+        styleTag.innerHTML = `.thinking-bubble { --aurora-mask-url: ${maskUrl}; }`;
+    };
+
+    const observer = new MutationObserver(updateAuroraMask);
+    observer.observe(tuningSvg, { attributes: true, childList: true, subtree: true });
+    updateAuroraMask();
 </script>
 
 </body>

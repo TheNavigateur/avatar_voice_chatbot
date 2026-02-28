@@ -214,8 +214,8 @@ def search_packages_tool(user_id: str, query: str = None, date_filter: str = Non
                 break
         
         summary += f"- '{p.title}' [SYSTEM_ID: {p.id}] Status: {p.status.value.capitalize()}, Date: {pkg_date}\n"
-    summary += "\n(Note to Agent: The '[SYSTEM_ID: ...]' is for your tool calls ONLY. DO NOT speak or print it in your response.)\n"
-    summary += "Which one would you like to open? Remember to use the ID internally."
+    summary += "\n(Note to Agent: The '[SYSTEM_ID: ...]' is for your tool calls ONLY. DO NOT speak or print it in your response. If you want the user to see a package, use the navigation protocol.)\n"
+    summary += "Which one would you like to open? Remember to use the ID internally with '[NAVIGATE_TO_PACKAGE: id]' to open it for them."
     return summary
 
 def get_package_details_tool(user_id: str, package_name_or_id: str):
@@ -284,6 +284,16 @@ class VoiceAgent:
         except Exception as e:
             logger.warning(f"Error ensuring session: {e}")
         
+        # --- PERSONA HELPER ---
+        import re
+        def format_thinking_persona(text):
+            """Ensures meta-logs use 'I' instead of 'Agent' but leaves content for the model to handle naturally."""
+            t = str(text)
+            # Meta-log adjustments ONLY - do not use regex for 'you' as it breaks grammar
+            t = re.sub(r'\bAgent decided to call\b', 'I decided to call', t, flags=re.IGNORECASE)
+            t = re.sub(r'\bAgent\b', 'I', t, flags=re.IGNORECASE)
+            return t
+
         # --- ACTIVE MEMORY: Structured Rewrite (Backgrounded) ---
         def run_memory_update():
             try:
@@ -321,49 +331,47 @@ class VoiceAgent:
         import threading
         threading.Thread(target=run_memory_update, daemon=True).start()
 
-        # Fetch current profile for the runner (using state BEFORE background update for speed, 
-        # or it will be updated by the time the next message comes)
         # Fetch current profile for the runner
         user_profile = ProfileService.get_profile(user_id)
-        yield ("thinking", f"Retrieved User Profile for {user_id}: {user_profile}")
+        yield ("thinking", format_thinking_persona(f"Retrieved your profile: {user_profile}"))
         
         # --- LATEST PACKAGE CONTENT CONTEXT (FOR CURRENT VIEW) ---
         package_view_context = ""
         if package_id:
             try:
-                yield ("thinking", f"Accessing current package view context for ID: {package_id}")
+                yield ("thinking", format_thinking_persona(f"Accessing your current package view context (ID: {package_id})"))
                 details = BookingService.get_package_details_summary(package_id)
                 if details:
-                    package_view_context = f"\nUSER CONTEXT: The user is currently viewing the following package details:\n{details}\n\nIf the user asks for a summary, details, or 'what's in it', you should provide a descriptive verbal summary based on these details. You no longer need to say 'the details are on the screen'."
-                    yield ("thinking", f"Using Package Context: {details}")
+                    package_view_context = f"\nUSER CONTEXT: You are currently viewing the following package details:\n{details}\n\nIf you ask for a summary, details, or 'what's in it', provide a descriptive verbal summary based on these details. Do not say 'the details are on the screen'."
+                    yield ("thinking", format_thinking_persona(f"Using your package details: {details}"))
             except Exception as e:
                 logger.warning(f"Failed to fetch package context for {package_id}: {e}")
-
+ 
         # --- GLOBAL USER CONTEXT (PACKAGES & PROFILE) ---
         all_packages_summary = ""
         try:
-            yield ("thinking", "Retrieving summary of all user packages...")
+            yield ("thinking", format_thinking_persona("Retrieving a summary of all your packages..."))
             all_packages_summary = BookingService.get_user_packages_summary(user_id)
             logger.info(f"Retrieved {len(all_packages_summary)} characters of package summary for {user_id}")
-            yield ("thinking", f"Found existing packages: {all_packages_summary}")
+            yield ("thinking", format_thinking_persona(f"Found your existing packages: {all_packages_summary}"))
         except Exception as e:
             logger.warning(f"Failed to fetch all packages summary: {e}")
 
         global_context = f"""
-        ### USER LIFESTYLE & PLANNED PACKAGES:
-        You have direct access to the user's saved profile and planned packages. Do not claim you don't know what they have planned.
+        ### YOUR LIFESTYLE & PLANNED PACKAGES:
+        You have direct access to your saved profile and planned packages. Do not claim you don't know what you have planned.
         
-        **User Profile (About Me):**
+        **Your Profile (About Me):**
         {user_profile or 'No profile information available yet.'}
-
-        **Current Packages Summary:**
+ 
+        **Summary of your Current Packages:**
         {all_packages_summary}
         """
 
         # Model initialization with streaming enabled
         model = Gemini(model="gemini-2.0-flash", stream=True, api_key=self.api_key)
         
-        yield ("thinking", "Initializing Agent (Gemini-2.0-Flash)...")
+        yield ("thinking", format_thinking_persona("Initializing Agent (Gemini-2.0-Flash)..."))
 
         # Tools binding
         def create_package_bound(title: str, package_type: str = "mixed"):
@@ -395,12 +403,16 @@ class VoiceAgent:
             res = get_package_details_tool(user_id, package_name_or_id)
             # yield_thinking(f"Tool Result: Retrieved details for {package_name_or_id}") # Handled by runner.run loop
             return res
-
         def log_reasoning(thought: str):
             """
             Logs internal reasoning, logic, and planning steps to the transparency trace.
-            Use this at the start of every turn and before/after tool calls to explain your process.
-            This information is ONLY visible in the 'Thinking' trace, NOT in your speech.
+            Use this at the start of every turn and before/after tool calls.
+            
+            CRITICAL PERSONA RULES:
+            1. WORD BAN: Never use the word "user", "user's", or "the user".
+            2. DIRECT ADDRESS: Always address the thought directly to the person you are helping.
+            3. USE 2ND PERSON: Use "You", "Your", "You've", "You're".
+            4. EXAMPLE: Instead of "The user wants a beach trip", say "You want a beach trip".
             """
             logger.info(f"[LOG_REASONING] Model says: {thought}")
             return thought
@@ -518,8 +530,21 @@ class VoiceAgent:
                 items_data = json.loads(items_json)
                 package_items = []
                 for data in items_data:
+                    # IMPROVED NAME EXTRACTION & FALLBACK
+                    item_name = data.get('name') or data.get('title')
+                    
+                    if not item_name and data.get('description'):
+                        # Fallback: Extract from the beginning of description (e.g. "Experience the magic of Paris..." -> "Experience the magic")
+                        desc = data.get('description', '')
+                        # Take the first 3-4 words or up to first punctuation
+                        first_phrase = desc.split('.')[0].split(',')[0].strip()
+                        words = first_phrase.split()
+                        item_name = " ".join(words[:4]) if words else "Activity"
+                    
+                    item_name = item_name or 'Unknown Item'
+                    
                     pkg_item = PackageItem(
-                        name=data.get('name', 'Unknown Item'),
+                        name=item_name,
                         item_type=data.get('item_type', 'activity'),
                         price=float(data.get('price', 0.0)),
                         description=data.get('description', '')
@@ -571,11 +596,12 @@ class VoiceAgent:
                 propose_itinerary_batch_bound
             ],
             instruction=f"""
-            ### 0. ABSOLUTE ANONYMITY & THE "WHERE" BAN (ZERO TOLERANCE - MANDATORY):
+            ### 0. ABSOLUTE ANONYMITY & ID SECRECY (ZERO TOLERANCE - MANDATORY):
             - **NO DESTINATION NAMES**: You are STRICTLY FORBIDDEN from naming ANY destination, city, region, or specific hotel in your verbal speech. This is an absolute category-level ban. Even if you have internally selected a spot, you MUST NOT say its name.
             - **THE "WHERE" BAN**: NEVER ask the user for a destination preference, city name, or region. Never ask "Are you interested in [Location]?" or "How about [Location]?".
+            - **PACKAGE ID SECRECY**: NEVER speak, print, or mention any Package IDs (UUIDs) to the user. These are for your internal tool use and navigation commands ONLY. The user does not know them and they are confusing.
             - **SUBSTITUTE WITH SENSORY DESCRIPTIONS**: Use generic, evocative descriptions instead (e.g., "that tropical northern coastline" or "the coral-filled islands" instead of naming a specific spot).
-            - **SELF-CORRECTION**: Before you speak, internally verify: "Did I name a location?" If yes, rewrite the sentence to remove it.
+            - **SELF-CORRECTION**: Before you speak, internally verify: "Did I name a location or ID?" If yes, rewrite the sentence to remove it.
             
             ### 1. SEASONAL INTEGRITY & FRESH DISCOVERY (MANDATORY):
             - **FRESH ACTIVITY DISCOVERY**: For EVERY new package, you MUST discover the user's vision (vibe, activities, pace) from scratch. Do NOT blindly assume preferences from the "About Me" or past packages.
@@ -585,7 +611,15 @@ class VoiceAgent:
             - **RE-VALIDATION**: If you see a previous location in context, you MUST re-validate its temperature and rainfall for the *new* month before even considering it as a suggestion. 
 
             ### 1. THINKING TRANSPARENCY:
-            You MUST call `log_reasoning` as the VERY FIRST tool at the start of EVERY turn. Explain your current phase, your logic, and your discard/winner selection process.
+            - You MUST call `log_reasoning` as the VERY FIRST tool at the start of EVERY turn. Explain your current phase, your logic, and your discard/winner selection process.
+            - **STRICT PERSONA (2nd Person)**: In your reasoning logs (`log_reasoning`), you MUST refer to the human as "You".
+            - **WORD BAN**: You are STRICTLY FORBIDDEN from using the word "user", "the user", or "user's" in your logs. 
+            - **GRAMMAR**: Use normal 2nd person grammar (e.g., "I see you ARE looking for..." or "I'm checking YOUR profile").
+            - **BEFORE vs AFTER**: 
+                - WRONG: "I will check the user's profile to see their history."
+                - RIGHT: "I will check your profile to see your history."
+                - WRONG: "The user is asking for a quiet beach."
+                - RIGHT: "You are asking for a quiet beach."
 
             ### 2. DISCOVERY & SELECTION PROTOCOLS:
             1. **Phase 0 (Triage)**: Mandatory check if New or Continuing.
@@ -604,22 +638,26 @@ class VoiceAgent:
                 - Internally select the best "Anchor Spot" based on weather and vision.
                 - **MANDATORY**: You MUST call `perform_google_search_bound` for "weather in [Internal Location] in [Target Month]" to confirm it meets the user's vision (e.g. 28°C+ for "Heat") before proceeding.
                 - Call `search_hotels_amadeus` or `perform_google_search_bound` for options.
-                - **SILENTLY** add the selected sanctuary to the package using `add_item_bound`.
+                - **SILENTLY** add ONLY the selected sanctuary (hotel) to the package using `add_item_bound`. DO NOT add anything else yet.
             7. **Phase 6 (Instantaneous Silent Build)**: 
-                - Once the vision and group needs are locked, build the ENTIRE holiday in one turn.
+                - Once the vision and group needs are locked, build the ENTIRE rest of the holiday in one turn.
                 - Use `perform_google_search_bound` and `search_activities_amadeus` to find the most recommended tours, restaurants, and activities for the entire duration.
                 - **STRICTLY SILENT**: Never ask for approval for individual days or items (e.g., "How about Day 2?"). Just build it.
-                - **DESCRIPTION DRAMA**: Move ALL exciting sensory descriptions (sights, smells, "marketing copy") into the `description` field of the `PackageItem` objects. The tool call should be rich with detail.
-                - Call `propose_itinerary_batch_bound` to populate the package instantly.
-            8. **Phase 7 (Concise Inform)**: 
+                - **DESCRIPTION DRAMA**: Move ALL exciting sensory descriptions (sights, smells, "marketing copy") into the `description` field of the `PackageItem` objects.
+                - **MANDATORY**: You MUST provide a clear, concise `name` for every item in your JSON (e.g. "Eiffel Tower Sunset Tour") even while writing long descriptions.
+                - **DUPLICATION BAN**: Do NOT call `add_item_bound` for items you are including in this batch. Call `propose_itinerary_batch_bound` EXACTLY ONCE to populate the rest of the package instantly.
+            8. **Phase 7 (Concise Inform & Navigate)**: 
                 - Verbal speech MUST be brief and direct. Do NOT provide a summary or sensory reveal in speech.
                 - Mandated response: "I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything."
+                - **MANDATORY**: You MUST append `[NAVIGATE_TO_PACKAGE: package_id]` to the end of your response (after your verbal speech) whenever you finish a build, or if the user asks to "open," "view," "show," or "navigate to" a specific package (including the "latest" one).
+                - **LATEST PACKAGE**: If the user asks for the "latest" package, refer to the first package listed in your `Summary of your Current Packages` context or call `list_all_packages` to find the most recent [SYSTEM_ID].
             
             ### 3. IDENTITY & REFINEMENTS:
             - Use "{avatar_name or 'Ray and Rae'}", use "we" for the service.
             - Always end your response with a question to move the discovery forward.
             - **Silence**: Never narrate tool usage in speech.
             - **Resilient Tool Use**: If API fails, you MUST use Google Search to find details and call `add_item_bound` with estimates.
+            - **Internal De-duplication**: Before calling any tool to add an item, check if it or something very similar is already in `Current Packages Summary`.
 
             ### 4. CONSTRAINTS (SANDWICH ENFORCEMENT - BOTTOM):
             - **HARD BAN**: No location names in speech.
@@ -629,6 +667,11 @@ class VoiceAgent:
 
             {package_view_context}
             {global_context}
+
+            ### FINAL MANDATES (RECAP - TOP PRIORITY):
+            - **CRITICAL**: Use `[NAVIGATE_TO_PACKAGE: package_id]` to open the holiday/package view at the end of every build or upon request.
+            - **CRITICAL**: Never speak or print Package IDs (UUIDs).
+            - **CRITICAL**: No location names or "Where?" questions in verbal speech.
             """
         )
         
@@ -679,9 +722,9 @@ class VoiceAgent:
                             tool_args = getattr(fc, 'args', {})
                             if tool_called == "log_reasoning":
                                 thought = tool_args.get("thought", "")
-                                yield ("thinking", f"LOG: {thought}")
+                                yield ("thinking", format_thinking_persona(f"LOG: {thought}"))
                             else:
-                                yield ("thinking", f"Agent decided to call: {tool_called}({tool_args})")
+                                yield ("thinking", format_thinking_persona(f"I decided to call: {tool_called}({tool_args})"))
                         
                         # Check for function_response (tool returning data)
                         fr = getattr(part, 'function_response', None)
@@ -689,8 +732,8 @@ class VoiceAgent:
                             res_val = getattr(fr, 'response', {})
                             # Often response is a dict with 'result' or similar
                             res_str = str(res_val.get('result', res_val)) if isinstance(res_val, dict) else str(res_val)
-                            yield ("thinking", f"Tool returned: {res_str}")
-
+                            yield ("thinking", format_thinking_persona(f"Tool returned: {res_str}"))
+ 
                 # Fallback for events that have .tool_calls directly (older ADK or different event types)
                 tool_calls = getattr(event, 'tool_calls', None)
                 if tool_calls:
@@ -699,15 +742,15 @@ class VoiceAgent:
                         tool_args = getattr(tc, 'args', {})
                         if tool_called == "log_reasoning":
                             thought = tool_args.get("thought", "")
-                            yield ("thinking", f"LOG: {thought}")
+                            yield ("thinking", format_thinking_persona(f"LOG: {thought}"))
                         else:
-                            yield ("thinking", f"Agent decided to call: {tool_called}({tool_args})")
-
+                            yield ("thinking", format_thinking_persona(f"I decided to call: {tool_called}({tool_args})"))
+ 
                 tool_outputs = getattr(event, 'tool_outputs', None)
                 if tool_outputs:
                     for to in tool_outputs:
                          res_summary = str(getattr(to, 'content', ''))
-                         yield ("thinking", f"Tool returned: {res_summary}")
+                         yield ("thinking", format_thinking_persona(f"Tool outcome: {res_summary}"))
 
                 event_author = getattr(event, 'author', None)
                 event_role = getattr(event, 'role', None)
