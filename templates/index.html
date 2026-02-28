@@ -909,7 +909,7 @@
             position: absolute;
             left: 0;
             right: 0;
-            height: 120px;
+            height: 200px;
             /* Unified Spectrum */
             background: linear-gradient(90deg, #ff4d4d, #ff944d, #ffd64d, #4dff88, #4dffff, #4d88ff, #944dff, #ff4dff, #ff4d4d);
             background-size: 3600px 100%;
@@ -917,8 +917,8 @@
             z-index: 11;
             opacity: 1;
             transition: opacity 0.5s ease;
-            -webkit-mask-size: 3600px 120px;
-            mask-size: 3600px 120px;
+            -webkit-mask-size: 3600px 200px;
+            mask-size: 3600px 200px;
             animation: aurora-slide 27s linear infinite;
 
             /* 
@@ -5076,19 +5076,20 @@
     -->
 <!-- Hidden container so the tuning SVG can be 'clean' for serialization -->
 <div style="display: none;" aria-hidden="true">
-    <svg id="aurora-tuning-svg" xmlns="http://www.w3.org/2000/svg" width="3600" height="120" viewBox="0 0 3600 120"
+    <svg id="aurora-tuning-svg" xmlns="http://www.w3.org/2000/svg" width="3600" height="200" viewBox="0 0 3600 200"
         preserveAspectRatio="none">
         <defs>
-            <filter id="aurora-blur-unified">
-                <feGaussianBlur stdDeviation="8" />
+            <filter id="aurora-blur-unified" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="15" />
             </filter>
             <linearGradient id="grad-unified" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="white" />
+                <stop offset="50%" stop-color="white" />
                 <stop offset="100%" stop-color="transparent" />
             </linearGradient>
         </defs>
         <path
-            d="M0 0 v5 q 30 30 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 t 60 0 h 3600 V0 Z"
+            d="M 0 0 h 3600 v 20 q -30 60 -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 t -60 0 Z"
             fill="url(#grad-unified)" filter="url(#aurora-blur-unified)" />
     </svg>
 </div>
