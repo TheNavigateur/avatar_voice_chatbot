@@ -915,11 +915,11 @@
             background-size: 3600px 100%;
             pointer-events: none;
             z-index: 11;
-            opacity: 1;
+            opacity: 0;
             transition: opacity 0.5s ease;
             -webkit-mask-size: 3600px var(--aurora-height, 200px);
             mask-size: 3600px var(--aurora-height, 200px);
-            animation: aurora-slide 27s linear infinite;
+            animation: aurora-slide var(--aurora-duration, 27s) linear infinite;
 
             /* 
                The --aurora-mask-url is updated live by the script at the bottom.
@@ -936,6 +936,12 @@
         .thinking-bubble::after {
             bottom: 0;
             transform: scaleY(-1);
+        }
+
+        /* Aurora only visible while thinking is in progress */
+        .thinking-bubble.is-processing::before,
+        .thinking-bubble.is-processing::after {
+            opacity: 1;
         }
 
         @keyframes wave-shift {
@@ -985,13 +991,19 @@
             text-transform: uppercase;
             font-size: 0.725rem;
 
-            /* Shimmer Effect Base */
+            /* Default: static dark color */
+            color: #1a1a1a;
+        }
+
+        /* Shimmer active only while thinking is in progress */
+        .thinking-bubble.is-processing .thinking-bubble-title,
+        .thinking-bubble.is-processing .trace-item {
             background: linear-gradient(120deg,
-                    #1a1a1a 30%,
-                    #4285f4 45%,
+                    #1a1a1a 20%,
+                    #4285f4 40%,
                     #10b981 50%,
-                    #4285f4 55%,
-                    #1a1a1a 70%);
+                    #4285f4 60%,
+                    #1a1a1a 80%);
             background-size: 200% auto;
             -webkit-background-clip: text;
             background-clip: text;
@@ -5071,13 +5083,13 @@
     <svg id="aurora-tuning-svg" xmlns="http://www.w3.org/2000/svg" width="3600" height="200" viewBox="0 0 3600 200"
         preserveAspectRatio="none">
         <defs>
-            <filter id="aurora-blur-unified" x="-20%" y="-20%" width="140%" height="140%">
+            <filter id="aurora-blur-unified" filterUnits="userSpaceOnUse" x="0" y="0" width="3600" height="200">
                 <feGaussianBlur id="aurora-blur-deviation" stdDeviation="15" />
             </filter>
             <linearGradient id="grad-unified" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="white" />
-                <stop offset="50%" stop-color="white" />
-                <stop offset="100%" stop-color="transparent" />
+                <stop id="grad-stop-solid" offset="0%" stop-color="white" />
+                <stop id="grad-stop-fade-start" offset="50%" stop-color="white" />
+                <stop id="grad-stop-fade-end" offset="100%" stop-color="transparent" />
             </linearGradient>
         </defs>
         <path id="aurora-mask-path" d="" fill="url(#grad-unified)" filter="url(#aurora-blur-unified)" />
@@ -5088,61 +5100,77 @@
 
 <script id="aurora-sync-script">
     /**
-     * CONFIGURATION
-     * Tweak the 'waveScale' below to grow or shrink the waves.
+     * AURORA WAVE CONFIGURATION
+     * Tweak 'waveScale' then reload the page to apply changes.
      */
     const AURORA_CONFIG = {
-        waveScale: 1.0,      // <--- TWEAK THIS SCALE VARIABLE
-        blurDeviation: 15,   // Blur intensity
-        tilingWidth: 3600,   // Total repeat width
-        waveSpacing: 60,     // Width of each individual wave cycle
-        baseAmplitude: 30,    // Base height of the wave peaks
-        baseOffset: 10       // Base gap from the border
+        waveScale: 1.5,        // <--- TWEAK THIS SCALE VARIABLE (reload page to apply)
+        animationDuration: 15,  // Animation duration in seconds — lower = faster
+        tilingWidth: 3600,      // Total repeat width
+        waveSpacing: 30,        // Width of each individual wave cycle
+        baseAmplitude: 20,      // Base wave depth in px at scale 1.0
+        baseOffset: 2,          // Solid top band height at scale 1.0
+        baseBlur: 8            // Blur at scale 1.0 (scales with amplitude automatically)
     };
 
-    const tuningSvg = document.getElementById('aurora-tuning-svg');
-    const styleTag = document.getElementById('aurora-dynamic-style');
-    const maskPath = document.getElementById('aurora-mask-path');
-    const blurFilter = document.getElementById('aurora-blur-deviation');
+    (() => {
+        const tuningSvg = document.getElementById('aurora-tuning-svg');
+        const styleTag = document.getElementById('aurora-dynamic-style');
+        const maskPath = document.getElementById('aurora-mask-path');
+        const blurFilter = document.getElementById('aurora-blur-deviation');
 
-    const updateAuroraMask = () => {
         const cfg = AURORA_CONFIG;
-
-        // 1. Calculate derived dimensions
         const amplitude = cfg.baseAmplitude * cfg.waveScale;
-        const offset = cfg.baseOffset * cfg.waveScale;
-        // Height covers path + offset + blur bleed buffer
-        const totalHeight = Math.ceil((amplitude + offset) * 2.5) + cfg.blurDeviation;
+        const offset = cfg.baseOffset; // top band stays constant — just the wave height scales
+        // Blur scales with amplitude so waves are never smeared flat
+        const blur = Math.min(cfg.baseBlur * cfg.waveScale, amplitude * 0.5);
+        // Total height: solid top + wave depth + 3× blur headroom
+        const totalHeight = Math.ceil(offset + amplitude + blur * 3);
 
-        // 2. Update SVG container
         tuningSvg.setAttribute('height', totalHeight);
         tuningSvg.setAttribute('viewBox', `0 0 ${cfg.tilingWidth} ${totalHeight}`);
-        if (blurFilter) blurFilter.setAttribute('stdDeviation', cfg.blurDeviation);
-
-        // 3. Generate clean Sine Path
-        const cycles = cfg.tilingWidth / cfg.waveSpacing;
-        let d = `M 0 0 h ${cfg.tilingWidth} v ${offset} `;
-        for (let i = 0; i < cycles; i++) {
-            d += `q -${cfg.waveSpacing / 2} ${amplitude} -${cfg.waveSpacing} 0 `;
+        // Update filter to cover the full SVG so blur is never clipped
+        const filterEl = document.getElementById('aurora-blur-unified');
+        if (filterEl) {
+            filterEl.setAttribute('width', cfg.tilingWidth);
+            filterEl.setAttribute('height', totalHeight);
         }
-        d += `Z`;
+        if (blurFilter) blurFilter.setAttribute('stdDeviation', blur);
+
+        // Update gradient: stay FULLY OPAQUE through the entire wave region,
+        // only fade AFTER the deepest trough (offset + amplitude).
+        // This ensures even, uniform blur across every part of the wave.
+        const waveBottom = offset + amplitude;  // deepest point (trough)
+        const fadeStartPct = Math.round((waveBottom / totalHeight) * 100);
+        const stopFadeStart = document.getElementById('grad-stop-fade-start');
+        if (stopFadeStart) stopFadeStart.setAttribute('offset', `${fadeStartPct}%`);
+
+        // Sine wave path:
+        // The wave oscillates around a midline (midY) between:
+        //   - Peak (closest to border):  midY - halfAmp
+        //   - Trough (furthest from border): midY + halfAmp
+        // We use cubic beziers and alternate direction each half-cycle.
+        const cycles = cfg.tilingWidth / cfg.waveSpacing;  // must be even for seamless tiling
+        const midY = offset + amplitude / 2;
+        const halfAmp = amplitude / 2;
+        const hw = cfg.waveSpacing;   // horizontal span of one half-cycle
+
+        // Start: top edge, drop to midline on the right, sweep left
+        let d = `M 0 0 h ${cfg.tilingWidth} V ${midY} `;
+        for (let i = 0; i < cycles; i++) {
+            // Alternate: even cycles arc UP (toward border), odd cycles arc DOWN (away)
+            const sign = (i % 2 === 0) ? -1 : 1;
+            // Cubic bezier: both control points at the arc peak, endpoint back on midY
+            d += `c -${hw / 4} ${sign * halfAmp} -${3 * hw / 4} ${sign * halfAmp} -${hw} 0 `;
+        }
+        d += `V 0 Z`;  // close to top-left corner
         if (maskPath) maskPath.setAttribute('d', d);
 
-        // 4. Serialize and push to CSS
+        // Serialize and push to CSS as Data URI mask
         const svgData = new XMLSerializer().serializeToString(tuningSvg);
         const maskUrl = `url("data:image/svg+xml,${encodeURIComponent(svgData)}")`;
-
-        styleTag.innerHTML = `
-            .thinking-bubble { 
-                --aurora-mask-url: ${maskUrl}; 
-                --aurora-height: ${totalHeight}px;
-            }
-        `;
-    };
-
-    const observer = new MutationObserver(updateAuroraMask);
-    observer.observe(tuningSvg, { attributes: true, childList: true, subtree: true });
-    updateAuroraMask();
+        styleTag.innerHTML = `.thinking-bubble { --aurora-mask-url: ${maskUrl}; --aurora-height: ${totalHeight}px; --aurora-duration: ${cfg.animationDuration}s; }`;
+    })();
 </script>
 
 </body>
