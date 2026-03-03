@@ -3637,12 +3637,28 @@
     const statusMessages = [
         "Thinking...",
         "Working on it...",
-        "One moment...",
-        "Checking details...",
-        "Reviewing...",
+        "Just a moment...",
+        "Checking some details...",
+        "Reviewing the data...",
         "Gathering information...",
-        "Analyzing request...",
-        "Processing..."
+        "Analyzing your request...",
+        "Processing...",
+        "Connecting the dots...",
+        "Synthesizing information...",
+        "Evaluating the context...",
+        "Compiling the best approach...",
+        "Formulating a response...",
+        "Cross-referencing details...",
+        "Evaluating alternatives...",
+        "Structuring the information...",
+        "Consulting the archives...",
+        "Uncovering insights...",
+        "Parsing the results...",
+        "Refining the thought process...",
+        "Validating the data...",
+        "Configuring the response...",
+        "Optimizing the approach...",
+        "Finalizing the computation...",
     ];
 
     function startProcessingStatus(userText) {
@@ -4146,11 +4162,12 @@
         const regionLabel = config ? config.label : 'USA';
         const isSupported = currentR !== 'OTHER';
 
-        // Filter Items Helper
+        const locationBannerItems = pkg.items.filter(i => i.item_type === 'location_banner');
         const isItineraryItem = (i) => {
             const type = i.item_type ? i.item_type.toLowerCase() : '';
             const name = i.name ? i.name.toLowerCase() : '';
             if (type === 'checklist') return false; // Checklist items are separate
+            if (type === 'location_banner') return false; // Location banners are separate
             // Strict types
             if (['flight', 'hotel', 'activity', 'accommodation', 'transportation', 'car_rental'].includes(type)) return true;
             // Ambiguous 'travel' type heuristic
@@ -4163,7 +4180,7 @@
 
         const travelItems = pkg.items.filter(isItineraryItem);
         const checklistItems = pkg.items.filter(i => i.item_type === 'checklist');
-        const productItems = pkg.items.filter(i => !isItineraryItem(i) && i.item_type !== 'checklist');
+        const productItems = pkg.items.filter(i => !isItineraryItem(i) && i.item_type !== 'checklist' && i.item_type !== 'location_banner');
 
         const travelTotal = travelItems.reduce((sum, i) => sum + i.price, 0);
         const productTotal = productItems.reduce((sum, i) => sum + i.price, 0);
@@ -4176,7 +4193,26 @@
             </div>
         `;
 
-        // 1. Shopping Package Section (Premium view for product items)
+        // Location Banner Section
+        if (locationBannerItems.length > 0) {
+            locationBannerItems.forEach(banner => {
+                // Extract the destination name from the item name (e.g. "Why the Whitsundays?" → "the Whitsundays")
+                const bannerTitle = banner.name || '✨ Why we chose this for you';
+                html += `
+                    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); border-radius: 14px; padding: 22px 24px; margin-bottom: 24px; box-shadow: 0 6px 20px rgba(15,52,96,0.35); position: relative; overflow: hidden;">
+                        <div style="position: absolute; top: -20px; right: -20px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%); border-radius: 50%;"></div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                            <span style="font-size: 1.4rem;">✨</span>
+                            <div>
+                                <div style="font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 2px;">Chosen for you</div>
+                                <div style="font-size: 1.25rem; font-weight: 700; color: #fff; line-height: 1.2;">${bannerTitle}</div>
+                            </div>
+                        </div>
+                        <p style="margin: 0; font-size: 0.95rem; color: rgba(255,255,255,0.82); line-height: 1.7; font-style: italic;">${banner.description || ''}</p>
+                    </div>
+                `;
+            });
+        }
         // This section shows products added via deep discovery (item_type="product")
         if (productItems.length > 0) {
             // Add All Logic
@@ -4724,24 +4760,6 @@
                                 if (data.thinking) {
                                     console.log("[Stream] Thinking event received:", data.thinking);
                                     currentThinkingTrace.push(data.thinking);
-
-                                    const thinkingHtml = renderThinkingTraceHtml(currentThinkingTrace, currentThinkingDiv ? currentThinkingDiv.id : null, !responseStarted);
-
-                                    // ONLY transition when we have actual renderable content
-                                    if (thinkingHtml) {
-                                        if (!currentThinkingDiv) {
-                                            stopProcessingStatus();
-                                            currentThinkingDiv = document.createElement('div');
-                                            currentThinkingDiv.className = 'thinking-trace-standalone';
-                                            const stableId = 'trace-container-' + Math.random().toString(36).substr(2, 9);
-                                            currentThinkingDiv.id = stableId;
-                                            const tDiv = document.getElementById('transcript');
-                                            tDiv.appendChild(currentThinkingDiv);
-                                        }
-                                        currentThinkingDiv.innerHTML = thinkingHtml;
-                                    }
-
-                                    scrollTranscriptToBottom();
                                     continue;
                                 }
 

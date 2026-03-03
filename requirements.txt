@@ -14,3 +14,7 @@ httpx
 mysql-connector-python
 duckduckgo-search
 duffel-api
+duffel-api
+psycopg2-binary
+gunicorn
+gevent

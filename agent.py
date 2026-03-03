@@ -11,6 +11,7 @@ from tools.market_tools import search_products, check_amazon_stock, search_amazo
 from services.duffel_service import DuffelService
 from services.amadeus_service import AmadeusService
 from services.image_search_service import ImageSearchService
+from services.google_places_service import GooglePlacesService
 from booking_service import BookingService
 from models import PackageItem, PackageType
 
@@ -21,49 +22,7 @@ logger = logging.getLogger(__name__)
 from profile_service import ProfileService
 from memory_agent import MemoryAgent
 
-# --- Tool Wrappers for Agent ---
-def create_new_package_tool(session_id: str, user_id: str, title: str, package_type: str = "mixed"):
-    """
-    Creates a new package for the user.
-    Args:
-        session_id: The current session ID.
-        user_id: The current user ID.
-        title: Title of the package (e.g., 'Holiday to Paris').
-        package_type: Type of package (holiday, party, shopping, activity, mixed).
-    """
-    logger.info(f"[TOOL] Creating new package: '{title}' (Type: {package_type}) for User: {user_id}")
-    # Map string to Enum
-    try:
-        p_type = PackageType(package_type.lower())
-    except ValueError:
-        p_type = PackageType.MIXED
-        
-    pkg = BookingService.create_package(session_id, title, p_type, user_id=user_id)
-    logger.info(f"[TOOL] Package created successfully: {pkg.id}")
-    return f"Created new package: {pkg.title} (ID: {pkg.id})"
-
-def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None):
-    """
-    Adds an item to an existing package.
-    Args:
-        session_id: The current session ID.
-        package_id: The ID of the package to add to.
-        item_name: Name of the item (e.g., 'Flight to Paris').
-        item_type: Type of item (flight, hotel, activity, product).
-        price: Estimated price.
-        description: Optional description.
-        image_url: Optional primary URL of the product/activity/hotel image.
-        product_url: Optional direct URL to the product page.
-        day: Optional day number for itinerary (e.g., 1, 2, 3).
-        date: Optional date string for itinerary (e.g., 'March 10, 2024').
-        rating: Optional rating (e.g., 4.5 out of 5).
-        review_link: Optional link to reviews.
-        reviews: Optional list of objects with "text" and "rating" (e.g. [{"text": "Great!", "rating": 5}, ...]).
-        images: Optional list of image URLs for carousel.
-    """
-    item = PackageItem(name=item_name, item_type=item_type, price=price, description=description)
-    
-    # --- IMAGE AUTO-FIX & FILTERING ---
+def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, item_name: str, item_type: str, image_url: str = None, images: list = None):
     # 1. Helper to detect "bad" URLs
     def is_bad_url(url):
         if not url: return True
@@ -133,6 +92,71 @@ def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, i
             
     if image_url:
         item.metadata['image_url'] = image_url
+
+    # --- REAL REVIEWS EXTRACTOR ---
+    if item_type in ['hotel', 'accommodation', 'activity']:
+        try:
+            places_service = GooglePlacesService()
+            # If we know the location from the package, provide it as context
+            location = ""
+            pkg = BookingService.get_package(session_id, package_id)
+            if pkg and pkg.title:
+                location = pkg.title.replace('Holiday', '').replace('Trip', '').replace('Getaway', '').strip()
+                
+            place_data = places_service.get_place_reviews(item_name, location)
+            if place_data:
+                # Discard LLM hallucinated reviews if we found authentic ones!
+                if place_data.get('reviews'):
+                    item.metadata['reviews'] = place_data['reviews']
+                if place_data.get('review_link'):
+                    item.metadata['review_link'] = place_data['review_link']
+        except Exception as e:
+            logger.warning(f"Failed to fetch authentic Google reviews for '{item_name}': {e}")
+
+    return item
+
+# --- Tool Wrappers for Agent ---
+def create_new_package_tool(session_id: str, user_id: str, title: str, package_type: str = "mixed"):
+    """
+    Creates a new package for the user.
+    Args:
+        session_id: The current session ID.
+        user_id: The current user ID.
+        title: Title of the package (e.g., 'Holiday to Paris').
+        package_type: Type of package (holiday, party, shopping, activity, mixed).
+    """
+    logger.info(f"[TOOL] Creating new package: '{title}' (Type: {package_type}) for User: {user_id}")
+    # Map string to Enum
+    try:
+        p_type = PackageType(package_type.lower())
+    except ValueError:
+        p_type = PackageType.MIXED
+        
+    pkg = BookingService.create_package(session_id, title, p_type, user_id=user_id)
+    logger.info(f"[TOOL] Package created successfully: {pkg.id}")
+    return f"Created new package: {pkg.title} (ID: {pkg.id})"
+
+def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None):
+    """
+    Adds an item to an existing package.
+    Args:
+        session_id: The current session ID.
+        package_id: The ID of the package to add to.
+        item_name: Name of the item (e.g., 'Flight to Paris').
+        item_type: Type of item (flight, hotel, activity, product).
+        price: Estimated price.
+        description: Optional description.
+        image_url: Optional primary URL of the product/activity/hotel image.
+        product_url: Optional direct URL to the product page.
+        day: Optional day number for itinerary (e.g., 1, 2, 3).
+        date: Optional date string for itinerary (e.g., 'March 10, 2024').
+        rating: Optional rating (e.g., 4.5 out of 5).
+        review_link: Optional link to reviews.
+        reviews: Optional list of objects with "text" and "rating" (e.g. [{"text": "Great!", "rating": 5}, ...]).
+        images: Optional list of image URLs for carousel.
+    """
+    item = PackageItem(name=item_name, item_type=item_type, price=price, description=description)
+    item = _enrich_item_metadata(session_id, package_id, item, item_name, item_type, image_url, images)
     if product_url:
         item.metadata['product_url'] = product_url
     if day is not None:
@@ -405,14 +429,15 @@ class VoiceAgent:
             return res
         def log_reasoning(thought: str):
             """
-            Logs internal reasoning, logic, and planning steps to the transparency trace.
+            Logs a FULL summary of what you are doing to the transparency trace.
             Use this at the start of every turn and before/after tool calls.
             
             CRITICAL PERSONA RULES:
-            1. WORD BAN: Never use the word "user", "user's", or "the user".
-            2. DIRECT ADDRESS: Always address the thought directly to the person you are helping.
-            3. USE 2ND PERSON: Use "You", "Your", "You've", "You're".
-            4. EXAMPLE: Instead of "The user wants a beach trip", say "You want a beach trip".
+            1. EXTREMELY SHORT: Keep your thought EXTREMELY SHORT (under 10 words if possible) but provide a full summary of what you are doing. Do not just say 'Thinking...'.
+            2. WORD BAN: Never use the word "user", "user's", or "the user".
+            3. DIRECT ADDRESS: Always address the thought directly to the person you are helping.
+            4. USE 2ND PERSON: Use "You", "Your", "You've", "You're".
+            5. EXAMPLE: Instead of "The user wants a beach trip", say "You want a beach trip".
             """
             logger.info(f"[LOG_REASONING] Model says: {thought}")
             return thought
@@ -524,30 +549,35 @@ class VoiceAgent:
             Adds a batch of itinerary items to a package in one go.
             Args:
                 items_json: A JSON string representing a list of items.
-                Each item should have: name, item_type (flight/hotel/activity/restaurant), price, description, day (int), date (string), image_url (optional),
-                time (optional, e.g. "09:00" - the suggested start time for the activity),
-                duration_hours (optional, float - estimated duration including time at the activity itself, e.g. 3.5 for a half-day tour).
+                Each item should have:
+                  - name: A SHORT, PROPER TITLE (e.g. "Dreamworld Theme Park", "Noosa Biosphere Reserve Cycle Trail"). NEVER a truncated sentence from the description. Max 6 words.
+                  - item_type (flight/hotel/activity/restaurant)
+                  - price, description, day (int), date (string), image_url (optional)
+                  - time (optional, e.g. "09:00" - the suggested start time for the activity)
+                  - duration_hours (optional, float - estimated duration including time at the activity itself, e.g. 3.5 for a half-day tour)
+                  - images (optional, list of image URLs)
+                  - review_link (optional, string URL to reviews)
+                CRITICAL: The 'name' and 'description' must be completely separate. The description must OPEN with a personalised reason sentence explaining why this was chosen for this specific traveller. 
             """
             try:
                 items_data = json.loads(items_json)
                 package_items = []
+                
+                # Fetch latest package if package_id is not explicitly provided or known
+                active_pkg = BookingService.get_latest_session_package(session_id)
+                if not active_pkg:
+                    return "Error: No active package found to add items to. Create a package first."
+                
                 for data in items_data:
-                    # IMPROVED NAME EXTRACTION & FALLBACK
                     item_name = data.get('name') or data.get('title')
+                    item_type = data.get('item_type', 'activity')
                     
-                    if not item_name and data.get('description'):
-                        # Fallback: Extract from the beginning of description (e.g. "Experience the magic of Paris..." -> "Experience the magic")
-                        desc = data.get('description', '')
-                        # Take the first 3-4 words or up to first punctuation
-                        first_phrase = desc.split('.')[0].split(',')[0].strip()
-                        words = first_phrase.split()
-                        item_name = " ".join(words[:4]) if words else "Activity"
-                    
-                    item_name = item_name or 'Unknown Item'
+                    if not item_name:
+                        item_name = f"Planned {item_type.capitalize()}"
                     
                     pkg_item = PackageItem(
                         name=item_name,
-                        item_type=data.get('item_type', 'activity'),
+                        item_type=item_type,
                         price=float(data.get('price', 0.0)),
                         description=data.get('description', '')
                     )
@@ -556,19 +586,19 @@ class VoiceAgent:
                         'day': data.get('day'),
                         'date': data.get('date'),
                         'image_url': data.get('image_url'),
+                        'images': data.get('images', []),
                         'product_url': data.get('product_url'),
                         'rating': data.get('rating'),
+                        'reviews': [], # Blanked. We fetch authentic ones below.
+                        'review_link': data.get('review_link'),
                         'time': data.get('time'),
                         'duration_hours': data.get('duration_hours')
                     })
+                    
+                    # Enrich automatically fetched images & real Google Places Reviews
+                    pkg_item = _enrich_item_metadata(session_id, active_pkg.id, pkg_item, item_name, item_type, data.get('image_url'), data.get('images', []))
+                    
                     package_items.append(pkg_item)
-                
-                # Fetch latest package if package_id is not explicitly provided or known
-                # In this context, we usually have package_id from the session or previous turns
-                # For now, we'll try to find the active package for this session
-                active_pkg = BookingService.get_latest_session_package(session_id)
-                if not active_pkg:
-                    return "Error: No active package found to add items to. Create a package first."
                 
                 res = BookingService.add_items_to_package(session_id, active_pkg.id, package_items)
                 return f"Successfully added {len(package_items)} items to package '{active_pkg.title}'."
@@ -611,6 +641,8 @@ class VoiceAgent:
             - **AFTER SELECTION — REVEAL IS ALLOWED**: Once you have committed to a hotel/destination by calling `add_item_bound` or `propose_itinerary_batch_bound`, you MAY name the destination and hotel naturally in conversation. At that point the location is chosen and the traveller deserves to know where they are going.
             - **THE "WHERE" BAN (discovery only)**: During Phases 1–4, NEVER ask the traveller for a destination or city preference. Never ask "Are you interested in [Location]?". The selection is yours to make silently.
             - **PACKAGE ID SECRECY**: NEVER speak, print, or mention any Package IDs (UUIDs) to the traveller. These are for your internal tool use and navigation commands ONLY.
+            - **TERMINOLOGY BAN (BOOKING)**: You are a travel planner creating a *proposed itinerary*, NOT a travel agent making actual bookings. You MUST NEVER say you have "booked" something. Use terms like "added to your package", "selected", or "included in your itinerary". NEVER claim you have booked a hotel, flight, or activity.
+            - **NO DEFERRING (DO IT NOW)**: You correspond in real-time. NEVER say things like "I will work on it now", "I am building it in the background", or "I will do that for you". Instead, simply EXCUTE the necessary tool calls (e.g., `propose_itinerary_batch_bound`) IMMEDIATELY in the same turn and present the finished result.
             - **SELF-CORRECTION**: Before speaking during discovery, verify: "Have I named a location before confirming the booking?" If yes and booking isn't done yet, rewrite to remove it.
             
             ### 1. SEASONAL INTEGRITY & FRESH DISCOVERY (MANDATORY):
@@ -633,8 +665,9 @@ class VoiceAgent:
                 - RIGHT: "You are asking for a quiet beach."
 
             ### 2. DISCOVERY & SELECTION PROTOCOLS:
+            - **SILENT ACTIONS (MANDATORY)**: Never narrate your tool uses or say what you just did (e.g. "I've created a new package called X", "I've added the flight"). Just perform the action silently and immediately ask the next discovery question to move the conversation forward.
             1. **Phase 0 (Triage)**: Mandatory check if New or Continuing.
-            2. **Phase 1 (Logistics)**: Confirm Origin, Duration, and Month. Do NOT ask again if already in `Current Packages Summary`.
+            2. **Phase 1 (Logistics)**: Confirm Origin, Duration, and Travel Month. IF the user has already provided a relative date (e.g. "in a month", "next week") when asking to create a package, consider the Month requirement ALREADY RESOLVED. Calculate it internally but do NOT ask them "Which month?". Do NOT ask again if already in `Current Packages Summary`.
             3. **Phase 2 (Budget)**: Establish clear budget range.
             4. **Phase 3 (Soulful Discovery)**: 
                 - You MUST spend at least 2 turns on "Soulful Discovery" (Phase 3). 
@@ -675,8 +708,13 @@ class VoiceAgent:
 
                 - **STRICTLY SILENT**: Never ask for approval for individual days or items (e.g., "How about Day 2?"). Just build it.
                 - **DESCRIPTION DRAMA**: Move ALL exciting sensory descriptions (sights, smells, "marketing copy") into the `description` field of the `PackageItem` objects.
-                - **MANDATORY**: You MUST provide a clear, concise real `name` for every item in your JSON (e.g. "Eiffel Tower Sunset Tour") even while writing long descriptions.
-                - **DUPLICATION BAN**: Do NOT call `add_item_bound` for items you are including in this batch. Call `propose_itinerary_batch_bound` EXACTLY ONCE to populate the rest of the package instantly.
+                - **PROPER TITLE MANDATE**: The `name` field for EVERY item MUST be a short, proper title of ≤6 words (e.g. "Eiffel Tower Sunset Tour", "Ricky's River Bar & Restaurant"). It must NEVER be a truncated sentence from the description field (e.g. FORBIDDEN: "Experience the magic of", "A stunning fusion of"). The `name` and `description` are completely separate fields with completely different content.
+                - **PERSONALISED REASON MANDATE**: The `description` for EVERY item (flights, hotels, activities, products) MUST open with 1-2 sentences that speak directly to the traveller (using "You"/"Your") explaining *why this specific choice was made for them*, referencing their stated vision, activities, or preferences. Examples:
+                  - Activity: "You mentioned wanting to experience the reef up close without a big boat — this small-group snorkel tour is exactly that, with a 6-person max so you get personal attention from the guide."
+                  - Hotel: "You wanted to wake up to the ocean, not walk to it — this resort puts you literally on the sand, with your room's balcony hanging over the water."
+                  - Flight: "You asked for the most direct route to avoid a long travel day — this non-stop flight gets you there in under 3 hours." After the personalised opener, continue with sensory/marketing detail as usual.
+                - **LOCATION BANNER MANDATE**: Before calling `propose_itinerary_batch_bound`, you MUST call `add_item_bound` ONCE with `item_type="location_banner"`, `item_name="Why [Destination Name]?"`, `price=0`, and a compelling 3-4 sentence `description` written in 2nd person that explains specifically why THIS destination was chosen for THIS traveller — referencing their stated vibe, activities, weather needs, and budget. This will be displayed as a special banner at the top of the package view. Example: `item_name="Why the Whitsundays?"`, description: "You wanted somewhere with reliable tropical heat in April but didn't want the wet-season roulette of Far North Queensland — the Whitsundays sit in a sweet spot that delivers 29°C sunshine with negligible rain that month. You said you craved something that felt genuinely remote and private, and the outer reef islands here deliver exactly that sense of having discovered something most tourists never reach. Your love of snorkelling and sailing makes this archipelago a near-perfect match — every day here can be spent on or in the water."
+                - **DUPLICATION BAN**: Do NOT call `add_item_bound` for items you are including in the batch (except for the hotel added in Phase 4 and the `location_banner` — those are intentionally added via `add_item_bound`). Call `propose_itinerary_batch_bound` EXACTLY ONCE to populate the rest of the package instantly.
 
             8. **Phase 7 (Concise Inform & Navigate)**:
                 - **HARD GATE — DO NOT PROCEED TO PHASE 7 UNTIL**: `propose_itinerary_batch_bound` has been called and returned a success message confirming items were added. If you have not yet called it, go back and do Step 3 first. You MUST NOT say "I've built out your full holiday plan" until the batch tool has confirmed success.
@@ -693,9 +731,9 @@ class VoiceAgent:
             - **Internal De-duplication**: Before calling any tool to add an item, check if it or something very similar is already in `Current Packages Summary`.
 
             ### 4. CONSTRAINTS (SANDWICH ENFORCEMENT - BOTTOM):
-            - **HARD BAN (during discovery)**: No location names in speech until the hotel has been committed to the package.
+            - **HARD BAN (during discovery)**: No location names in speech until the hotel has been added to the package.
             - **HARD BAN**: Never ask "Where?" or solicit a destination from the traveller.
-            - **HARD BAN**: Never mention internal tool results or reasoning prefixes in speech.
+            - **HARD BAN**: Never mention internal tool results, reasoning prefixes, or "I'm working on it" deferrals in speech.
             - **END WITH A QUESTION**: Every speech response MUST end with a question (CTA).
 
             {package_view_context}
@@ -703,8 +741,10 @@ class VoiceAgent:
 
             ### FINAL MANDATES (RECAP - TOP PRIORITY):
             - **CRITICAL**: Use `[NAVIGATE_TO_PACKAGE: package_id]` to open the holiday/package view at the end of every build or upon request.
+            - **CRITICAL**: Never narrate your actions in speech (e.g. "I have created a package", "I am adding...", "I am working on it"). Actions like creating an itinerary must be done silently using tools immediately in the same turn.
             - **CRITICAL**: Never speak or print Package IDs (UUIDs).
-            - **CRITICAL**: No location names during discovery (Phases 1–4). Once the hotel is booked, you may name the destination freely.
+            - **CRITICAL**: No location names during discovery (Phases 1–4). Once the hotel is added, you may name the destination freely.
+            - **CRITICAL**: NEVER say you have "booked" something. You are proposing a package. Use "added".
             """
         )
         
