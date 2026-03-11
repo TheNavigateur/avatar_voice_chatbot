@@ -1114,7 +1114,7 @@
         .mobile-header {
             display: none;
             background: #fff;
-            padding: 1rem;
+            padding: 1.25rem 1rem;
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
@@ -1124,9 +1124,36 @@
         .hamburger {
             background: none;
             border: none;
-            font-size: 1.5rem;
             cursor: pointer;
-            color: #333;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 24px;
+            height: 19px;
+            padding: 0;
+            z-index: 201;
+        }
+
+        .hamburger span {
+            display: block;
+            width: 100%;
+            height: 3px;
+            background: #333;
+            border-radius: 3px;
+            transition: all 0.3s ease-in-out;
+            transform-origin: center;
+        }
+
+        .hamburger.open span:nth-child(1) {
+            transform: translateY(8px) rotate(45deg);
+        }
+
+        .hamburger.open span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .hamburger.open span:nth-child(3) {
+            transform: translateY(-8px) rotate(-45deg);
         }
 
         .mobile-header h2 {
@@ -1163,17 +1190,24 @@
                 position: fixed;
                 left: -260px;
                 /* Hide off-screen */
-                top: 0;
+                top: 85px; /* flow under the mobile header */
                 bottom: 0;
                 box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+                z-index: 1000;
             }
 
             .sidebar.open {
                 transform: translateX(260px);
             }
 
+            .sidebar-header {
+                display: none;
+            }
+
             .mobile-header {
                 display: flex;
+                height: 85px; /* explicit height for anchor */
+                box-sizing: border-box;
             }
 
             #main-view {
@@ -1679,7 +1713,11 @@
 
 <!-- Mobile Header -->
 <header class="mobile-header">
-    <button class="hamburger" id="hamburger-btn">☰</button>
+    <button class="hamburger" id="hamburger-btn">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
     <div class="mobile-header-text">
         <img src="/static/icons/logo.svg" class="sidebar-logo" style="width: 40px; margin-bottom: 0;"
             alt="Ray and Rae Logo">
@@ -2945,7 +2983,7 @@
 
     async function startConversationMode() {
         initAudio();
-        sendChatMessage("Hi!");
+        sendChatMessage("Make my holiday!");
     }
     async function startVoiceConversationMode() {
         initAudio();
@@ -2989,22 +3027,14 @@
         container.id = 'dynamic-start-container';
         container.style.cssText = "display: flex; gap: 10px; justify-content: center; margin-top: 1rem; margin-bottom: 1rem;";
 
-        const hiBtn = document.createElement('button');
-        hiBtn.className = 'action-btn start-btn';
-        hiBtn.textContent = '"Hi"'; // In quotes as requested
-        hiBtn.onclick = startConversationMode;
+        const startBtn = document.createElement('button');
+        startBtn.className = 'action-btn start-btn';
+        startBtn.textContent = 'Make my holiday!';
+        
+        // Calling startConversationMode will initialize audio and send 'Hi!'
+        startBtn.onclick = startConversationMode;
 
-        container.appendChild(hiBtn);
-
-        if (SpeechRecognition) {
-            const speakBtn = document.createElement('button');
-            speakBtn.className = 'action-btn start-btn';
-            const currentAvatarName = document.getElementById('avatarSelector')?.value?.replace('glb_', '').replace('vrm_', '');
-            const displayName = currentAvatarName ? (currentAvatarName.charAt(0).toUpperCase() + currentAvatarName.slice(1)) : 'Ray';
-            speakBtn.textContent = `Tell ${displayName} what you want`;
-            speakBtn.onclick = window.startVoiceConversationMode;
-            container.appendChild(speakBtn);
-        }
+        container.appendChild(startBtn);
 
         const tDiv = document.getElementById('transcript');
         const isNearBottom = tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100;
@@ -3941,6 +3971,8 @@
 
     function toggleSidebar() {
         document.getElementById('sidebar').classList.toggle('open');
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        if (hamburgerBtn) hamburgerBtn.classList.toggle('open');
     }
 
     // --- Package Logic (List & Details) ---
@@ -4662,15 +4694,23 @@
             updatePackages();
         }
 
+        // Handle hamburger menu click
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        if (hamburgerBtn) {
+            hamburgerBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent document click from immediately closing it
+                toggleSidebar();
+            });
+        }
+
         // Close sidebar when clicking outside on mobile
         document.addEventListener('click', (e) => {
             const sidebar = document.getElementById('sidebar');
-            const hamburger = document.querySelector('.hamburger');
 
             // Only if sidebar is open and on mobile (checked via CSS/window width or just logic)
             if (sidebar.classList.contains('open') &&
                 !sidebar.contains(e.target) &&
-                !hamburger.contains(e.target)) {
+                !hamburgerBtn.contains(e.target)) {
                 toggleSidebar();
             }
         });
