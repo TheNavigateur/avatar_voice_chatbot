@@ -9,7 +9,7 @@ from models import PackageItem
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fix_existing_packages():
+def fix_existing_packages(force_refresh=False):
     conn = get_db_connection()
     c = conn.cursor()
     # Let's fix the most recent 10 packages to start with
@@ -31,14 +31,24 @@ def fix_existing_packages():
             except Exception as e:
                 meta = {}
             
+            if force_refresh:
+                # Clear existing images and reviews to force a fresh search
+                meta['images'] = []
+                meta['image_url'] = None
+                meta['reviews'] = []
+                # Keep other meta like airline, hotel name, etc.
+            
             existing_images = meta.get('images', [])
             item_type = item_data['item_type']
             item_name = item_data['name']
             
-            # Check if this item is missing images or has less than 3
+            # Check if this item is missing images or has less than 3, OR is missing reviews
+            has_few_images = not existing_images or len(existing_images) < 3
+            missing_reviews = not meta.get('reviews')
+            
             if item_type in ['flight', 'hotel', 'accommodation', 'activity', 'product']:
-                if not existing_images or len(existing_images) < 3:
-                    logger.info(f"  -> Enriching '{item_name}' (type: {item_type}) with more images...")
+                if has_few_images or (missing_reviews and item_type in ['hotel', 'accommodation', 'activity']):
+                    logger.info(f"  -> Enriching '{item_name}' (type: {item_type}) [Images: {len(existing_images)}, Reviews: {1 if not missing_reviews else 0}]...")
                     
                     # Construct a temporary PackageItem object
                     pkg_item = PackageItem(
@@ -72,4 +82,5 @@ def fix_existing_packages():
     logger.info("Done fixing existing packages.")
 
 if __name__ == '__main__':
-    fix_existing_packages()
+    # Set force_refresh=True to clear old images and start fresh
+    fix_existing_packages(force_refresh=False)

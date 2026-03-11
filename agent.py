@@ -22,6 +22,26 @@ logger = logging.getLogger(__name__)
 from profile_service import ProfileService
 from memory_agent import MemoryAgent
 
+def clean_location_from_title(title: str) -> str:
+    """Helper to extract a clean location name from a package title."""
+    if not title: return ""
+    import re
+    t = title
+    # Remove common trip words
+    t = re.sub(r'\b(Holiday|Trip|Getaway|Package|Enrichment|Planned|New)\b', '', t, flags=re.IGNORECASE)
+    # Remove dates (years like 2027, 2024)
+    t = re.sub(r'\b20\d{2}\b', '', t)
+    # Remove months
+    months = r'\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b'
+    t = re.sub(months, '', t, flags=re.IGNORECASE)
+    # Remove relative timing words
+    t = re.sub(r'\b(in|a|months?|weeks?|days?|next)\b', '', t, flags=re.IGNORECASE)
+    # Remove isolated numbers (like '4' from 'in 4 months')
+    t = re.sub(r'\b\d+\b', '', t)
+    # Clean up whitespace
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t
+
 def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, item_name: str, item_type: str, image_url: str = None, images: list = None):
     # 1. Helper to detect "bad" URLs
     def is_bad_url(url):
@@ -44,20 +64,29 @@ def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, i
     if not images or len(images) < 3:
         try:
             image_service = ImageSearchService()
+            # Extract specific location context from metadata if available (e.g. from Amadeus/Duffel)
+            item_city = item.metadata.get('city') or item.metadata.get('location')
+            
+            # Detect location context from the package title (CLEANED) as a fallback
+            fallback_location = ""
             pkg = BookingService.get_package(session_id, package_id)
-            location = None
             if pkg and pkg.title:
-                location = pkg.title.replace('Holiday', '').replace('Trip', '').replace('Getaway', '').strip()
+                fallback_location = clean_location_from_title(pkg.title)
+            
+            location = item_city or fallback_location
             
             found_images = []
             if item_type == 'activity':
                 found_images = image_service.get_activity_image(item_name, location, num=5)
-            elif item_type == 'hotel':
+            elif item_type == 'hotel' or item_type == 'accommodation':
                 found_images = image_service.get_hotel_image(item_name, num=5)
             elif item_type == 'flight':
-                found_images = image_service.get_flight_image(item_name, num=5)
+                airline = item.metadata.get('airline')
+                found_images = image_service.get_flight_image(airline, num=5)
             elif item_type == 'product':
                 found_images = image_service.get_product_image(item_name, num=5)
+            else:
+                found_images = image_service.search_image_multi(f"{item_name} {location}", num=5)
             
             for img in found_images:
                 if img not in images and not is_bad_url(img):
@@ -97,19 +126,35 @@ def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, i
     if item_type in ['hotel', 'accommodation', 'activity']:
         try:
             places_service = GooglePlacesService()
-            # If we know the location from the package, provide it as context
-            location = ""
+            # Use item-specific location context if available, otherwise fallback to title
+            item_city = item.metadata.get('city') or item.metadata.get('location')
+            fallback_location = ""
             pkg = BookingService.get_package(session_id, package_id)
             if pkg and pkg.title:
-                location = pkg.title.replace('Holiday', '').replace('Trip', '').replace('Getaway', '').strip()
+                fallback_location = clean_location_from_title(pkg.title)
+            
+            location = item_city or fallback_location
                 
-            place_data = places_service.get_place_reviews(item_name, location)
+            place_data = places_service.get_place_data(item_name, location)
             if place_data:
-                # Discard LLM hallucinated reviews if we found authentic ones!
+                # 1. Update Reviews
                 if place_data.get('reviews'):
                     item.metadata['reviews'] = place_data['reviews']
                 if place_data.get('review_link'):
                     item.metadata['review_link'] = place_data['review_link']
+                
+                # 2. Update Photos (PRIORITY over generic search)
+                places_images = place_data.get('photos', [])
+                if places_images:
+                    # For hotels and activities, we want AUTHENTICITY. 
+                    # If we found official photos, we PURGE the generic search results.
+                    authentic_images = [url for url in places_images if not is_bad_url(url)]
+                    if authentic_images:
+                        # REPLACING the list instead of appending
+                        images = authentic_images
+                        item.metadata['images'] = images[:10]
+                        item.metadata['image_url'] = images[0]
+                        logger.info(f"Purged generic images for '{item_name}' and replaced with {len(authentic_images)} authentic photos.")
         except Exception as e:
             logger.warning(f"Failed to fetch authentic Google reviews for '{item_name}': {e}")
 
@@ -642,7 +687,8 @@ class VoiceAgent:
             - **THE "WHERE" BAN (discovery only)**: During Phases 1–4, NEVER ask the traveller for a destination or city preference. Never ask "Are you interested in [Location]?". The selection is yours to make silently.
             - **PACKAGE ID SECRECY**: NEVER speak, print, or mention any Package IDs (UUIDs) to the traveller. These are for your internal tool use and navigation commands ONLY.
             - **TERMINOLOGY BAN (BOOKING)**: You are a travel planner creating a *proposed itinerary*, NOT a travel agent making actual bookings. You MUST NEVER say you have "booked" something. Use terms like "added to your package", "selected", or "included in your itinerary". NEVER claim you have booked a hotel, flight, or activity.
-            - **NO DEFERRING (DO IT NOW)**: You correspond in real-time. NEVER say things like "I will work on it now", "I am building it in the background", or "I will do that for you". Instead, simply EXCUTE the necessary tool calls (e.g., `propose_itinerary_batch_bound`) IMMEDIATELY in the same turn and present the finished result.
+            - **REAL DATA MANDATE**: Do NOT hallucinate names of hotels, flights, or activities. You **MUST** call `search_flights_duffel` and `search_hotels_amadeus` (or `search_activities_amadeus`) to find real, bookable options before calling `propose_itinerary_batch_bound`. If you call the batch tool with fake names like "Flight to Gold Coast" instead of "Jetstar JQ123", you have FAILED.
+            - **NO DEFERRING (DO IT NOW)**: You correspond in real-time. NEVER say things like "I will work on it now", "I am building it in the background", or "I will do that for you". Instead, simply EXECUTE the necessary tool calls (e.g., `propose_itinerary_batch_bound`) IMMEDIATELY in the same turn and present the finished result.
             - **SELF-CORRECTION**: Before speaking during discovery, verify: "Have I named a location before confirming the booking?" If yes and booking isn't done yet, rewrite to remove it.
             
             ### 1. SEASONAL INTEGRITY & FRESH DISCOVERY (MANDATORY):
