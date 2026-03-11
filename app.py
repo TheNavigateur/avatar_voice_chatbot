@@ -1,4 +1,7 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -17,6 +20,20 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+security = HTTPBearer()
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "645972259055-dcknu49vj5h6kaeaml1facanoesv4epl.apps.googleusercontent.com")
+    try:
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
+        if idinfo['aud'] != client_id:
+            raise ValueError("Could not verify audience.")
+        return idinfo['sub']
+    except ValueError as e:
+        logger.error(f"Invalid token: {e}")
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
 
 from models import Package, PackageItem, BookingStatus
 from booking_service import BookingService
@@ -60,28 +77,29 @@ async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/api/profile/{user_id}")
-async def get_profile(user_id: str):
-    return {"content": ProfileService.get_profile(user_id)}
+async def get_profile(user_id: str, current_user: str = Depends(get_current_user)):
+    return {"content": ProfileService.get_profile(current_user)}
 
 @app.post("/api/profile/{user_id}")
-async def update_profile(user_id: str, request: ProfileUpdateRequest):
-    ProfileService.update_profile(user_id, request.content)
+async def update_profile(user_id: str, request: ProfileUpdateRequest, current_user: str = Depends(get_current_user)):
+    ProfileService.update_profile(current_user, request.content)
     return {"status": "success"}
 
 @app.post("/api/profile/fact")
-async def update_profile_fact(request: ProfileFactRequest):
+async def update_profile_fact(request: ProfileFactRequest, current_user: str = Depends(get_current_user)):
+    user_id = current_user
     if request.remove:
         # Simple removal logic: find line and remove it
-        current = ProfileService.get_profile(request.user_id)
+        current = ProfileService.get_profile(user_id)
         lines = [l for l in current.split('\n') if request.fact.lower() not in l.lower()]
-        ProfileService.update_profile(request.user_id, "\n".join(lines))
+        ProfileService.update_profile(user_id, "\n".join(lines))
     else:
-        ProfileService.append_to_profile(request.user_id, request.fact)
+        ProfileService.append_to_profile(user_id, request.fact)
     return {"status": "success"}
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
-    user_id = "web_user" 
+async def chat(request: ChatRequest, current_user: str = Depends(get_current_user)):
+    user_id = current_user 
     session_id = request.session_id or str(uuid.uuid4())
     
     if not request.message:
@@ -97,11 +115,11 @@ async def chat(request: ChatRequest):
     })
 
 @app.post("/chat_stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, current_user: str = Depends(get_current_user)):
     from fastapi.responses import StreamingResponse
     import json
     
-    user_id = "web_user"
+    user_id = current_user
     session_id = request.session_id or str(uuid.uuid4())
     
     if not request.message:
@@ -133,21 +151,24 @@ async def get_packages(session_id: str):
     return [p.model_dump() for p in packages]
 
 @app.get("/api/user/{user_id}/packages")
-async def get_user_packages(user_id: str):
-    packages = BookingService.get_user_packages(user_id)
+async def get_user_packages(user_id: str, current_user: str = Depends(get_current_user)):
+    packages = BookingService.get_user_packages(current_user)
     return [p.model_dump() for p in packages]
 
 @app.post("/api/packages/{session_id}/{package_id}/book")
-async def book_package(session_id: str, package_id: str):
+async def book_package(session_id: str, package_id: str, current_user: str = Depends(get_current_user)):
     package = BookingService.get_package(session_id, package_id)
-    if not package:
+    if not package or package.user_id != current_user:
         raise HTTPException(status_code=404, detail="Package not found")
     
     result = await BookingService.execute_booking(package)
     return result
 
 @app.delete("/api/packages/{session_id}/{package_id}/items/{item_id}")
-async def delete_package_item(session_id: str, package_id: str, item_id: str):
+async def delete_package_item(session_id: str, package_id: str, item_id: str, current_user: str = Depends(get_current_user)):
+    package = BookingService.get_package(session_id, package_id)
+    if not package or package.user_id != current_user:
+        raise HTTPException(status_code=403, detail="Forbidden")
     pkg = BookingService.remove_item_from_package(session_id, package_id, item_id)
     if not pkg:
         raise HTTPException(status_code=404, detail="Package or item not found")

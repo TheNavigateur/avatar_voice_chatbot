@@ -21,3 +21,4 @@ gevent
 amadeus
 google-genai
 sqlalchemy
+google-auth

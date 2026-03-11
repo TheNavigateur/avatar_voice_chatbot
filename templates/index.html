@@ -14,7 +14,22 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lateef:wght@200;300;400;500;600;700;800;900&family=Fontdiner+Swanky&family=Space+Mono:wght@400;700&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://accounts.google.com/gsi/client" async></script>
     <style>
+        .gsi-modal-overlay {
+            position: fixed; top: 0; left: 0;right: 0;bottom: 0;
+            background: rgba(0,0,0,0.5); z-index: 9999;
+            display: none; justify-content: center; align-items: center;
+        }
+        .gsi-modal {
+            background: white; padding: 30px; border-radius: 12px;
+            text-align: center; max-width: 400px; width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .gsi-modal h3 { margin-top: 0; color: #333; }
+        .gsi-modal p { color: #666; margin-bottom: 20px; }
+        #gsi-button-container { display: flex; justify-content: center; }
+
         :root {
             --primary-color: #6366f1;
             --secondary-color: #4f46e5;
@@ -1709,6 +1724,12 @@
             <span class="icon"><i class="ph ph-user-circle"></i></span> About Me
         </button>
     </nav>
+    <div id="sidebar-auth-section" style="margin-top: auto; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+        <div id="sidebar-gsi-container" style="display:none; justify-content:center; margin-bottom: 10px;"></div>
+        <button class="nav-item" id="sidebar-signout-btn" onclick="signOut()" style="display:none; color: #d9534f; width: 100%;">
+            <span class="icon"><i class="ph ph-sign-out"></i></span> Sign Out
+        </button>
+    </div>
 </div>
 
 <!-- Mobile Header -->
@@ -1729,6 +1750,13 @@
 
 <!-- Main View Container -->
 <div id="main-view">
+
+<!-- Google Sign-In Modal -->
+<div class="gsi-modal-overlay" id="gsi-modal" onclick="if(event.target === this) this.style.display='none'">
+    <div class="gsi-modal" style="padding: 10px; width: auto;">
+        <div id="gsi-button-container"></div>
+    </div>
+</div>
 
     <!-- VIEW 1: CHAT -->
     <section id="view-chat" class="view-section active">
@@ -2844,6 +2872,97 @@
     const transcriptDiv = document.getElementById('transcript');
 
     let sessionId = localStorage.getItem('chat_session_id');
+
+    // --- Auth Logic ---
+    let googleAuthToken = sessionStorage.getItem('googleAuthToken');
+    let pendingAuthCallback = null;
+
+    function handleCredentialResponse(response) {
+        googleAuthToken = response.credential;
+        sessionStorage.setItem('googleAuthToken', googleAuthToken);
+        document.getElementById('gsi-modal').style.display = 'none';
+        
+        if (typeof updateSidebarAuthState === 'function') updateSidebarAuthState();
+        
+        if (pendingAuthCallback) {
+            const cb = pendingAuthCallback;
+            pendingAuthCallback = null;
+            // Execute the original intended action
+            cb();
+        }
+    }
+
+    window.signOut = function() {
+        googleAuthToken = null;
+        sessionStorage.removeItem('googleAuthToken');
+        if (typeof updateSidebarAuthState === 'function') updateSidebarAuthState();
+        window.location.reload(); 
+    }
+
+    window.updateSidebarAuthState = function() {
+        const gsiContainer = document.getElementById('sidebar-gsi-container');
+        const signoutBtn = document.getElementById('sidebar-signout-btn');
+        if (!gsiContainer || !signoutBtn) return;
+        
+        if (googleAuthToken) {
+            gsiContainer.style.display = 'none';
+            signoutBtn.style.display = 'flex';
+        } else {
+            signoutBtn.style.display = 'none';
+            gsiContainer.style.display = 'flex';
+            if (!gsiContainer.hasChildNodes() && window.google && google.accounts) {
+                google.accounts.id.initialize({
+                    client_id: '645972259055-dcknu49vj5h6kaeaml1facanoesv4epl.apps.googleusercontent.com',
+                    callback: handleCredentialResponse
+                });
+                google.accounts.id.renderButton(
+                    gsiContainer,
+                    { theme: "outline", size: "medium", type: "standard", shape: "rectangular", text: "continue_with" }
+                );
+            }
+        }
+    }
+
+    window.addEventListener('load', () => {
+        setTimeout(updateSidebarAuthState, 1000); 
+    });
+
+    function requireAuth(callback) {
+        if (googleAuthToken) {
+            callback();
+        } else {
+            pendingAuthCallback = callback;
+            const modal = document.getElementById('gsi-modal');
+            modal.style.display = 'flex';
+            
+            if (!document.getElementById('gsi-button-container').hasChildNodes()) {
+                google.accounts.id.initialize({
+                    client_id: '645972259055-dcknu49vj5h6kaeaml1facanoesv4epl.apps.googleusercontent.com',
+                    callback: handleCredentialResponse
+                });
+                google.accounts.id.renderButton(
+                    document.getElementById("gsi-button-container"),
+                    { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "continue_with" }
+                );
+            }
+        }
+    }
+
+    async function fetchWithAuth(url, options = {}) {
+        if (!options.headers) options.headers = {};
+        if (googleAuthToken) {
+            options.headers['Authorization'] = `Bearer ${googleAuthToken}`;
+        }
+        const res = await fetch(url, options); // FIXED: was fetchWithAuth
+        if (res.status === 401 || res.status === 403) {
+            sessionStorage.removeItem('googleAuthToken');
+            googleAuthToken = null;
+            requireAuth(() => window.location.reload());
+            throw new Error("Authentication failed");
+        }
+        return res;
+    }
+
     let recognition;
     let isConversationActive = false;
     let isBotSpeaking = false;
@@ -2982,8 +3101,10 @@
 
 
     async function startConversationMode() {
-        initAudio();
-        sendChatMessage("Make my holiday!");
+        requireAuth(() => {
+            initAudio();
+            sendChatMessage("Make my holiday!");
+        });
     }
     async function startVoiceConversationMode() {
         initAudio();
@@ -3533,7 +3654,7 @@
         }
 
         try {
-            await fetch('/api/profile/fact', {
+            await fetchWithAuth('/api/profile/fact', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -3730,7 +3851,7 @@
             let ttsText = textToSpeak;
 
             // Call /tts
-            const response = await fetch('/tts', {
+            const response = await fetchWithAuth('/tts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -3942,6 +4063,16 @@
 
     // --- View Navigation & Mobile Menu ---
     function switchView(viewName) {
+        if (viewName === 'packages' || viewName === 'profile') {
+            requireAuth(() => {
+                executeSwitchView(viewName);
+            });
+        } else {
+            executeSwitchView(viewName);
+        }
+    }
+
+    function executeSwitchView(viewName) {
         // Hide all views
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -3981,13 +4112,13 @@
 
     // --- Package Logic (List & Details) ---
     async function updatePackages() {
-        if (!sessionId) return cachedPackages;
+        if (!sessionId || !googleAuthToken) return cachedPackages;
         if (updatePackagesPromise) return updatePackagesPromise;
 
         updatePackagesPromise = (async () => {
             console.log(`[UI] Updating packages for user: web_user`);
             try {
-                const res = await fetch(`/api/user/web_user/packages`);
+                const res = await fetchWithAuth(`/api/user/web_user/packages`);
                 const packages = await res.json();
                 console.log(`[UI] Received ${packages.length} packages`);
                 cachedPackages = packages;
@@ -4587,7 +4718,7 @@
         // Fetch rendered HTML or raw text? Let's just use raw text and simple render for now.
         // Or better, fetch profile and assume it's just text for now as we don't have a markdown parser lib loaded.
         try {
-            const res = await fetch(`/api/profile/web_user`);
+            const res = await fetchWithAuth(`/api/profile/web_user`);
             const data = await res.json();
             // Simple textual display for Read Mode (preserving whitespace)
             document.getElementById('profile-content').style.whiteSpace = 'pre-wrap';
@@ -4599,7 +4730,7 @@
 
     async function loadProfileRaw() {
         try {
-            const res = await fetch(`/api/profile/web_user`);
+            const res = await fetchWithAuth(`/api/profile/web_user`);
             const data = await res.json();
             document.getElementById('profile-editor').value = data.content || "";
         } catch (e) { }
@@ -4613,7 +4744,7 @@
         btn.disabled = true;
 
         try {
-            await fetch(`/api/profile/web_user`, {
+            await fetchWithAuth(`/api/profile/web_user`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: content })
@@ -4659,7 +4790,7 @@
             // Let's use the existing chat endpoint but maybe we can suppress the user bubble?
             // We will manually fetch and NOT call 'addMessage' for the user part.
 
-            const response = await fetch('/chat', {
+            const response = await fetchWithAuth('/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -4727,7 +4858,11 @@
         initApp();
     }
 
-    async function sendChatMessage(textOverride) {
+    window.sendChatMessage = function(textOverride) {
+        requireAuth(() => _sendChatMessage(textOverride));
+    }
+
+    async function _sendChatMessage(textOverride) {
         initAudio(); // Crucial: Initialize audio on every user interaction
         interruptBot();
 
@@ -4757,7 +4892,7 @@
         currentChatAbortController = new AbortController();
 
         try {
-            const response = await fetch('/chat_stream', {
+            const response = await fetchWithAuth('/chat_stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 signal: currentChatAbortController.signal,
@@ -4897,7 +5032,7 @@
 
         console.log(`[UI] Removing item ${itemId} from package ${packageId}`);
         try {
-            const res = await fetch(`/api/packages/${sessionId}/${packageId}/items/${itemId}`, {
+            const res = await fetchWithAuth(`/api/packages/${sessionId}/${packageId}/items/${itemId}`, {
                 method: 'DELETE'
             });
             if (res.ok) {
@@ -4920,7 +5055,7 @@
         if (!sessionId) return;
         setBotStatusMessage("Processing booking...", 'center');
         try {
-            const res = await fetch(`/api/packages/${sessionId}/${packageId}/book`, {
+            const res = await fetchWithAuth(`/api/packages/${sessionId}/${packageId}/book`, {
                 method: 'POST'
             });
             const data = await res.json();
@@ -4942,7 +5077,6 @@
     }
 
     // Expose globals
-    window.sendChatMessage = sendChatMessage;
     window.continueShoppingConversation = continueShoppingConversation;
     window.updateChecklistFact = updateChecklistFact;
     window.switchView = switchView;
