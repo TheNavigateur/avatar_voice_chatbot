@@ -3814,7 +3814,10 @@
 
     function startProcessingStatus(userText) {
         if (hasStartedSpeakingThisResponse) return; // Ignore if speech already started
-        if (statusInterval) clearInterval(statusInterval);
+        if (statusInterval) {
+            clearTimeout(statusInterval);
+            statusInterval = null;
+        }
 
         // Shuffle pool
         const shuffled = [...statusMessages].sort(() => Math.random() - 0.5);
@@ -3822,15 +3825,22 @@
 
         setBotStatusMessage(shuffled[i], 'left');
 
-        statusInterval = setInterval(() => {
+        function updateStatus() {
             i = (i + 1) % shuffled.length;
             setBotStatusMessage(shuffled[i], 'left');
-        }, 1200);
+
+            // Randomized duration between 800ms and 1600ms (Average 1200ms)
+            const randomDelay = 800 + Math.random() * 800;
+            statusInterval = setTimeout(updateStatus, randomDelay);
+        }
+
+        // Start the first transition after a fixed initial delay
+        statusInterval = setTimeout(updateStatus, 1200);
     }
 
     function stopProcessingStatus() {
         if (statusInterval) {
-            clearInterval(statusInterval);
+            clearTimeout(statusInterval);
             statusInterval = null;
         }
         clearBotStatusMessage();

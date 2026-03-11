@@ -12,6 +12,7 @@ from services.duffel_service import DuffelService
 from services.amadeus_service import AmadeusService
 from services.image_search_service import ImageSearchService
 from services.google_places_service import GooglePlacesService
+from services.correction_engine import CorrectionEngine
 from booking_service import BookingService
 from models import PackageItem, PackageType
 
@@ -314,15 +315,11 @@ class VoiceAgent:
         if not self.api_key:
             logger.warning("GOOGLE_API_KEY not set. Agent will fail to run.")
 
-        # Initialize Session Service (no app_name argument)
-        # We keep this global to persist sessions across requests
-        # Initialize Session Service (no app_name argument)
-        # We keep this global to persist sessions across requests
+        # Initialize Session Service
         self.session_service = InMemorySessionService()
         self.memory_agent = MemoryAgent()
         
-        
-        # Initialize Duffel Service
+        # Services will be initialized per request or kept if thread-safe
         self.duffel_service = DuffelService()
         self.amadeus_service = AmadeusService()
 
@@ -335,6 +332,13 @@ class VoiceAgent:
         for event_type, content in self.process_message_stream(user_id, session_id, message, region, package_id, avatar_name, current_time):
             if event_type == "text":
                 full_text.append(content)
+            elif event_type == "error":
+                logger.error(f"Agent Error during processing: {content}")
+                return f"I'm sorry, I encountered an error while processing your request: {content}. Please try again."
+        
+        if not full_text:
+            return "I'm sorry, I couldn't generate a response. Please try asking again."
+            
         return "".join(full_text)
 
     def process_message_stream(self, user_id: str, session_id: str, message: str, region: str = "UK", package_id: str = None, avatar_name: str = None, current_time: str = None):
@@ -437,41 +441,55 @@ class VoiceAgent:
         {all_packages_summary}
         """
 
-        # Model initialization with streaming enabled
+        # --- MODEL INITIALIZATION (PER-REQUEST to avoid event loop issues) ---
+        from google.adk.models import Gemini
         model = Gemini(model="gemini-2.0-flash", stream=True, api_key=self.api_key)
         
         yield ("thinking", format_thinking_persona("Initializing Agent (Gemini-2.0-Flash)..."))
 
+        # --- TOOL WRAPPER (FOR FIXING STRATEGY) ---
+        def run_tool(name: str, func, **kwargs):
+            # 1. Apply Correction Rules
+            params = kwargs
+            try:
+                params = CorrectionEngine.apply_corrections(name, kwargs)
+            except Exception as e:
+                logger.error(f"Correction Engine failed: {e}")
+            
+            # 2. Execute Tool
+            try:
+                result = func(**params)
+                
+                # Check for "soft" failures (e.g. string results indicating no results found)
+                # This helps catch failures where the tool returns a string instead of raising an exception
+                if isinstance(result, str) and ("No results found" in result or "No bookable hotel offers" in result or "No activities found" in result):
+                    CorrectionEngine.record_failure(name, params, f"Soft Failure: {result}", package_id=package_id)
+                
+                return result
+            except Exception as e:
+                # 3. Record "Hard" Failure
+                error_msg = str(e)
+                logger.error(f"Tool {name} failed: {error_msg}")
+                CorrectionEngine.record_failure(name, params, error_msg, package_id=package_id)
+                
+                # Return a safe error message for the agent to pivot
+                return f"Error from {name}: {error_msg}. Please pivot to an alternative solution (like Google Search) without telling the user about this error."
+
         # Tools binding
         def create_package_bound(title: str, package_type: str = "mixed"):
-            # yield_thinking(f"Tool Call: create_package_bound(title='{title}', type='{package_type}')") # Handled by runner.run loop
-            res = create_new_package_tool(session_id, user_id, title, package_type)
-            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
-            return res
+            return run_tool("create_package", create_new_package_tool, session_id=session_id, user_id=user_id, title=title, package_type=package_type)
             
         def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None):
-            # yield_thinking(f"Tool Call: add_item_bound(item='{item_name}', type='{item_type}', package='{package_id}')") # Handled by runner.run loop
-            res = add_item_to_package_tool(session_id, package_id, item_name, item_type, price, description, image_url, product_url, day, date, rating, review_link, reviews, images)
-            # yield_thinking(f"Tool Result: Added {item_name}") # Handled by runner.run loop
-            return res
+            return run_tool("add_item", add_item_to_package_tool, session_id=session_id, package_id=package_id, item_name=item_name, item_type=item_type, price=price, description=description, image_url=image_url, product_url=product_url, day=day, date=date, rating=rating, review_link=review_link, reviews=reviews, images=images)
 
         def remove_item_bound(package_id: str, item_id: str):
-            # yield_thinking(f"Tool Call: remove_item_from_package(item='{item_id}', package='{package_id}')") # Handled by runner.run loop
-            res = remove_item_from_package_tool(session_id, package_id, item_id)
-            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
-            return res
+            return run_tool("remove_item", remove_item_from_package_tool, session_id=session_id, package_id=package_id, item_id=item_id)
 
         def save_user_info_bound(fact: str):
-            # yield_thinking(f"Tool Call: save_user_info(fact='{fact}')") # Handled by runner.run loop
-            res = update_profile_memory_tool(user_id, fact)
-            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
-            return res
+            return run_tool("save_user_info", update_profile_memory_tool, user_id=user_id, fact=fact)
         
         def get_package_details_bound(package_name_or_id: str):
-            # yield_thinking(f"Tool Call: get_package_details(query='{package_name_or_id}')") # Handled by runner.run loop
-            res = get_package_details_tool(user_id, package_name_or_id)
-            # yield_thinking(f"Tool Result: Retrieved details for {package_name_or_id}") # Handled by runner.run loop
-            return res
+            return run_tool("get_package_details", get_package_details_tool, user_id=user_id, package_name_or_id=package_name_or_id)
         def log_reasoning(thought: str):
             """
             Logs a FULL summary of what you are doing to the transparency trace.
@@ -488,112 +506,75 @@ class VoiceAgent:
             return thought
 
         def perform_google_search_bound(query: str):
-            # yield_thinking(f"Tool Call: perform_google_search(query='{query}')") # Handled by runner.run loop
-            res = perform_google_search(query, region=region)
-            # yield_thinking(f"Tool Result: Search returned {len(res)} results.") # Handled by runner.run loop
-            return res
+            return run_tool("google_search", perform_google_search, query=query, region=region)
 
         def search_products_bound(query: str):
-            # yield_thinking(f"Tool Call: search_products(query='{query}')") # Handled by runner.run loop
-            res = search_products(query, region=region)
-            # yield_thinking(f"Tool Result: Found {res.count('Title:') if hasattr(res, 'count') else 'multiple'} products.") # Handled by runner.run loop
-            return res
+            return run_tool("search_products", search_products, query=query, region=region)
             
         def check_amazon_stock_bound(product_name: str, variant_details: str):
-            # yield_thinking(f"Tool Call: check_amazon_stock(product='{product_name}')") # Handled by runner.run loop
-            res = check_amazon_stock(product_name, variant_details, region=region)
-            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
-            return res
+            return run_tool("check_amazon_stock", check_amazon_stock, product_name=product_name, variant_details=variant_details, region=region)
             
         def search_amazon_bound(query: str):
-            # yield_thinking(f"Tool Call: search_amazon(query='{query}')") # Handled by runner.run loop
-            res = search_amazon(query, region=region)
-            # yield_thinking(f"Tool Result: Found Amazon listings.") # Handled by runner.run loop
-            return res
+            return run_tool("search_amazon", search_amazon, query=query, region=region)
 
         def search_amazon_with_reviews_bound(query: str):
-            # yield_thinking(f"Tool Call: search_amazon_with_reviews(query='{query}')") # Handled by runner.run loop
-            res = search_amazon_with_reviews(query, region=region)
-            # yield_thinking(f"Tool Result: Found listings with reviews.") # Handled by runner.run loop
-            return res
+            return run_tool("search_amazon_with_reviews", search_amazon_with_reviews, query=query, region=region)
 
         def search_flights_duffel(origin: str, destination: str, date: str, end_date: str = None):
-            # yield_thinking(f"Tool Call: search_flights_duffel(from='{origin}', to='{destination}', on='{date}')") # Handled by runner.run loop
-            if not origin or not destination or not date:
-                return "Error: Origin, destination, and date are required for flight search."
-            
-            target_origin = origin
-            if len(origin) != 3 or not origin.isupper():
-                resolved_origin = self.duffel_service.resolve_place(origin)
-                if resolved_origin: target_origin = resolved_origin
-            
-            target_destination = destination
-            if len(destination) != 3 or not destination.isupper():
-                resolved_destination = self.duffel_service.resolve_place(destination)
-                if resolved_destination: target_destination = resolved_destination
+            def _flight_exec(origin, destination, date, end_date):
+                target_origin = origin
+                if len(origin) != 3 or not origin.isupper():
+                    resolved_origin = self.duffel_service.resolve_place(origin)
+                    if resolved_origin: target_origin = resolved_origin
                 
-            res = self.duffel_service.search_flights_formatted(target_origin, target_destination, date, end_date)
-            # yield_thinking(f"Tool Result: Found flight options.") # Handled by runner.run loop
-            return res
+                target_destination = destination
+                if len(destination) != 3 or not destination.isupper():
+                    resolved_destination = self.duffel_service.resolve_place(destination)
+                    if resolved_destination: target_destination = resolved_destination
+                    
+                return self.duffel_service.search_flights_formatted(target_origin, target_destination, date, end_date)
+            
+            return run_tool("search_flights", _flight_exec, origin=origin, destination=destination, date=date, end_date=end_date)
 
         def search_hotels_amadeus(city_code_or_name: str = None, check_in: str = None, check_out: str = None, latitude: float = None, longitude: float = None, radius: int = 10):
-            """
-            Search for bookable hotel offers via Amadeus API.
-            Supports searching by City Code (e.g., 'MLE') or specific coordinates (latitude/longitude).
-            """
-            res = self.amadeus_service.search_hotels_formatted(
-                city_code_or_name=city_code_or_name,
-                check_in=check_in,
-                check_out=check_out,
-                latitude=latitude,
-                longitude=longitude,
-                radius=radius
-            )
-            return res
+            return run_tool("search_hotels", self.amadeus_service.search_hotels_formatted, 
+                            city_code_or_name=city_code_or_name, check_in=check_in, check_out=check_out, 
+                            latitude=latitude, longitude=longitude, radius=radius)
 
         def search_activities_amadeus(location: str, keyword: str = ""):
-            # yield_thinking(f"Tool Call: search_activities_amadeus(at='{location}', keyword='{keyword}')") # Handled by runner.run loop
-            search_keyword = keyword
-            if keyword.lower() in ["family", "kids", "children"]:
-                search_keyword = "family friendly"
-            amadeus_res = self.amadeus_service.search_activities_formatted(location, search_keyword)
-            if "No activities found" not in amadeus_res:
-                # yield_thinking(f"Tool Result: Found activities via Amadeus.") # Handled by runner.run loop
-                return amadeus_res
-            if search_keyword:
-                broad_res = self.amadeus_service.search_activities_formatted(location)
-                if "No activities found" not in broad_res:
-                    # yield_thinking(f"Tool Result: Found activities via Amadeus (broad).") # Handled by runner.run loop
-                    return f"{broad_res}\n(Note: No specific matches for '{keyword}', showing general activities.)"
-            query = f"Things to do in {location}"
-            if keyword: query = f"{keyword} in {location}"
-            google_res = perform_google_search_bound(query)
-            # yield_thinking(f"Tool Result: Found activities via Google Search.") # Handled by runner.run loop
-            return f"{google_res}\n(Note: Amadeus had no specific tours, falling back to Google Search results.)"
+            def _activity_exec(location, keyword):
+                search_keyword = keyword
+                if keyword.lower() in ["family", "kids", "children"]:
+                    search_keyword = "family friendly"
+                amadeus_res = self.amadeus_service.search_activities_formatted(location, search_keyword)
+                if "No activities found" not in amadeus_res:
+                    return amadeus_res
+                if search_keyword:
+                    broad_res = self.amadeus_service.search_activities_formatted(location)
+                    if "No activities found" not in broad_res:
+                        return f"{broad_res}\n(Note: No specific matches for '{keyword}', showing general activities.)"
+                query = f"Things to do in {location}"
+                if keyword: query = f"{keyword} in {location}"
+                google_res = perform_google_search(query, region=region)
+                return f"{google_res}\n(Note: Amadeus had no specific tours, falling back to Google Search results.)"
+            
+            return run_tool("search_activities", _activity_exec, location=location, keyword=keyword)
 
         def list_all_packages():
-            # yield_thinking("Tool Call: list_all_packages") # Handled by runner.run loop
-            res = list_user_packages_tool(user_id)
-            # yield_thinking(f"Tool Result: Found {res.count('-') if hasattr(res, 'count') else 'multiple'} packages.") # Handled by runner.run loop
-            return res
+            return run_tool("list_all_packages", list_user_packages_tool, user_id=user_id)
         
         def find_packages(query: str = None, date_filter: str = None, package_type: str = None):
-            # yield_thinking(f"Tool Call: find_packages(query='{query}')") # Handled by runner.run loop
-            res = search_packages_tool(user_id, query, date_filter, package_type)
-            # yield_thinking(f"Tool Result: Found matching packages.") # Handled by runner.run loop
-            return res
+            return run_tool("find_packages", search_packages_tool, user_id=user_id, query=query, date_filter=date_filter, package_type=package_type)
 
         def delete_package_bound(package_id: str):
-            # yield_thinking(f"Tool Call: delete_package(id='{package_id}')") # Handled by runner.run loop
-            res = BookingService.delete_package(package_id) or f"Deleted package {package_id}."
-            # yield_thinking(f"Tool Result: {res}") # Handled by runner.run loop
-            return res
+            return run_tool("delete_package", BookingService.delete_package, package_id=package_id)
 
-        def propose_itinerary_batch_bound(items_json: str):
+        def propose_itinerary_batch_bound(items_json: str, package_id: str = None):
             """
             Adds a batch of itinerary items to a package in one go.
             Args:
                 items_json: A JSON string representing a list of items.
+                package_id: (Optional) The specific UUID of the package to add items to. If missing, it uses the latest.
                 Each item should have:
                   - name: A SHORT, PROPER TITLE (e.g. "Dreamworld Theme Park", "Noosa Biosphere Reserve Cycle Trail"). NEVER a truncated sentence from the description. Max 6 words.
                   - item_type (flight/hotel/activity/restaurant)
@@ -602,16 +583,27 @@ class VoiceAgent:
                   - duration_hours (optional, float - estimated duration including time at the activity itself, e.g. 3.5 for a half-day tour)
                   - images (optional, list of image URLs)
                   - review_link (optional, string URL to reviews)
+                **CRITICAL**: You MUST pass the `package_id` of the specific holiday you are building. This prevents items from being mixed into a different package if the user has multiple holidays planned.
                 CRITICAL: The 'name' and 'description' must be completely separate. The description must OPEN with a personalised reason sentence explaining why this was chosen for this specific traveller. 
             """
             try:
                 items_data = json.loads(items_json)
                 package_items = []
+                logger.info(f"Proposing batch of {len(items_data)} items...")
                 
-                # Fetch latest package if package_id is not explicitly provided or known
-                active_pkg = BookingService.get_latest_session_package(session_id)
+                # Use provided package_id or fallback to latest
+                active_pkg = None
+                if package_id:
+                    active_pkg = BookingService.get_package(session_id, package_id)
+                
+                if not active_pkg:
+                    active_pkg = BookingService.get_latest_session_package(session_id)
+                
                 if not active_pkg:
                     return "Error: No active package found to add items to. Create a package first."
+                
+                target_package_id = active_pkg.id
+                logger.info(f"Adding batch to package: {active_pkg.title} ({target_package_id})")
                 
                 for data in items_data:
                     item_name = data.get('name') or data.get('title')
@@ -641,12 +633,18 @@ class VoiceAgent:
                     })
                     
                     # Enrich automatically fetched images & real Google Places Reviews
-                    pkg_item = _enrich_item_metadata(session_id, active_pkg.id, pkg_item, item_name, item_type, data.get('image_url'), data.get('images', []))
+                    try:
+                        pkg_item = _enrich_item_metadata(session_id, target_package_id, pkg_item, item_name, item_type, data.get('image_url'), data.get('images', []))
+                    except Exception as enrichment_err:
+                        logger.warning(f"Metadata enrichment failed for {item_name}: {enrichment_err}")
                     
                     package_items.append(pkg_item)
                 
-                res = BookingService.add_items_to_package(session_id, active_pkg.id, package_items)
-                return f"Successfully added {len(package_items)} items to package '{active_pkg.title}'."
+                if not package_items:
+                    return "No valid items were found in the provided batch."
+
+                res = BookingService.add_items_to_package(session_id, target_package_id, package_items)
+                return f"Successfully added {len(package_items)} items to package '{active_pkg.title}' ({target_package_id})."
             except Exception as e:
                 logger.error(f"Error in propose_itinerary_batch_bound: {e}")
                 return f"Error adding batch items: {str(e)}"
@@ -677,117 +675,53 @@ class VoiceAgent:
             instruction=f"""
             ### -1. TODAY'S DATE (GROUND TRUTH — HIGHEST PRIORITY):
             - **TODAY IS: {current_time or datetime.now().strftime('%Y-%m-%d %H:%M:%S')}**. This is the single authoritative source of truth for the current date and time.
-            - When a traveller says "in 2 weeks", "next month", "this summer", or any relative date phrase, you MUST calculate it from TODAY'S DATE above — never from a package date.
-            - **CRITICAL**: Existing packages in your context are FUTURE PLANS, not the current date. Their travel dates (e.g. 2027) are trip dates, NOT today's date. Do NOT use them to infer what year or month it currently is.
-            - If asked to create a trip "in 2 weeks", that departure date = TODAY + 14 days. Use TODAY'S DATE to compute this.
+            - When a traveller says "in 2 weeks", "next month", "this summer", or any relative date phrase, you MUST calculate it from TODAY'S DATE above.
+            - **CRITICAL**: Existing packages in your context are FUTURE PLANS, not the current date. Their travel dates (e.g. 2027) are trip dates, NOT today's date.
 
-            ### 0. DESTINATION SECRECY & ID SECRECY (MANDATORY):
-            - **BEFORE SELECTION — NO DESTINATION NAMES**: During discovery and selection (Phases 1–4), you are STRICTLY FORBIDDEN from naming any destination, city, region, or hotel in your verbal speech. Use evocative sensory descriptions instead (e.g., "that tropical northern coastline", "coral-filled islands").
-            - **AFTER SELECTION — REVEAL IS ALLOWED**: Once you have committed to a hotel/destination by calling `add_item_bound` or `propose_itinerary_batch_bound`, you MAY name the destination and hotel naturally in conversation. At that point the location is chosen and the traveller deserves to know where they are going.
-            - **THE "WHERE" BAN (discovery only)**: During Phases 1–4, NEVER ask the traveller for a destination or city preference. Never ask "Are you interested in [Location]?". The selection is yours to make silently.
-            - **PACKAGE ID SECRECY**: NEVER speak, print, or mention any Package IDs (UUIDs) to the traveller. These are for your internal tool use and navigation commands ONLY.
-            - **TERMINOLOGY BAN (BOOKING)**: You are a travel planner creating a *proposed itinerary*, NOT a travel agent making actual bookings. You MUST NEVER say you have "booked" something. Use terms like "added to your package", "selected", or "included in your itinerary". NEVER claim you have booked a hotel, flight, or activity.
-            - **REAL DATA MANDATE**: Do NOT hallucinate names of hotels, flights, or activities. You **MUST** call `search_flights_duffel` and `search_hotels_amadeus` (or `search_activities_amadeus`) to find real, bookable options before calling `propose_itinerary_batch_bound`. If you call the batch tool with fake names like "Flight to Gold Coast" instead of "Jetstar JQ123", you have FAILED.
-            - **NO DEFERRING (DO IT NOW)**: You correspond in real-time. NEVER say things like "I will work on it now", "I am building it in the background", or "I will do that for you". Instead, simply EXECUTE the necessary tool calls (e.g., `propose_itinerary_batch_bound`) IMMEDIATELY in the same turn and present the finished result.
-            - **SELF-CORRECTION**: Before speaking during discovery, verify: "Have I named a location before confirming the booking?" If yes and booking isn't done yet, rewrite to remove it.
-            
-            ### 1. SEASONAL INTEGRITY & FRESH DISCOVERY (MANDATORY):
-            - **FRESH ACTIVITY DISCOVERY**: For EVERY new package, you MUST discover the user's vision (vibe, activities, pace) from scratch. Do NOT blindly assume preferences from the "About Me" or past packages.
-            - **FRESH GROUP COMPOSITION**: For EVERY new trip, you MUST ask who is travelling — never assume. Even if a previous trip included children, partners, or elderly relatives, those people may NOT be coming on this trip. If you see past group info, you may use it as a soft prompt only (e.g., "Last time you travelled with the kids — is that the same for this one?"), but NEVER silently carry it over. The group composition must be confirmed explicitly for each new trip.
-            - **DOUBLE-CHECK PROTOCOL**: You may use past data ONLY for verification (e.g., "I see you've loved tropical heat before; is that still the case for this trip?"). Never silently assume.
-            - **FRESH WEATHER CHECK**: Every new package creation MUST undergo a fresh weather verification for the *specific* intended month via `perform_google_search_bound`. 
-            - **NO LAZY REUSE**: Do NOT assume a previous location (e.g., Queensland) is suitable for a different month. Climate varies significantly. 
-            - **RE-VALIDATION**: If you see a previous location in context, you MUST re-validate its temperature and rainfall for the *new* month before even considering it as a suggestion. 
+            ### 0. DISCOVERY & SELECTION PROTOCOLS (Level 6 & 7):
+            - **Phase 0 (Triage)**: Mandatory check if New or Continuing. Create NEW package via `create_package_bound` if vision/intent has changed.
+            - **Phase 1 (Logistics)**: Confirm Origin, Duration, and Travel Month.
+            - **Phase 2 (Budget)**: Establish clear budget range.
+            - **Phase 3 (Soulful Discovery)**: Ask about "Vibe", "Pace", and specific "Activities".
+            - **Phase 3.5 (Group & Rhythm)**: Establish WHO is traveling and their SLEEP/WAKE RHYTHM.
+            - **Phase 4 (Silent Selection)**: Internally select "Anchor Spot" based on weather and vision. Call `search_hotels_amadeus` or `perform_google_search_bound`.
+            - **Phase 6 (Instantaneous Silent Build)**: Build the ENTIRE holiday in one turn using `propose_itinerary_batch_bound`.
 
             ### 1. THINKING TRANSPARENCY:
-            - You MUST call `log_reasoning` as the VERY FIRST tool at the start of EVERY turn. Explain your current phase, your logic, and your discard/winner selection process.
-            - **STRICT PERSONA (2nd Person)**: In your reasoning logs (`log_reasoning`), you MUST refer to the human as "You".
-            - **WORD BAN**: You are STRICTLY FORBIDDEN from using the word "user", "the user", or "user's" in your logs. 
-            - **GRAMMAR**: Use normal 2nd person grammar (e.g., "I see you ARE looking for..." or "I'm checking YOUR profile").
-            - **BEFORE vs AFTER**: 
-                - WRONG: "I will check the user's profile to see their history."
-                - RIGHT: "I will check your profile to see your history."
-                - WRONG: "The user is asking for a quiet beach."
-                - RIGHT: "You are asking for a quiet beach."
+            - You MUST call `log_reasoning` as the VERY FIRST tool at the start of EVERY turn.
+            - **STRICT PERSONA (2nd Person)**: In `log_reasoning`, you MUST refer to the human as "You".
+            - **WORD BAN**: You are STRICTLY FORBIDDEN from using the word "user", "the user", or "user's" in your logs.
 
-            ### 2. DISCOVERY & SELECTION PROTOCOLS:
-            - **SILENT ACTIONS (MANDATORY)**: Never narrate your tool uses or say what you just did (e.g. "I've created a new package called X", "I've added the flight"). Just perform the action silently and immediately ask the next discovery question to move the conversation forward.
-            1. **Phase 0 (Triage)**: Mandatory check if New or Continuing.
-            2. **Phase 1 (Logistics)**: Confirm Origin, Duration, and Travel Month. IF the user has already provided a relative date (e.g. "in a month", "next week") when asking to create a package, consider the Month requirement ALREADY RESOLVED. Calculate it internally but do NOT ask them "Which month?". Do NOT ask again if already in `Current Packages Summary`.
-            3. **Phase 2 (Budget)**: Establish clear budget range.
-            4. **Phase 3 (Soulful Discovery)**: 
-                - You MUST spend at least 2 turns on "Soulful Discovery" (Phase 3). 
-                - **Activity First**: Prioritize asking about the "Vibe", "Pace", and specific "Activities" (e.g., water parks, hiking, museums) first.
-                - **Internal Weather Inference**: Once activities are set, you MUST internally determine the "ideal" weather for those experiences. 
-                - **Scoped Clarification**: Only ask the user for weather preferences if the requested activities allow for a range (e.g., "Hiking can be done in crisp air or warm sun; which do you prefer?"). If an activity REQUIRES specific weather (e.g., water parks need heat), assume that heat is required for the user's vision.
-                - **Weather-Experience Anchor**: Verify climate via `perform_google_search_bound` for the target month. If it doesn't match the inferred ideal weather, reject the location in your log.
-            5. **Phase 3.5 (Group & Rhythm Discovery)**:
-                - You MUST establish WHO is traveling. Ask about age groups, mobility requirements, and any specific preferences or constraints for children or seniors.
-                - **SLEEP/WAKE RHYTHM**: Ask the travelers about their preferred wake time and bedtime (e.g., "Are you early risers or do you prefer to sleep in?"). Store this as the anchor for the daily schedule — most activities should be scheduled within those waking hours.
-                - Ensure the vision is inclusive of all travelers' requirements.
-            6. **Phase 4 (Silent Selection)**: 
-                - Internally select the best "Anchor Spot" based on weather and vision.
-                - **MANDATORY**: You MUST call `perform_google_search_bound` for "weather in [Internal Location] in [Target Month]" to confirm it meets the user's vision (e.g. 28°C+ for "Heat") before proceeding.
-                - Call `search_hotels_amadeus` or `perform_google_search_bound` for options.
-                - **SILENTLY** add ONLY the selected sanctuary (hotel) to the package using `add_item_bound`. DO NOT add anything else yet.
-            7. **Phase 6 (Instantaneous Silent Build)**:
-                - Once the vision and group needs are locked, build the ENTIRE rest of the holiday in one turn.
+            ### 2. SILENT ACTION MANDATE (CRITICAL):
+            - **NO NARRATION**: NEVER narrate your tool uses, actions, or status (e.g., "I've created a package", "I'm adding...", "I am searching for...").
+            - **NO FAILURE NARRATION**: If a tool fails or you have trouble finding something, NEVER tell the traveller. SILENTLY pivot to an alternative (e.g., Google Search if Amadeus fails) or add a best-estimate manually. The traveller should never hear about your "trouble".
+            - **DEFERRAL BAN**: NEVER say "I will work on it", "I'll build it for you", or "I'm doing that now". Instead, just DO it immediately in the same turn.
+            - **SILENT BUILD**: Execute `propose_itinerary_batch_bound` IMMEDIATELY once requirements are met. Do NOT ask for permission to build.
 
-                - **STEP 1 — RESORT AMENITY DISCOVERY**: After selecting the hotel/resort, call `perform_google_search_bound` for `"[resort/hotel name] amenities activities pool spa restaurants"` to discover what the property itself offers. Store these amenities as a list — you will use them as fallback when a day has open time.
+            ### 3. DESTINATION & ID SECRECY:
+            - **ANONYMITY**: NEVER name any specific location, city, or hotel in speech until the hotel has been added to the package (`add_item_bound`). Use evocative sensory descriptions instead.
+            - **THE "WHERE" BAN**: NEVER ask the traveller for a destination preference. The selection is yours to make silently.
+            - **PACKAGE ID SECRECY**: NEVER speak or print Package IDs (UUIDs).
 
-                - **STEP 2 — COUNT YOUR DAYS EXPLICITLY**: Before building, calculate the total number of trip days. Explicitly reason: "This is a [N]-week holiday = [N×7] days. I must cover all [N×7] days." A 2-week holiday = 14 days. A 3-week holiday = 21 days. Do NOT stop after the first week.
-
-                - **STEP 3 — TIME-AWARE SCHEDULING (per day)**:
-                  For EVERY day, plan activities by real clock time, treating each day as a timeline:
-                  - Anchor the day to the travellers' stated **wake time** and **bedtime** (from Phase 3.5). Most activities should fall within those hours.
-                  - For each activity/item, estimate a **start time** and **duration** (e.g. a full-day boat trip = 08:00–17:00, 9 hours). Include a `time` field (e.g. "09:00") and a `duration_hours` field (e.g. 3.5) in the item JSON.
-                  - Add **realistic buffers**: 30–60 min travel time between activities, and 1–2 hrs of unstructured time per day for spontaneous eating, shopping, and exploration.
-                  - Only add another activity to a day if there is **genuinely free time** left in the day's timeline after accounting for prior activities, travel, and buffer. A long full-day tour means that day may legitimately have only one item.
-                  - **NEVER leave a full day completely empty** — if the day has open time, use a resort amenity or low-key suggestion (e.g. "Beach Afternoon & Resort Pool", "Sunset Cocktails at the Beach Bar") to fill that time naturally.
-                  - **EARLY-START TRADE-OFF**: If an activity requires starting before the travellers' preferred wake time (e.g., a 05:30 sunrise hike when they prefer 08:00 wake), add it but MUST acknowledge it in the description: e.g. *"Note: This requires an early 05:30 start — worth every minute for the view, but plan for a relaxed afternoon afterwards."*
-
-                - **STEP 4 — FULL COVERAGE CHECK**: Before calling `propose_itinerary_batch_bound`, verify every day from Day 1 to Day N has at least one scheduled item. If any day is completely uncovered, add an appropriate resort or local suggestion for it.
-
-                - Use `perform_google_search_bound` and `search_activities_amadeus` to find recommended tours, restaurants, and activities. Spread discoveries across all days — do not front-load the first week.
-
-                - **REAL NAMES ONLY**: Every activity, restaurant, and attraction MUST use its real, specific name as found in search results (e.g. "Dreamworld Theme Park", "Noosa Biosphere Reserve Cycle Trail", "Ricky's River Bar & Restaurant"). Generic placeholders like "Morning water park visit" or "Day 3 activity" are STRICTLY FORBIDDEN. If search returns no specific name, perform another search until you find a real named option.
-
-                - **STRICTLY SILENT**: Never ask for approval for individual days or items (e.g., "How about Day 2?"). Just build it.
-                - **DESCRIPTION DRAMA**: Move ALL exciting sensory descriptions (sights, smells, "marketing copy") into the `description` field of the `PackageItem` objects.
-                - **PROPER TITLE MANDATE**: The `name` field for EVERY item MUST be a short, proper title of ≤6 words (e.g. "Eiffel Tower Sunset Tour", "Ricky's River Bar & Restaurant"). It must NEVER be a truncated sentence from the description field (e.g. FORBIDDEN: "Experience the magic of", "A stunning fusion of"). The `name` and `description` are completely separate fields with completely different content.
-                - **PERSONALISED REASON MANDATE**: The `description` for EVERY item (flights, hotels, activities, products) MUST open with 1-2 sentences that speak directly to the traveller (using "You"/"Your") explaining *why this specific choice was made for them*, referencing their stated vision, activities, or preferences. Examples:
-                  - Activity: "You mentioned wanting to experience the reef up close without a big boat — this small-group snorkel tour is exactly that, with a 6-person max so you get personal attention from the guide."
-                  - Hotel: "You wanted to wake up to the ocean, not walk to it — this resort puts you literally on the sand, with your room's balcony hanging over the water."
-                  - Flight: "You asked for the most direct route to avoid a long travel day — this non-stop flight gets you there in under 3 hours." After the personalised opener, continue with sensory/marketing detail as usual.
-                - **LOCATION BANNER MANDATE**: Before calling `propose_itinerary_batch_bound`, you MUST call `add_item_bound` ONCE with `item_type="location_banner"`, `item_name="Why [Destination Name]?"`, `price=0`, and a compelling 3-4 sentence `description` written in 2nd person that explains specifically why THIS destination was chosen for THIS traveller — referencing their stated vibe, activities, weather needs, and budget. This will be displayed as a special banner at the top of the package view. Example: `item_name="Why the Whitsundays?"`, description: "You wanted somewhere with reliable tropical heat in April but didn't want the wet-season roulette of Far North Queensland — the Whitsundays sit in a sweet spot that delivers 29°C sunshine with negligible rain that month. You said you craved something that felt genuinely remote and private, and the outer reef islands here deliver exactly that sense of having discovered something most tourists never reach. Your love of snorkelling and sailing makes this archipelago a near-perfect match — every day here can be spent on or in the water."
-                - **DUPLICATION BAN**: Do NOT call `add_item_bound` for items you are including in the batch (except for the hotel added in Phase 4 and the `location_banner` — those are intentionally added via `add_item_bound`). Call `propose_itinerary_batch_bound` EXACTLY ONCE to populate the rest of the package instantly.
-
-            8. **Phase 7 (Concise Inform & Navigate)**:
-                - **HARD GATE — DO NOT PROCEED TO PHASE 7 UNTIL**: `propose_itinerary_batch_bound` has been called and returned a success message confirming items were added. If you have not yet called it, go back and do Step 3 first. You MUST NOT say "I've built out your full holiday plan" until the batch tool has confirmed success.
-                - Verbal speech MUST be brief and direct. Do NOT provide a summary or sensory reveal in speech.
-                - Mandated response: "I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything."
-                - **MANDATORY**: You MUST append `[NAVIGATE_TO_PACKAGE: package_id]` to the end of your response (after your verbal speech) whenever you finish a build, or if the user asks to "open," "view," "show," or "navigate to" a specific package (including the "latest" one).
-                - **LATEST PACKAGE**: If the user asks for the "latest" package, refer to the first package listed in your `Summary of your Current Packages` context or call `list_all_packages` to find the most recent [SYSTEM_ID].
-            
-            ### 3. IDENTITY & REFINEMENTS:
+            ### 4. IDENTITY & UI:
             - Use "{avatar_name or 'Ray and Rae'}", use "we" for the service.
-            - Always end your response with a question to move the discovery forward.
-            - **Silence**: Never narrate tool usage in speech.
-            - **Resilient Tool Use**: If API fails, you MUST use Google Search to find details and call `add_item_bound` with estimates.
-            - **Internal De-duplication**: Before calling any tool to add an item, check if it or something very similar is already in `Current Packages Summary`.
+            - **END WITH A QUESTION**: Every speech response MUST end with a question to move the activity forward.
+            - **MANDATED RESPONSE (After Build)**: Once you have successfully called `propose_itinerary_batch_bound`, your response MUST be: "I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything."
+            - **NAVIGATE**: ALWAYS append `[NAVIGATE_TO_PACKAGE: package_id]` after your speech whenever a build is complete.
 
-            ### 4. CONSTRAINTS (SANDWICH ENFORCEMENT - BOTTOM):
-            - **HARD BAN (during discovery)**: No location names in speech until the hotel has been added to the package.
-            - **HARD BAN**: Never ask "Where?" or solicit a destination from the traveller.
-            - **HARD BAN**: Never mention internal tool results, reasoning prefixes, or "I'm working on it" deferrals in speech.
-            - **END WITH A QUESTION**: Every speech response MUST end with a question (CTA).
+            ### 5. CONSTRAINTS (SANDWICH ENFORCEMENT - BOTTOM):
+            - **HARD BAN**: Never narrate tools or say "I am working on it".
+            - **HARD BAN**: Never tell the traveller you are "having trouble" or "finding it difficult". Just find a workaround silently.
+            - **HARD BAN**: No location names in speech during Phases 1–4.
+            - **HARD BAN**: Never ask "Where?".
+            - **PROACTIVITY**: If you have enough info to build, BUILD NOW. Do not ask "Would you like me to build it?".
 
             {package_view_context}
             {global_context}
 
             ### FINAL MANDATES (RECAP - TOP PRIORITY):
             - **CRITICAL**: Use `[NAVIGATE_TO_PACKAGE: package_id]` to open the holiday/package view at the end of every build or upon request.
-            - **CRITICAL**: Never narrate your actions in speech (e.g. "I have created a package", "I am adding...", "I am working on it"). Actions like creating an itinerary must be done silently using tools immediately in the same turn.
+            - **CRITICAL**: Never narrate your actions in speech (e.g. "I have created a package", "I am adding...", "I am working on it", "I need to create a package for you"). Actions like creating an itinerary must be done silently using tools immediately in the same turn.
             - **CRITICAL**: Never speak or print Package IDs (UUIDs).
             - **CRITICAL**: No location names during discovery (Phases 1–4). Once the hotel is added, you may name the destination freely.
             - **CRITICAL**: NEVER say you have "booked" something. You are proposing a package. Use "added".

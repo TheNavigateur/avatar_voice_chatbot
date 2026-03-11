@@ -32,9 +32,9 @@ You need a **Search Engine ID** and an **API Key** for it.
 Run these commands in your terminal (replace the values with your actual keys):
 
 ```bash
-export GOOGLE_API_KEY="AIzaSy..."
-export GOOGLE_CSE_ID="012345..."
-export GOOGLE_CSE_API_KEY="AIzaSy..."
+export GOOGLE_API_KEY="YOUR_API_KEY"
+export GOOGLE_CSE_ID="c27m..."
+export GOOGLE_CSE_API_KEY="YOUR_API_KEY"
 ```
 
 Then run the bot:

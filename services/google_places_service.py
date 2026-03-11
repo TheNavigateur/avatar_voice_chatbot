@@ -67,21 +67,38 @@ class GooglePlacesService:
             # 2. Process Photos
             raw_photos = result.get('photos', [])
             photo_urls = []
-            for p in raw_photos[:5]: # Get up to 5 photos
+            for p in raw_photos[:5]:
                 ref = p.get('photo_reference')
                 if ref:
-                    # Construct the final authenticated photo URL
-                    url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photoreference={ref}&key={self.api_key}"
+                    # SECURE: Return a proxy URL instead of exposing the API Key in the URL
+                    url = f"/api/proxy/photo?ref={ref}"
                     photo_urls.append(url)
             
             return {
                 "reviews": formatted_reviews,
                 "review_link": result.get('url'),
-                "photos": photo_urls
+                "photos": photo_urls,
+                "coordinates": result.get('geometry', {}).get('location')
             }
         except Exception as e:
             logger.error(f"Google Places Service Error for '{name}': {e}")
             return None
+
+    def get_coordinates(self, location_name: str) -> Optional[Dict[str, float]]:
+        """Resolves a location name to coordinates using Google Places Text Search."""
+        if not self.api_key: return None
+        try:
+            url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
+            params = {"query": location_name, "key": self.api_key}
+            res = requests.get(url, params=params, timeout=5)
+            data = res.json()
+            if data.get('status') == 'OK' and data.get('results'):
+                loc = data['results'][0].get('geometry', {}).get('location')
+                if loc:
+                    return {"lat": loc['lat'], "lng": loc['lng']}
+        except Exception as e:
+            logger.error(f"Google Places Geocoding Error for '{location_name}': {e}")
+        return None
 
     def get_place_reviews(self, name: str, location: str = "") -> Optional[Dict]:
         data = self.get_place_data(name, location)

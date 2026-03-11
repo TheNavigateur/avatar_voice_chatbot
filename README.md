@@ -52,3 +52,26 @@ source secrets.sh && python3 app.py
     *   `GET /api/session/{id}/packages`: Retrieve current packages.
     *   `POST /api/packages/{id}/book`: Execute booking transaction.
 *   **Mock Booking Service**: Simulates API calls with success/failure probability for testing rollback logic.
+
+## 🛠️ Maintenance & AI Self-Fixing
+
+The bot includes a structured **"Mistake Journal"** and **"Correction Rulebook"** to help it improve over time without manual code changes for every edge case.
+
+### Using a Coding Agent (like Antigravity) for Maintenance
+This system is designed so that a coding agent can maintain the bot for you. You should periodically ask your agent to:
+> *"Check for recent tool errors and fix them."*
+
+**The AI Workflow:**
+1.  **Audit**: The agent reads the `tool_failures` database table (the "Mistake Journal").
+2.  **Fix**: The agent uses `audit_errors.py` to add a rule to the `correction_rules` table (the "Rulebook").
+    - *Example*: Mapping a broad query like "Queensland" to a specific city code like "BNE".
+3.  **Verify**: The agent confirms the fix works, preventing that error from ever happening again.
+
+### Manual Maintenance Tools
+If you are comfortable with the command line, you can use `audit_errors.py`:
+- `python3 audit_errors.py list`: View recent tool failures.
+- `python3 audit_errors.py fix <wrong_input> <right_input>`: Add a manual correction rule.
+- `python3 audit_errors.py patch <pkg_id> <title> <type> <price> <desc>`: Manually push an item into a package (The Quick Fix).
+
+---
+*Note: This maintenance workflow works with any coding agent (Claude, Gemini, etc.) that has access to your files and can run Python commands.*

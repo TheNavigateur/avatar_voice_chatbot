@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -97,8 +97,33 @@ async def update_profile_fact(request: ProfileFactRequest, current_user: str = D
         ProfileService.append_to_profile(user_id, request.fact)
     return {"status": "success"}
 
+@app.get("/api/proxy/photo")
+async def proxy_photo(ref: str):
+    """
+    Proxies a Google Places photo request to avoid exposing the API key to the client.
+    """
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="API key not configured")
+    
+    google_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=1200&photoreference={ref}&key={api_key}"
+    
+    try:
+        # Use a streaming response to pass the image data directly
+        response = requests.get(google_url, stream=True, timeout=10)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch image from Google")
+        
+        # Determine content type
+        content_type = response.headers.get("Content-Type", "image/jpeg")
+        
+        return StreamingResponse(response.iter_content(chunk_size=1024), media_type=content_type)
+    except Exception as e:
+        logger.error(f"Error proxying photo: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/chat")
-async def chat(request: ChatRequest, current_user: str = Depends(get_current_user)):
+def chat(request: ChatRequest, current_user: str = Depends(get_current_user)):
     user_id = current_user 
     session_id = request.session_id or str(uuid.uuid4())
     
@@ -116,8 +141,9 @@ async def chat(request: ChatRequest, current_user: str = Depends(get_current_use
 
 @app.post("/chat_stream")
 async def chat_stream(request: ChatRequest, current_user: str = Depends(get_current_user)):
-    from fastapi.responses import StreamingResponse
     import json
+    import asyncio
+    import threading
     
     user_id = current_user
     session_id = request.session_id or str(uuid.uuid4())
@@ -125,23 +151,46 @@ async def chat_stream(request: ChatRequest, current_user: str = Depends(get_curr
     if not request.message:
         raise HTTPException(status_code=400, detail="Message is empty")
 
+    queue = asyncio.Queue()
+    loop = asyncio.get_event_loop()
+
+    def run_agent_sync():
+        try:
+            from datetime import datetime
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Send initial session event
+            loop.call_soon_threadsafe(queue.put_nowait, {"session_id": session_id})
+            
+            for event_type, content in voice_agent.process_message_stream(user_id, session_id, request.message, region=request.region, package_id=request.package_id, avatar_name=request.avatar_name, current_time=current_time):
+                if event_type == "text" and content:
+                    loop.call_soon_threadsafe(queue.put_nowait, {"chunk": content})
+                elif event_type == "thinking" and content:
+                    loop.call_soon_threadsafe(queue.put_nowait, {"thinking": content})
+                elif event_type == "error" and content:
+                    loop.call_soon_threadsafe(queue.put_nowait, {"error": content})
+            
+            loop.call_soon_threadsafe(queue.put_nowait, "[DONE]")
+        except Exception as e:
+            logger.error(f"Error in background agent thread: {e}", exc_info=True)
+            loop.call_soon_threadsafe(queue.put_nowait, {"error": str(e)})
+            loop.call_soon_threadsafe(queue.put_nowait, "[DONE]")
+
     async def event_generator():
-        # Add initial event with session_id
-        yield f"data: {json.dumps({'session_id': session_id})}\n\n"
-        
-        from datetime import datetime
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # We need to run the blocking process_message_stream in a thread or use an async version
-        # For now, let's use the generator and yield chunks
-        for event_type, content in voice_agent.process_message_stream(user_id, session_id, request.message, region=request.region, package_id=request.package_id, avatar_name=request.avatar_name, current_time=current_time):
-            if event_type == "text" and content:
-                yield f"data: {json.dumps({'chunk': content})}\n\n"
-            elif event_type == "thinking" and content:
-                logger.info(f"[Stream] Sending thinking event: {content[:50]}...")
-                yield f"data: {json.dumps({'thinking': content})}\n\n"
-        
-        yield "data: [DONE]\n\n"
+        # Start agent in a background thread
+        thread = threading.Thread(target=run_agent_sync, daemon=True)
+        thread.start()
+
+        while True:
+            item = await queue.get()
+            if item == "[DONE]":
+                yield "data: [DONE]\n\n"
+                break
+            
+            if "error" in item:
+                yield f"data: {json.dumps({'event': 'error', 'content': item['error']})}\n\n"
+            else:
+                yield f"data: {json.dumps(item)}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 

@@ -108,6 +108,30 @@ def init_db():
         )
     ''')
     
+    # Tool Failures Table (Mistake Journal)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS tool_failures (
+            id TEXT PRIMARY KEY,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            tool_name TEXT NOT NULL,
+            input_params TEXT,
+            error_message TEXT,
+            status TEXT DEFAULT 'open',
+            package_id TEXT
+        )
+    ''')
+
+    # Correction Rules Table (Rulebook)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS correction_rules (
+            id TEXT PRIMARY KEY,
+            pattern TEXT NOT NULL,
+            replacement TEXT NOT NULL,
+            tool_scope TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
     # Simple migration: add user_id if it doesn't exist (Only for SQLite locally)
     if not DATABASE_URL:
         try:

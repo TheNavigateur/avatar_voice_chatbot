@@ -23,6 +23,10 @@ class AmadeusService:
             except Exception as e:
                 logger.error(f"Failed to initialize Amadeus Client: {e}")
                 self.amadeus = None
+        
+        # Geocoding fallback
+        from services.google_places_service import GooglePlacesService
+        self.places_service = GooglePlacesService()
 
     def search_hotels_by_city(self, city_code: str, check_in: str = None, check_out: str = None) -> List[Dict]:
         """
@@ -242,6 +246,14 @@ class AmadeusService:
                 
         except Exception as e:
             logger.error(f"Geocoding Failed: {e}")
+            
+            # Use Google Places as primary fallback (more reliable)
+            logger.info(f"Attempting Google Places geocoding for '{location_name}'...")
+            loc = self.places_service.get_coordinates(location_name)
+            if loc:
+                logger.info(f"Geocoded via Google Places: {location_name} -> ({loc['lat']}, {loc['lng']})")
+                return loc['lat'], loc['lng']
+                
             return self._geocode_osm(location_name)
 
     def _geocode_osm(self, location_name: str):
