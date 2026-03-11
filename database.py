@@ -112,7 +112,7 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS tool_failures (
             id TEXT PRIMARY KEY,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             tool_name TEXT NOT NULL,
             input_params TEXT,
             error_message TEXT,
@@ -128,7 +128,7 @@ def init_db():
             pattern TEXT NOT NULL,
             replacement TEXT NOT NULL,
             tool_scope TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
