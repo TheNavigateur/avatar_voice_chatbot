@@ -184,7 +184,7 @@ def create_new_package_tool(session_id: str, user_id: str, title: str, package_t
     logger.info(f"[TOOL] Package created successfully: {pkg.id}")
     return f"Created new package: {pkg.title} (ID: {pkg.id})"
 
-def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None):
+def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None, time: str = None, duration_hours: float = None):
     """
     Adds an item to an existing package.
     Args:
@@ -202,6 +202,8 @@ def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, i
         review_link: Optional link to reviews.
         reviews: Optional list of objects with "text" and "rating" (e.g. [{"text": "Great!", "rating": 5}, ...]).
         images: Optional list of image URLs for carousel.
+        time: Optional suggested start time (e.g. "09:00").
+        duration_hours: Optional estimated duration (e.g. 2.5).
     """
     item = PackageItem(name=item_name, item_type=item_type, price=price, description=description)
     item = _enrich_item_metadata(session_id, package_id, item, item_name, item_type, image_url, images)
@@ -213,6 +215,10 @@ def add_item_to_package_tool(session_id: str, package_id: str, item_name: str, i
         item.metadata['date'] = date
     if rating is not None:
         item.metadata['rating'] = rating
+    if time:
+        item.metadata['time'] = time
+    if duration_hours is not None:
+        item.metadata['duration_hours'] = duration_hours
     if review_link:
         item.metadata['review_link'] = review_link
     if reviews:
@@ -481,8 +487,8 @@ class VoiceAgent:
         def create_package_bound(title: str, package_type: str = "mixed"):
             return run_tool("create_package", create_new_package_tool, session_id=session_id, user_id=user_id, title=title, package_type=package_type)
             
-        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None):
-            return run_tool("add_item", add_item_to_package_tool, session_id=session_id, package_id=package_id, item_name=item_name, item_type=item_type, price=price, description=description, image_url=image_url, product_url=product_url, day=day, date=date, rating=rating, review_link=review_link, reviews=reviews, images=images)
+        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, description: str = "", image_url: str = None, product_url: str = None, day: int = None, date: str = None, rating: float = None, review_link: str = None, reviews: list = None, images: list = None, time: str = None, duration_hours: float = None):
+            return run_tool("add_item", add_item_to_package_tool, session_id=session_id, package_id=package_id, item_name=item_name, item_type=item_type, price=price, description=description, image_url=image_url, product_url=product_url, day=day, date=date, rating=rating, review_link=review_link, reviews=reviews, images=images, time=time, duration_hours=duration_hours)
 
         def remove_item_bound(package_id: str, item_id: str):
             return run_tool("remove_item", remove_item_from_package_tool, session_id=session_id, package_id=package_id, item_id=item_id)
@@ -694,7 +700,18 @@ class VoiceAgent:
             - **Phase 3 (Soulful Discovery)**: Ask about "Vibe", "Pace", and specific "Activities".
             - **Phase 3.5 (Group & Rhythm)**: Establish WHO is traveling and their SLEEP/WAKE RHYTHM.
             - **Phase 4 (Silent Selection)**: Internally select "Anchor Spot" based on weather and vision. Call `search_hotels_amadeus` or `perform_google_search_bound`.
-            - **Phase 6 (Instantaneous Silent Build)**: Build the ENTIRE holiday in one turn using `propose_itinerary_batch_bound`.
+            - **Phase 6 (Instantaneous Silent Build)**: Build the ENTIRE holiday in one turn using `propose_itinerary_batch_bound`. 
+                - **NO BLANK DAYS**: You MUST fill EVERY SINGLE DAY of the duration (from Day 1 to the final day).
+                - **TIME-AWARE SCHEDULING**: 
+                    - Respect the traveller's **sleep/wake rhythm** (from their profile) as the day's boundaries. Default to 08:00 - 22:00 if not specified.
+                    - Use `time` (e.g. "09:00") and `duration_hours` (e.g. 2.5) for EVERY activity and dining recommendation.
+                - **REALISTIC FLOW & BUFFERS**:
+                    - **JOURNEY TIME**: Account for ~30-60 mins of travel between activities that aren't at the same location.
+                    - **BUFFER TIME**: Include dedicated slots (at least 1-2 hours daily) for snacks, shopping, or spontaneous discovery (items like "Local Market Exploration" or "Free Time & Coffee").
+                    - **LOGICAL SLOT ALLOCATION**: Do NOT just "prefer adding early activities first". Build the day based on when the activity *actually* makes sense (e.g., sunrise hikes early, stargazing late, fine dining in the evening).
+                    - **ENTIRE DAY COVERAGE**: Add activities only if they logically fit within the remaining "wake" hours. If an activity is long (6+ hours), let it be the anchor for the day.
+                - **DINING**: Always include Lunch and Dinner recommendations with appropriate durations (1.5 - 2 hours).
+                - **ITINERARY DENSITY**: Focus on a "bookable" flow. If an activity is short, add a buffer or another item. If it's long, let it breathe.
 
             ### 1. THINKING TRANSPARENCY:
             - You MUST call `log_reasoning` as the VERY FIRST tool at the start of EVERY turn.
@@ -756,6 +773,8 @@ class VoiceAgent:
             ### FINAL MANDATES (RECAP - TOP PRIORITY):
             - **CRITICAL**: Use `[NAVIGATE_TO_PACKAGE: package_id]` to open the holiday/package view at the end of every build or upon request.
             - **CRITICAL**: Never narrate your actions in speech (e.g. "I have created a package", "I am adding...", "I am working on it", "I need to create a package for you"). Actions like creating an itinerary must be done silently using tools immediately in the same turn.
+            - **CRITICAL**: TIME-AWARE SCHEDULING. You MUST use `time` and `duration_hours` for EVERY item added to a package (via `propose_itinerary_batch_bound` OR `add_item_bound`). This creates a realistic, NON-OVERLAPPING, bookable flow that respects the traveller's rhythm and journey/buffer times.
+            - **CRITICAL**: NO BLANK DAYS. You MUST ensure every single day of the itinerary has items.
             - **CRITICAL**: Never speak or print Package IDs (UUIDs).
             - **CRITICAL**: No location names during discovery (Phases 1–4). Once the hotel is added, you may name the destination freely.
             - **CRITICAL**: NEVER say you have "booked" something. You are proposing a package. Use "added".
