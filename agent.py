@@ -2,6 +2,7 @@ import os
 import json
 import logging
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from google.adk import Agent, Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.models import Gemini
@@ -46,6 +47,11 @@ def clean_location_from_title(title: str) -> str:
     return t
 
 def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, item_name: str, item_type: str, image_url: str = None, images: list = None):
+    # 0. Skip enrichment for generic "Planned" items to save time
+    if "Planned" in item_name:
+        logger.info(f"Skipping enrichment for generic item: {item_name}")
+        return item
+
     # 1. Helper to detect "bad" URLs
     def is_bad_url(url):
         if not url: return True
@@ -63,14 +69,47 @@ def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, i
     elif image_url not in images:
         images.insert(0, image_url)
 
-    # 4. Search if we still need images
-    if not images or len(images) < 3:
+    # --- ENRICHMENT STRATEGY ---
+    # We want AUTHENTICITY first. 
+    # For hotels and activities, Google Places is the gold standard.
+    
+    enriched_from_places = False
+    if item_type in ['hotel', 'accommodation', 'activity']:
+        try:
+            places_service = GooglePlacesService()
+            item_city = item.metadata.get('city') or item.metadata.get('location')
+            fallback_location = ""
+            pkg = BookingService.get_package(session_id, package_id)
+            if pkg and pkg.title:
+                fallback_location = clean_location_from_title(pkg.title)
+            
+            location = item_city or fallback_location
+            
+            place_data = places_service.get_place_data(item_name, location)
+            if place_data:
+                # Update Reviews
+                if place_data.get('reviews'):
+                    item.metadata['reviews'] = place_data['reviews']
+                if place_data.get('review_link'):
+                    item.metadata['review_link'] = place_data['review_link']
+                
+                # Update Photos
+                places_images = place_data.get('photos', [])
+                if places_images:
+                    authentic_images = [url for url in places_images if not is_bad_url(url)]
+                    if authentic_images:
+                        images = authentic_images
+                        enriched_from_places = True
+                        logger.info(f"Enriched '{item_name}' via Google Places photos.")
+        except Exception as e:
+            logger.warning(f"Failed to fetch authentic Google reviews for '{item_name}': {e}")
+
+    # 4. Fallback/Standard Search if Google Places didn't provide enough
+    if (not images or len(images) < 3) and not enriched_from_places:
         try:
             image_service = ImageSearchService()
-            # Extract specific location context from metadata if available (e.g. from Amadeus/Duffel)
             item_city = item.metadata.get('city') or item.metadata.get('location')
             
-            # Detect location context from the package title (CLEANED) as a fallback
             fallback_location = ""
             pkg = BookingService.get_package(session_id, package_id)
             if pkg and pkg.title:
@@ -99,67 +138,14 @@ def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, i
         except Exception as e:
             logger.warning(f"Failed to auto-search images for {item_name}: {e}")
 
-    # 5. Final fallback for primary image_url
-    if not image_url and images:
-        image_url = images[0]
-    
-    # 6. Final product-specific search if still no image
-    if not image_url and item_type == 'product':
-        logger.info(f"[TOOL] No image for product '{item_name}', searching...")
-        try:
-             found = ImageSearchService().get_product_image(item_name, num=1)
-             if found:
-                 image_url = found[0]
-                 if image_url not in images:
-                     images.insert(0, image_url)
-        except Exception as e:
-            logger.warning(f"Product image search failed: {e}")
-
-    # Store extended details in metadata
+    # Store results in metadata
     if images:
-        item.metadata['images'] = images
-        # Set primary image_url if not already set
+        item.metadata['images'] = images[:10]
         if not image_url:
             image_url = images[0]
             
     if image_url:
         item.metadata['image_url'] = image_url
-
-    # --- REAL REVIEWS EXTRACTOR ---
-    if item_type in ['hotel', 'accommodation', 'activity']:
-        try:
-            places_service = GooglePlacesService()
-            # Use item-specific location context if available, otherwise fallback to title
-            item_city = item.metadata.get('city') or item.metadata.get('location')
-            fallback_location = ""
-            pkg = BookingService.get_package(session_id, package_id)
-            if pkg and pkg.title:
-                fallback_location = clean_location_from_title(pkg.title)
-            
-            location = item_city or fallback_location
-                
-            place_data = places_service.get_place_data(item_name, location)
-            if place_data:
-                # 1. Update Reviews
-                if place_data.get('reviews'):
-                    item.metadata['reviews'] = place_data['reviews']
-                if place_data.get('review_link'):
-                    item.metadata['review_link'] = place_data['review_link']
-                
-                # 2. Update Photos (PRIORITY over generic search)
-                places_images = place_data.get('photos', [])
-                if places_images:
-                    # For hotels and activities, we want AUTHENTICITY. 
-                    # If we found official photos, we PURGE the generic search results.
-                    authentic_images = [url for url in places_images if not is_bad_url(url)]
-                    if authentic_images:
-                        # REPLACING the list instead of appending
-                        images = authentic_images
-                        item.metadata['images'] = images[:10]
-                        item.metadata['image_url'] = images[0]
-                        logger.info(f"Purged generic images for '{item_name}' and replaced with {len(authentic_images)} authentic photos.")
-        except Exception as e:
-            logger.warning(f"Failed to fetch authentic Google reviews for '{item_name}': {e}")
 
     return item
 
@@ -616,7 +602,7 @@ class VoiceAgent:
                 target_package_id = active_pkg.id
                 logger.info(f"Adding batch to package: {active_pkg.title} ({target_package_id})")
                 
-                for data in items_data:
+                def enrich_item(data):
                     item_name = data.get('name') or data.get('title')
                     item_type = data.get('item_type', 'activity')
                     
@@ -637,19 +623,27 @@ class VoiceAgent:
                         'images': data.get('images', []),
                         'product_url': data.get('product_url'),
                         'rating': data.get('rating'),
-                        'reviews': [], # Blanked. We fetch authentic ones below.
+                        'reviews': [],
                         'review_link': data.get('review_link'),
                         'time': data.get('time'),
                         'duration_hours': data.get('duration_hours')
                     })
                     
-                    # Enrich automatically fetched images & real Google Places Reviews
                     try:
                         pkg_item = _enrich_item_metadata(session_id, target_package_id, pkg_item, item_name, item_type, data.get('image_url'), data.get('images', []))
                     except Exception as enrichment_err:
                         logger.warning(f"Metadata enrichment failed for {item_name}: {enrichment_err}")
                     
-                    package_items.append(pkg_item)
+                    return pkg_item
+
+                # Parallel enrichment for speed
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    futures = [executor.submit(enrich_item, data) for data in items_data]
+                    for future in as_completed(futures):
+                        try:
+                            package_items.append(future.result())
+                        except Exception as e:
+                            logger.error(f"Error in parallel enrichment: {e}")
                 
                 if not package_items:
                     return "No valid items were found in the provided batch."
