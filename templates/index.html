@@ -3829,8 +3829,8 @@
             i = (i + 1) % shuffled.length;
             setBotStatusMessage(shuffled[i], 'left');
 
-            // Randomized duration between 800ms and 1600ms (Average 1200ms)
-            const randomDelay = 800 + Math.random() * 800;
+            // Randomized duration between 0ms and 1500ms (Average 750ms)
+            const randomDelay = Math.random() * 1500;
             statusInterval = setTimeout(updateStatus, randomDelay);
         }
 
@@ -4143,7 +4143,7 @@
 
                 list.innerHTML = '';
 
-                packages.forEach(pkg => {
+                [...packages].reverse().forEach(pkg => {
                     // Summary Card
                     const card = document.createElement('div');
                     card.style.cssText = "background: #f9f9f9; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);";
@@ -4875,6 +4875,11 @@
     async function _sendChatMessage(textOverride) {
         initAudio(); // Crucial: Initialize audio on every user interaction
         interruptBot();
+
+        // Stop daydream bubbles as soon as a conversation message is posted
+        if (typeof stopDaydreamCycle === 'function') {
+            stopDaydreamCycle();
+        }
 
         const input = document.getElementById('chat-input');
         const text = (textOverride !== undefined ? textOverride : input.value).trim();
