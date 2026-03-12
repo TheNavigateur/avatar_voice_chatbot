@@ -30,7 +30,9 @@ def clean_location_from_title(title: str) -> str:
     t = title
     # Remove common trip words
     t = re.sub(r'\b(Holiday|Trip|Getaway|Package|Enrichment|Planned|New)\b', '', t, flags=re.IGNORECASE)
-    # Remove dates (years like 2027, 2024)
+    # Remove dates (years like 2027, 2024) - but keep months for now as they help context? 
+    # Actually, the requirement is to have dates back in TITLE, but SEARCH needs clean locations.
+    # We will strip them here for the search query, but preserve the package title itself.
     t = re.sub(r'\b20\d{2}\b', '', t)
     # Remove months
     months = r'\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b'
@@ -588,6 +590,9 @@ class VoiceAgent:
             """
             try:
                 items_data = json.loads(items_json)
+                if not items_data or not isinstance(items_data, list):
+                    return "Error: No items found in the provided batch. Do not call this tool with empty data."
+                
                 package_items = []
                 logger.info(f"Proposing batch of {len(items_data)} items...")
                 
@@ -644,7 +649,10 @@ class VoiceAgent:
                     return "No valid items were found in the provided batch."
 
                 res = BookingService.add_items_to_package(session_id, target_package_id, package_items)
-                return f"Successfully added {len(package_items)} items to package '{active_pkg.title}' ({target_package_id})."
+                if res:
+                    return f"Successfully added {len(package_items)} items to package '{active_pkg.title}' ({target_package_id})."
+                else:
+                    return f"Error: Failed to add items to package '{active_pkg.title}'. Please ensure the package exists."
             except Exception as e:
                 logger.error(f"Error in propose_itinerary_batch_bound: {e}")
                 return f"Error adding batch items: {str(e)}"
@@ -680,6 +688,7 @@ class VoiceAgent:
 
             ### 0. DISCOVERY & SELECTION PROTOCOLS (Level 6 & 7):
             - **Phase 0 (Triage)**: Mandatory check if New or Continuing. Create NEW package via `create_package_bound` if vision/intent has changed.
+            - **PACKAGE TITLE PROTOCOL**: Package titles MUST include the destination, month and year of travel (e.g., "Gold Coast Family Holiday Oct 2026"). This helps the traveller identify their trips in the list.
             - **Phase 1 (Logistics)**: Confirm Origin, Duration, and Travel Month.
             - **Phase 2 (Budget)**: Establish clear budget range.
             - **Phase 3 (Soulful Discovery)**: Ask about "Vibe", "Pace", and specific "Activities".
