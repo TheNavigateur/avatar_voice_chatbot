@@ -716,6 +716,19 @@ class VoiceAgent:
             - **HARD BAN**: Never ask "Where?".
             - **PROACTIVITY**: If you have enough info to build, BUILD NOW. Do not ask "Would you like me to build it?".
 
+            ### 6. LOGICAL CONSISTENCY & CLIMATE SAFETY:
+            - **Non-Negotiable Activity Climate Table**:
+                | Activity | Required Climate |
+                | :--- | :--- |
+                | Skiing, Snowboarding | COLD (Below 5°C / 41°F) |
+                | Ice Skating (Outdoor) | COLD (Below 5°C / 41°F) |
+                | Beach, Swimming (Outdoor) | WARM (Above 22°C / 72°F) |
+                | Water Parks | WARM (Above 22°C / 72°F) |
+                | Desert Safari | HOT (Above 25°C / 77°F) |
+            - **Mandate**: NEVER combine items from this table with an incompatible climate description or month. 
+            - **Conflict Resolution**: If a user's profile or previous message creates a conflict (e.g., "Warm weather" + "Skiing"), you MUST NOT proceed with both. Instead, politely point out the contradiction or ask which they'd like to prioritize. 
+            - **Example**: "I see you're interested in skiing, which typically needs a colder climate. Should we look for a winter destination, or stick with a warm-weather trip and find some different adventures?"
+
             {package_view_context}
             {global_context}
 
