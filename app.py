@@ -30,7 +30,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
         if idinfo['aud'] != client_id:
             raise ValueError("Could not verify audience.")
-        return idinfo['sub']
+        return {"id": idinfo['sub'], "email": idinfo.get("email", "web_user@example.com")}
     except ValueError as e:
         logger.error(f"Invalid token: {e}")
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
@@ -72,22 +72,25 @@ class ProfileFactRequest(BaseModel):
     fact: str
     remove: bool = False
 
+class BookRequest(BaseModel):
+    travelers: List[Dict] # List of {first_name, last_name, dob, gender, email, phone}
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/api/profile/{user_id}")
-async def get_profile(user_id: str, current_user: str = Depends(get_current_user)):
-    return {"content": ProfileService.get_profile(current_user)}
+async def get_profile(user_id: str, current_user: dict = Depends(get_current_user)):
+    return {"content": ProfileService.get_profile(current_user['id'])}
 
 @app.post("/api/profile/{user_id}")
-async def update_profile(user_id: str, request: ProfileUpdateRequest, current_user: str = Depends(get_current_user)):
-    ProfileService.update_profile(current_user, request.content)
+async def update_profile(user_id: str, request: ProfileUpdateRequest, current_user: dict = Depends(get_current_user)):
+    ProfileService.update_profile(current_user['id'], request.content)
     return {"status": "success"}
 
 @app.post("/api/profile/fact")
-async def update_profile_fact(request: ProfileFactRequest, current_user: str = Depends(get_current_user)):
-    user_id = current_user
+async def update_profile_fact(request: ProfileFactRequest, current_user: dict = Depends(get_current_user)):
+    user_id = current_user['id']
     if request.remove:
         # Simple removal logic: find line and remove it
         current = ProfileService.get_profile(user_id)
@@ -123,8 +126,8 @@ async def proxy_photo(ref: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat")
-def chat(request: ChatRequest, current_user: str = Depends(get_current_user)):
-    user_id = current_user 
+def chat(request: ChatRequest, current_user: dict = Depends(get_current_user)):
+    user_id = current_user['id']
     session_id = request.session_id or str(uuid.uuid4())
     
     if not request.message:
@@ -140,12 +143,12 @@ def chat(request: ChatRequest, current_user: str = Depends(get_current_user)):
     })
 
 @app.post("/chat_stream")
-async def chat_stream(request: ChatRequest, current_user: str = Depends(get_current_user)):
+async def chat_stream(request: ChatRequest, current_user: dict = Depends(get_current_user)):
     import json
     import asyncio
     import threading
     
-    user_id = current_user
+    user_id = current_user['id']
     session_id = request.session_id or str(uuid.uuid4())
     
     if not request.message:
@@ -200,23 +203,23 @@ async def get_packages(session_id: str):
     return [p.model_dump() for p in packages]
 
 @app.get("/api/user/{user_id}/packages")
-async def get_user_packages(user_id: str, current_user: str = Depends(get_current_user)):
-    packages = BookingService.get_user_packages(current_user)
+async def get_user_packages(user_id: str, current_user: dict = Depends(get_current_user)):
+    packages = BookingService.get_user_packages(current_user['id'])
     return [p.model_dump() for p in packages]
 
 @app.post("/api/packages/{session_id}/{package_id}/book")
-async def book_package(session_id: str, package_id: str, current_user: str = Depends(get_current_user)):
+async def book_package(session_id: str, package_id: str, request: BookRequest, current_user: dict = Depends(get_current_user)):
     package = BookingService.get_package(session_id, package_id)
-    if not package or package.user_id != current_user:
+    if not package or package.user_id != current_user['id']:
         raise HTTPException(status_code=404, detail="Package not found")
     
-    result = await BookingService.execute_booking(package)
+    result = await BookingService.execute_booking(package, current_user['email'], request.travelers)
     return result
 
 @app.delete("/api/packages/{session_id}/{package_id}/items/{item_id}")
-async def delete_package_item(session_id: str, package_id: str, item_id: str, current_user: str = Depends(get_current_user)):
+async def delete_package_item(session_id: str, package_id: str, item_id: str, current_user: dict = Depends(get_current_user)):
     package = BookingService.get_package(session_id, package_id)
-    if not package or package.user_id != current_user:
+    if not package or package.user_id != current_user['id']:
         raise HTTPException(status_code=403, detail="Forbidden")
     pkg = BookingService.remove_item_from_package(session_id, package_id, item_id)
     if not pkg:

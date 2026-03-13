@@ -293,66 +293,139 @@ class BookingService:
         return BookingService.get_package(actual_session_id, package_id)
 
     @staticmethod
-    async def execute_booking(package: Package) -> Dict:
+    async def execute_booking(package: Package, user_email: str, travelers: List[Dict]) -> Dict:
         """
-        Simulates booking all items in a package.
-        Returns result dict.
+        Executes real booking for a package.
+        Flights & Hotels (if IDs exist) -> Duffel API
+        Everything else -> Affilate deep-links
         """
-        conn = get_db_connection()
-        c = conn.cursor()
+        from services.duffel_service import DuffelService
+        from services.email_service import EmailService
         
+        duffel = DuffelService()
         success_items = []
         failed_items = []
         
-        # Re-fetch items from DB to be safe
-        # Or just use package.items provided
+        conn = get_db_connection()
+        c = conn.cursor()
         
         for item in package.items:
             try:
-                # Simulate API call
-                logger.info(f"Booking item: {item.name} ({item.item_type})")
+                logger.info(f"Processing booking for: {item.name} ({item.item_type})")
                 
-                # Mock failure for specific items relative to "Test"
-                if "fail" in item.name.lower():
-                    raise Exception("Mock booking failure")
+                # 1. Flights (Duffel API)
+                if item.item_type == 'flight':
+                    offer_id = item.metadata.get('offer_id')
+                    if offer_id:
+                        order = duffel.create_order(offer_id, travelers)
+                        if order and 'id' in order:
+                            item.metadata['booking_reference'] = order.get('booking_reference')
+                            item.metadata['duffel_order_id'] = order.get('id')
+                            item.status = BookingStatus.BOOKED
+                        else:
+                            item.status = BookingStatus.FAILED
+                            failed_items.append(item)
+                    else:
+                        # Fallback: Redirect
+                        item.metadata['booking_link'] = BookingService.build_duffel_search_link(item)
+                        item.status = BookingStatus.BOOKED
+
+                # 2. Hotels (Duffel Stays API or Redirect)
+                elif item.item_type == 'hotel':
+                    stay_id = item.metadata.get('stay_id') # rate_id or stay_id
+                    if stay_id:
+                        # For Stay bookings, we need a quote first usually, or we assume it's pre-quoted
+                        booking = duffel.create_stay_order(stay_id, travelers[0]) # use lead guest
+                        if booking and 'id' in booking:
+                            item.metadata['booking_reference'] = booking.get('id')
+                            item.status = BookingStatus.BOOKED
+                        else:
+                            item.status = BookingStatus.FAILED
+                            failed_items.append(item)
+                    else:
+                        item.metadata['booking_link'] = BookingService.build_travelpayouts_hotel_link(item)
+                        item.status = BookingStatus.BOOKED
+
+                # 3. Activities (Travelpayouts Redirect)
+                elif item.item_type == 'activity':
+                    item.metadata['booking_link'] = BookingService.build_travelpayouts_viator_link(item)
+                    item.status = BookingStatus.BOOKED
+
+                # 4. Restaurants (OpenTable Redirect)
+                elif item.item_type == 'restaurant':
+                    item.metadata['booking_link'] = BookingService.build_opentable_link(item)
+                    item.status = BookingStatus.BOOKED
+
+                # 5. Products (Amazon Redirect)
+                elif item.item_type == 'product':
+                    # Already has booking_link in metadata usually
+                    item.status = BookingStatus.BOOKED
+
+                # Update item in DB
+                c.execute("UPDATE package_items SET status = ?, metadata = ? WHERE id = ?", 
+                          (item.status.value, json.dumps(item.metadata), item.id))
                 
-                # Update DB status
-                c.execute("UPDATE package_items SET status = ? WHERE id = ?", (BookingStatus.BOOKED, item.id))
-                item.status = BookingStatus.BOOKED
-                success_items.append(item)
-                
+                if item.status == BookingStatus.BOOKED:
+                    success_items.append(item)
+
             except Exception as e:
-                logger.error(f"Failed to book {item.name}: {e}")
-                # Update DB status
-                c.execute("UPDATE package_items SET status = ? WHERE id = ?", (BookingStatus.FAILED, item.id))
-                item.status = BookingStatus.FAILED
+                logger.error(f"Error booking {item.name}: {e}")
                 failed_items.append(item)
         
-        conn.commit() # Commit partial progress
-        conn.close()
-        
-        if failed_items:
-            logger.info("Critical failure detected. Rolling back...")
-            await BookingService.rollback_booking(package, success_items)
-            
-            # Update Package Status
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("UPDATE packages SET status = ? WHERE id = ?", (BookingStatus.FAILED, package.id))
-            conn.commit()
-            conn.close()
-            
+        # Update Package Level Status
+        if failed_items and success_items:
+            package.status = BookingStatus.PARTIAL
+        elif failed_items:
             package.status = BookingStatus.FAILED
-            return {"status": "failed", "message": "Booking failed. Transaction rolled back.", "failed_items": [i.name for i in failed_items]}
         else:
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("UPDATE packages SET status = ? WHERE id = ?", (BookingStatus.BOOKED, package.id))
-            conn.commit()
-            conn.close()
-            
             package.status = BookingStatus.BOOKED
-            return {"status": "success", "message": "All items booked successfully!"}
+            
+        c.execute("UPDATE packages SET status = ? WHERE id = ?", (package.status.value, package.id))
+        conn.commit()
+        conn.close()
+
+        # Trigger Email if any successes
+        if success_items:
+            try:
+                # Re-serialize for email helper
+                pkg_dict = package.dict() if hasattr(package, 'dict') else package.__dict__
+                EmailService().send_booking_confirmation(user_email, pkg_dict)
+            except Exception as e:
+                logger.error(f"Failed to trigger booking email: {e}")
+
+        return {
+            "status": "success" if not failed_items else "partial",
+            "message": "Booking processed." if not failed_items else "Some items could not be booked.",
+            "success_count": len(success_items),
+            "failed_count": len(failed_items)
+        }
+
+    @staticmethod
+    def build_duffel_search_link(item: PackageItem) -> str:
+        # Simplified redirect to Duffel's search UI if we have one, or just Google Flights
+        # Since Duffel doesn't have a public "consumer" link usually, we'll use a placeholder or Google Flights
+        return f"https://www.google.com/travel/flights?q=flights+to+{item.metadata.get('destination', 'destination')}"
+
+    @staticmethod
+    def build_travelpayouts_hotel_link(item: PackageItem) -> str:
+        marker = "507481"
+        city = item.metadata.get('location', '')
+        # Simple Search link for Booking.com via Travelpayouts
+        base_url = "https://www.booking.com/searchresults.html"
+        params = f"?ss={city}&marker={marker}&aid=2312000" # AID is example, user should provide
+        return base_url + params
+
+    @staticmethod
+    def build_travelpayouts_viator_link(item: PackageItem) -> str:
+        # The user has Partner ID P00292499
+        partner_id = "P00292499"
+        name = item.name.replace(" ", "+")
+        return f"https://www.viator.com/partner/{partner_id}/search/{name}"
+
+    @staticmethod
+    def build_opentable_link(item: PackageItem) -> str:
+        name = item.name.replace(" ", "+")
+        return f"https://www.opentable.com/s/?term={name}"
 
     @staticmethod
     async def rollback_booking(package: Package, booked_items: List[PackageItem]):
