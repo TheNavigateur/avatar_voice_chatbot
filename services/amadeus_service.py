@@ -388,9 +388,18 @@ class AmadeusService:
              city_code = city_code_or_name
              if len(city_code) != 3 or not city_code.isupper():
                   resolved = self.resolve_city_to_iata(city_code_or_name)
-                  if resolved: city_code = resolved
-             offers = self.search_hotels_by_city(city_code, check_in=check_in, check_out=check_out)
-             loc_desc = city_code
+                  if resolved: 
+                       city_code = resolved
+                       offers = self.search_hotels_by_city(city_code, check_in=check_in, check_out=check_out)
+                  else:
+                       # Fallback to coordinates if IATA resolution fails
+                       lat, lon = self.get_coordinates(city_code_or_name)
+                       if lat:
+                            return self.search_hotels_formatted(latitude=lat, longitude=lon, radius=radius, check_in=check_in, check_out=check_out)
+                       offers = [] # Give up if no lat/lon either
+             else:
+                  offers = self.search_hotels_by_city(city_code, check_in=check_in, check_out=check_out)
+             loc_desc = city_code_or_name
         else:
              return "Error: City code or coordinates required for hotel search."
         

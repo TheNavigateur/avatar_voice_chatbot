@@ -148,6 +148,7 @@ class BookingService:
             type=PackageType(row['type']),
             status=BookingStatus(row['status']),
             total_price=row['total_price'],
+            booking_window_opens_at=row['booking_window_opens_at'],
             items=items
         )
         conn.close()
@@ -199,21 +200,21 @@ class BookingService:
         return packages
 
     @staticmethod
-    def create_package(session_id: str, title: str, type: PackageType = PackageType.MIXED, user_id: str = "web_user") -> Package:
+    def create_package(session_id: str, title: str, type: PackageType = PackageType.MIXED, user_id: str = "web_user", status: BookingStatus = BookingStatus.DRAFT, booking_window_opens_at: str = None) -> Package:
         conn = get_db_connection()
         c = conn.cursor()
         
         new_id = str(uuid.uuid4())
         c.execute("""
-            INSERT INTO packages (id, session_id, user_id, title, type, status, total_price)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (new_id, session_id, user_id, title, type.value, BookingStatus.DRAFT.value, 0.0))
+            INSERT INTO packages (id, session_id, user_id, title, type, status, total_price, booking_window_opens_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (new_id, session_id, user_id, title, type.value, status.value, 0.0, booking_window_opens_at))
         
         conn.commit()
         conn.close()
         
         # Return object
-        return Package(id=new_id, session_id=session_id, user_id=user_id, title=title, type=type)
+        return Package(id=new_id, session_id=session_id, user_id=user_id, title=title, type=type, status=status, booking_window_opens_at=booking_window_opens_at)
 
     @staticmethod
     def add_item_to_package(session_id: str, package_id: str, item: PackageItem) -> Optional[Package]:
@@ -311,9 +312,15 @@ class BookingService:
         
         for item in package.items:
             try:
+                # Skip already booked items
+                if item.status == BookingStatus.BOOKED:
+                    logger.info(f"Item {item.name} is already booked. Skipping.")
+                    success_items.append(item)
+                    continue
+
                 logger.info(f"Processing booking for: {item.name} ({item.item_type})")
                 
-                # 1. Flights (Duffel API)
+                # 1. Flights (Duffel API with fallback)
                 if item.item_type == 'flight':
                     offer_id = item.metadata.get('offer_id')
                     if offer_id:
@@ -323,38 +330,43 @@ class BookingService:
                             item.metadata['duffel_order_id'] = order.get('id')
                             item.status = BookingStatus.BOOKED
                         else:
-                            item.status = BookingStatus.FAILED
-                            failed_items.append(item)
+                            # Fallback if API call fails
+                            item.status = BookingStatus.PENDING_EXTERNAL
+                            logger.info(f"Duffel Flight API failed for {item.name}, falling back to external link.")
                     else:
-                        # Fallback: Redirect
-                        item.metadata['booking_link'] = BookingService.build_duffel_search_link(item)
-                        item.status = BookingStatus.BOOKED
+                        # FALLBACK: No direct booking ID found.
+                        item.status = BookingStatus.PENDING_EXTERNAL
+                        logger.info(f"No Duffel Offer ID for {item.name}, setting to PENDING_EXTERNAL.")
 
-                # 2. Hotels (Duffel Stays API or Redirect)
+                # 2. Hotels (Duffel Stays API with fallback)
                 elif item.item_type == 'hotel':
-                    stay_id = item.metadata.get('stay_id') # rate_id or stay_id
-                    if stay_id:
-                        # For Stay bookings, we need a quote first usually, or we assume it's pre-quoted
-                        booking = duffel.create_stay_order(stay_id, travelers[0]) # use lead guest
+                    stay_id = item.metadata.get('stay_id') or item.metadata.get('hotel_id') 
+                    if stay_id and (stay_id.startswith('sta_') or stay_id.startswith('acc_')):
+                        # For Stay bookings on Duffel
+                        booking = duffel.create_stay_order(stay_id, travelers[0]) 
                         if booking and 'id' in booking:
                             item.metadata['booking_reference'] = booking.get('id')
                             item.status = BookingStatus.BOOKED
                         else:
-                            item.status = BookingStatus.FAILED
-                            failed_items.append(item)
+                            # Fallback if API call fails but we has an ID
+                            item.status = BookingStatus.PENDING_EXTERNAL
+                            logger.info(f"Duffel Stays API failed for {item.name}, falling back to external link.")
                     else:
-                        item.metadata['booking_link'] = BookingService.build_travelpayouts_hotel_link(item)
-                        item.status = BookingStatus.BOOKED
+                        # FALLBACK: No direct booking ID found.
+                        item.status = BookingStatus.PENDING_EXTERNAL
+                        logger.info(f"No Duffel ID for {item.name}, setting to PENDING_EXTERNAL for affiliate booking.")
 
                 # 3. Activities (Travelpayouts Redirect)
                 elif item.item_type == 'activity':
                     item.metadata['booking_link'] = BookingService.build_travelpayouts_viator_link(item)
-                    item.status = BookingStatus.BOOKED
+                    item.status = BookingStatus.PENDING_EXTERNAL
+                    # Also record a placeholder for verification if we had an API key
+                    # For now, it stays as pending_external
 
                 # 4. Restaurants (OpenTable Redirect)
                 elif item.item_type == 'restaurant':
                     item.metadata['booking_link'] = BookingService.build_opentable_link(item)
-                    item.status = BookingStatus.BOOKED
+                    item.status = BookingStatus.PENDING_EXTERNAL
 
                 # 5. Products (Amazon Redirect)
                 elif item.item_type == 'product':
@@ -369,14 +381,19 @@ class BookingService:
                     success_items.append(item)
 
             except Exception as e:
-                logger.error(f"Error booking {item.name}: {e}")
+                error_msg = str(e)
+                logger.error(f"Error booking {item.name}: {error_msg}")
+                item.status = BookingStatus.FAILED
                 failed_items.append(item)
+                # Keep track of the first error message to return
+                if 'first_error' not in locals():
+                    first_error = error_msg
         
         # Update Package Level Status
-        if failed_items and success_items:
+        if failed_items:
+            package.status = BookingStatus.FAILED if not success_items and not any(i.status == BookingStatus.PENDING_EXTERNAL for i in package.items) else BookingStatus.PARTIAL
+        elif any(i.status == BookingStatus.PENDING_EXTERNAL for i in package.items):
             package.status = BookingStatus.PARTIAL
-        elif failed_items:
-            package.status = BookingStatus.FAILED
         else:
             package.status = BookingStatus.BOOKED
             
@@ -385,34 +402,166 @@ class BookingService:
         conn.close()
 
         # Trigger Email if any successes
+        from services.notification_service import NotificationService
         if success_items:
             try:
                 # Re-serialize for email helper
                 pkg_dict = package.dict() if hasattr(package, 'dict') else package.__dict__
-                EmailService().send_booking_confirmation(user_email, pkg_dict)
+                NotificationService.send_booking_confirmation(user_email, pkg_dict)
             except Exception as e:
                 logger.error(f"Failed to trigger booking email: {e}")
 
+        msg = "Booking processed."
+        if failed_items:
+            # Use the captured error message if available
+            msg = f"Booking failed for {failed_items[0].name}: {locals().get('first_error', 'General error')}"
+            if len(failed_items) > 1:
+                msg += f" (and {len(failed_items)-1} other items)"
+
         return {
             "status": "success" if not failed_items else "partial",
-            "message": "Booking processed." if not failed_items else "Some items could not be booked.",
+            "message": msg,
             "success_count": len(success_items),
             "failed_count": len(failed_items)
         }
 
     @staticmethod
+    def verify_item_booking(user_id: str, package_id: str, item_id: str) -> Dict:
+        """
+        Manually marks an item as BOOKED. Used for external redirects.
+        """
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 1. Update the item
+        c.execute("UPDATE package_items SET status = ? WHERE id = ? AND package_id = ?", 
+                  (BookingStatus.BOOKED.value, item_id, package_id))
+        
+        # 2. Re-fetch all items for this package to determine package status
+        c.execute("SELECT status FROM package_items WHERE package_id = ?", (package_id,))
+        rows = c.fetchall()
+        item_statuses = [row[0] for row in rows]
+        
+        new_package_status = BookingStatus.BOOKED
+        # Note: If any remain as 'pending_external', the package is still 'partial'
+        if any(s == BookingStatus.FAILED.value for s in item_statuses):
+            new_package_status = BookingStatus.PARTIAL
+        elif any(s == BookingStatus.PENDING_EXTERNAL.value for s in item_statuses):
+            new_package_status = BookingStatus.PARTIAL
+        elif any(s == BookingStatus.DRAFT.value for s in item_statuses):
+            new_package_status = BookingStatus.DRAFT
+
+        # 3. Update the package
+        c.execute("UPDATE packages SET status = ? WHERE id = ?", (new_package_status.value, package_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            "status": "success",
+            "item_status": BookingStatus.BOOKED.value,
+            "package_status": new_package_status.value
+        }
+
+    @staticmethod
+    def sync_external_bookings(user_id: str, package_id: str) -> Dict:
+        """
+        Polls Travelpayouts Statistics API for paid bookings matching our SubIDs.
+        """
+        token = os.environ.get("TRAVELPAYOUTS_API_TOKEN")
+        if not token:
+            return {"status": "error", "message": "TRAVELPAYOUTS_API_TOKEN not set."}
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 1. Get all pending external items for this package
+        c.execute("SELECT id FROM package_items WHERE package_id = ? AND status = ?", 
+                  (package_id, BookingStatus.PENDING_EXTERNAL.value))
+        pending_ids = [row[0] for row in c.fetchall()]
+        
+        if not pending_ids:
+            return {"status": "success", "updates": 0, "message": "No pending external items to verify."}
+
+        # 2. Call Travelpayouts Statistics API
+        # We check the last 30 days to be safe
+        import datetime
+        end_date = datetime.date.today()
+        start_date = end_date - datetime.timedelta(days=30)
+        
+        url = "https://api.tp.st/v2/statistics/actions"
+        headers = {"X-Access-Token": token}
+        params = {
+            "date_from": start_date.strftime("%Y-%m-%d"),
+            "date_to": end_date.strftime("%Y-%m-%d"),
+            "limit": 100
+        }
+        
+        try:
+            import requests
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+            if response.status_code != 200:
+                logger.error(f"Travelpayouts API Error {response.status_code}: {response.text}")
+                return {"status": "error", "message": f"API error: {response.status_code}"}
+            
+            data = response.json()
+            actions = data.get("actions", [])
+            
+            # Map sub_id to action status
+            # We look for "paid" or "confirmed" states
+            completed_subids = set()
+            for action in actions:
+                subid = action.get("sub_id")
+                state = action.get("state") # e.g. "paid", "confirmed", "pending"
+                if subid in pending_ids and state in ["paid", "confirmed"]:
+                    completed_subids.add(subid)
+            
+            # 3. Update database for matched SubIDs
+            update_count = 0
+            for subid in completed_subids:
+                c.execute("UPDATE package_items SET status = ? WHERE id = ?", 
+                          (BookingStatus.BOOKED.value, subid))
+                update_count += 1
+            
+            if update_count > 0:
+                # Recalculate package status
+                c.execute("SELECT status FROM package_items WHERE package_id = ?", (package_id,))
+                item_statuses = [row[0] for row in c.fetchall()]
+                
+                new_pkg_status = BookingStatus.BOOKED
+                if any(s == BookingStatus.FAILED.value for s in item_statuses):
+                    new_pkg_status = BookingStatus.PARTIAL
+                elif any(s == BookingStatus.PENDING_EXTERNAL.value for s in item_statuses):
+                    new_pkg_status = BookingStatus.PARTIAL
+                elif any(s == BookingStatus.DRAFT.value for s in item_statuses):
+                    new_pkg_status = BookingStatus.DRAFT
+                
+                c.execute("UPDATE packages SET status = ? WHERE id = ?", (new_pkg_status.value, package_id))
+            
+            conn.commit()
+            conn.close()
+            
+            return {
+                "status": "success", 
+                "updates": update_count, 
+                "message": f"Sync complete. {update_count} items updated."
+            }
+            
+        except Exception as e:
+            logger.error(f"Sync failed: {e}")
+            return {"status": "error", "message": f"Sync failed: {str(e)}"}
+    @staticmethod
     def build_duffel_search_link(item: PackageItem) -> str:
         # Simplified redirect to Duffel's search UI if we have one, or just Google Flights
-        # Since Duffel doesn't have a public "consumer" link usually, we'll use a placeholder or Google Flights
         return f"https://www.google.com/travel/flights?q=flights+to+{item.metadata.get('destination', 'destination')}"
 
     @staticmethod
     def build_travelpayouts_hotel_link(item: PackageItem) -> str:
         marker = "507481"
         city = item.metadata.get('location', '')
-        # Simple Search link for Booking.com via Travelpayouts
+        # Simple Search link for Booking.com via Travelpayouts with SubID
         base_url = "https://www.booking.com/searchresults.html"
-        params = f"?ss={city}&marker={marker}&aid=2312000" # AID is example, user should provide
+        params = f"?ss={city}&marker={marker}&aid=2312000&subid={item.id}"
         return base_url + params
 
     @staticmethod
@@ -420,7 +569,8 @@ class BookingService:
         # The user has Partner ID P00292499
         partner_id = "P00292499"
         name = item.name.replace(" ", "+")
-        return f"https://www.viator.com/partner/{partner_id}/search/{name}"
+        # Include item ID as SubID for automated tracking
+        return f"https://www.viator.com/partner/{partner_id}/search/{name}?subid={item.id}"
 
     @staticmethod
     def build_opentable_link(item: PackageItem) -> str:

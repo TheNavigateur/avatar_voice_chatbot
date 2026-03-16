@@ -40,14 +40,24 @@
 
         /* Simulation Banner */
         .simulation-banner {
-            background: #ff4757;
-            color: white;
-            padding: 8px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 0.9rem;
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            background: rgba(30, 41, 59, 0.7);
+            color: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            backdrop-filter: blur(4px);
+            z-index: 10000;
             display: none;
-            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: opacity 0.3s;
+        }
+        .simulation-banner:hover {
+            opacity: 1;
+            background: rgba(30, 41, 59, 1);
         }
         .simulation-mode .simulation-banner { display: block; }
         .simulation-mode .action-btn { background: #2ed573 !important; } /* A bright, safe green for sim mode */
@@ -1158,6 +1168,27 @@
             border-bottom: none;
         }
 
+        /* Inline spinner for the current thinking message */
+        @keyframes status-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-spinner {
+            display: inline-block;
+            width: 0.75em;
+            height: 0.75em;
+            border-radius: 50%;
+            border: 1.5px solid currentColor;
+            border-top-color: transparent;
+            vertical-align: middle;
+            margin-right: 0.35em;
+            animation: status-spin 0.8s linear infinite;
+            flex-shrink: 0;
+            position: relative;
+            top: -0.05em; /* optical centering */
+            opacity: 0.9;
+        }
+
         .message {
             margin-bottom: 12px;
             display: flex;
@@ -1842,16 +1873,16 @@
 
                 <div style="display:flex; gap:10px;">
                     <button type="button" onclick="closeCheckout()" class="action-btn" style="background:#94a3b8; flex:1;">Cancel</button>
-                    <button type="submit" class="action-btn" style="background:#28a745; flex:2;">Complete Booking</button>
+                    <button type="submit" id="complete-booking-btn" class="action-btn" style="background:#28a745; flex:2;">Complete Booking</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div class="simulation-banner" id="sim-banner">
-        ⚠️ TEST MODE: Simulated Bookings Only
-        <label style="margin-left: 15px; font-size: 0.8rem; cursor: pointer;">
-            <input type="checkbox" id="sim-toggle" checked onclick="toggleSimMode()"> Sim Mode ON
+        <span>Test Mode</span>
+        <label style="margin-left: 8px; font-size: 0.7rem; cursor: pointer; display: inline-flex; align-items: center;">
+            <input type="checkbox" id="sim-toggle" checked onclick="toggleSimMode()" style="margin-right: 4px; width: 12px; height: 12px;"> Sim ON
         </label>
     </div>
 
@@ -3875,13 +3906,21 @@
 
         // For right-aligned messages (like "Listening..."), replace existing ones
         if (align === 'right') {
-            // Remove any existing right-aligned status messages
             const existingRightMessages = tDiv.querySelectorAll('.bot-status-message-right');
             existingRightMessages.forEach(msg => msg.remove());
         }
 
+        // Strip spinner from the previous last left-aligned message, leaving only the text
+        if (align === 'left') {
+            const prevLeft = tDiv.querySelectorAll('.bot-status-message-left');
+            if (prevLeft.length > 0) {
+                const lastPrev = prevLeft[prevLeft.length - 1];
+                const textNode = lastPrev.querySelector('.status-msg-text');
+                if (textNode) lastPrev.innerHTML = textNode.textContent;
+            }
+        }
+
         const div = document.createElement('div');
-        // Use different classes for left vs right to distinguish them
         if (align === 'right') {
             div.className = 'bot-status-message bot-status-message-right';
         } else {
@@ -3893,7 +3932,13 @@
         if (align === 'right') alignSelf = 'flex-end';
 
         div.style.cssText = `text-align: ${align}; align-self: ${alignSelf}; color: #888; font-style: italic; margin: 0; font-size: 0.85em; opacity: 0.8; max-width: 85%;`;
-        div.textContent = text;
+
+        if (align === 'left') {
+            // Render with animated spinner icon in front of the current (latest) message
+            div.innerHTML = `<span class="status-spinner" aria-hidden="true"></span><span class="status-msg-text">${text}</span>`;
+        } else {
+            div.textContent = text;
+        }
 
         const isNearBottom = tDiv.scrollHeight - tDiv.scrollTop - tDiv.clientHeight < 100;
         tDiv.appendChild(div);
@@ -4440,6 +4485,75 @@
         });
     };
 
+    window.verifyExternalBooking = async function(packageId, itemId) {
+        console.log(`[UI] Verifying item ${itemId} in package ${packageId}`);
+        try {
+            const response = await fetch(`/package/${packageId}/item/${itemId}/verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'user-id': currentUser.id
+                }
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                console.log('[UI] Verification successful');
+                // Refresh package details
+                const pkgsResponse = await fetch('/package/list', {
+                    headers: { 'user-id': currentUser.id }
+                });
+                const pkgs = await pkgsResponse.json();
+                const updatedPkg = pkgs.find(p => p.id === packageId);
+                if (updatedPkg) showPackageDetails(updatedPkg);
+            } else {
+                alert('Verification failed: ' + (data.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('[UI] Verification error:', error);
+            alert('Error connecting to server.');
+        }
+    };
+
+    window.syncExternalBookings = async function(packageId) {
+        console.log(`[UI] Syncing external bookings for package ${packageId}`);
+        const btn = document.getElementById('sync-bookings-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Syncing...';
+        }
+        try {
+            const response = await fetch(`/package/${packageId}/sync`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'user-id': currentUser.id
+                }
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                console.log('[UI] Sync successful:', data.message);
+                // Refresh package details
+                const pkgsResponse = await fetch('/package/list', {
+                    headers: { 'user-id': currentUser.id }
+                });
+                const pkgs = await pkgsResponse.json();
+                const updatedPkg = pkgs.find(p => p.id === packageId);
+                if (updatedPkg) showPackageDetails(updatedPkg);
+                alert(data.message);
+            } else {
+                alert('Sync failed: ' + (data.message || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('[UI] Sync error:', error);
+            alert('Error connecting to server.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'Sync with Travelpayouts 🔄';
+            }
+        }
+    };
+
     function showPackageDetails(pkg) {
         if (!pkg) {
             console.error("[UI] Attempted to show details for null package");
@@ -4792,10 +4906,19 @@
                                 <div class="package-item-details" style="padding:12px;">
                                     <div style="font-weight:600; color:#333; margin-bottom:6px; font-size:0.95rem;">${activity.name}</div>
                                     <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">${sym}${activity.price}</div>
-                                    ${bookingRef ? `<div style="font-size:0.85rem; color:#28a745; font-weight:bold; margin-bottom:4px;">✅ Confirmed (Ref: ${bookingRef})</div>` : ''}
+                                    
+                                    ${activity.status === 'booked' ? `<div style="font-size:0.85rem; color:#28a745; font-weight:bold; margin-bottom:4px;">✅ Confirmed (Ref: ${bookingRef || 'API'})</div>` : ''}
+                                    ${activity.status === 'pending_external' ? `<div style="font-size:0.85rem; color:#f59e0b; font-weight:bold; margin-bottom:4px;">⚠️ Redirect Action Required</div>` : ''}
+                                    
                                     ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:var(--primary-color); text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
                                     ${activity.description ? `<div style="font-size:0.8rem; color:#666; line-height:1.4; margin-top:8px;">${activity.description}</div>` : ''}
-                                    ${bookingLink ? `<a href="${bookingLink}" target="_blank" style="display:inline-block; margin-top:10px; color:#4f46e5; text-decoration:none; font-weight:bold; font-size:0.85rem;">Complete Reservation &rarr;</a>` : ''}
+                                    
+                                    ${bookingLink ? `
+                                        <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+                                            <a href="${bookingLink}" target="_blank" style="display:inline-block; color:#4f46e5; text-decoration:none; font-weight:bold; font-size:0.85rem; padding:6px 12px; background:rgba(79,70,229,0.1); border-radius:6px;">Complete on External Site &rarr;</a>
+                                            ${activity.status === 'pending_external' ? `<button onclick="verifyExternalBooking('${pkg.id}', '${activity.id}')" style="background:none; border:1px solid #ddd; color:#666; padding:5px 10px; border-radius:6px; font-size:0.75rem; cursor:pointer;">Verify</button>` : ''}
+                                        </div>
+                                    ` : ''}
                                     ${reviewCarouselHtml}
                                 </div>
                             </div>
@@ -4818,16 +4941,22 @@
             </div>`;
         }
 
-        if (pkg.status === 'draft' && travelItems.length > 0) {
+        if ((pkg.status === 'draft' || pkg.status === 'failed' || pkg.status === 'partial') && travelItems.length > 0) {
+            const btnText = (pkg.status === 'partial') ? "Complete Booking" : "Book Holiday Now";
             html += `
                 <div style="text-align:center; margin-top:20px;">
-                    <button onclick="openCheckout('${pkg.id}', ${travelTotal})" class="action-btn" style="background:#28a745; font-size:1.1rem; padding:10px 30px;">
-                        Book Holiday Now (${sym}${travelTotal})
+                    <button id="main-booking-btn" onclick="openCheckout('${pkg.id}', ${travelTotal})" class="action-btn" style="background:#28a745; font-size:1.1rem; padding:10px 30px;">
+                        ${btnText} (${sym}${travelTotal})
                     </button>
-                    <p style="font-size:0.8rem; color:#888; margin-top:5px;">Secure 1-Click Payment</p>
+                    ${pkg.status === 'failed' ? '<p style="font-size:0.85rem; color:#dc3545; margin-top:5px; font-weight:bold;">Previous attempt failed. You can retry now.</p>' : ''}
+                    ${pkg.status === 'partial' ? `<p style="font-size:0.85rem; color:#f59e0b; margin-top:10px; font-weight:bold; background:#fff7ed; padding:15px; border-radius:8px; border:1px solid #fed7aa; text-align:center;">
+                        ⏳ Travel Essentials (Hotels/Flights) are Secured, but Activities require external booking.<br>
+                        <span style="font-weight:normal; color:#ea580c; font-size:0.8rem; display:block; margin:5px 0 10px 0;">Click 'Complete Reservation' on each activity. Once done, use the sync button below to automatically verify.</span>
+                        <button id="sync-bookings-btn" onclick="syncExternalBookings('${pkg.id}')" style="background:#f97316; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem;">Sync with Travelpayouts 🔄</button>
+                    </p>` : '<p style="font-size:0.8rem; color:#888; margin-top:5px;">Secure 1-Click Payment for Travel Essentials</p>'}
                 </div>
             `;
-        } else if (pkg.status === 'booked' || pkg.status === 'partial') {
+        } else if (pkg.status === 'booked') {
             html += `
                 <div style="text-align:center; margin-top:20px; padding:15px; background:#eef2ff; border-radius:12px;">
                     <div style="color:#4f46e5; font-weight:bold; font-size:1.1rem; margin-bottom:5px;">🎉 Holiday Secured!</div>
@@ -5210,6 +5339,12 @@
     async function bookPackage(packageId, travelers) {
         if (!sessionId || !packageId) return;
         setBotStatusMessage("Processing booking...", 'center');
+        const btn = document.getElementById('complete-booking-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Booking...';
+        }
+        
         try {
             const res = await fetchWithAuth(`/api/packages/${sessionId}/${packageId}/book`, {
                 method: 'POST',
@@ -5225,13 +5360,17 @@
                 const p = pkgs.find(p => p.id === packageId);
                 if (p) showPackageDetails(p);
             } else {
-                alert("Booking failed: " + (data.detail || data.message || "General error"));
+                alert("Booking failed: " + (data.message || data.detail || "General error"));
             }
         } catch (e) {
             console.error(e);
             alert("Booking error.");
         } finally {
             clearBotStatusMessage();
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = 'Complete Booking';
+            }
         }
     }
 

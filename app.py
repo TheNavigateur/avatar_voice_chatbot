@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -27,7 +27,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     token = credentials.credentials
     client_id = os.environ.get("GOOGLE_CLIENT_ID", "645972259055-dcknu49vj5h6kaeaml1facanoesv4epl.apps.googleusercontent.com")
     try:
-        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), client_id)
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), client_id, clock_skew_in_seconds=10)
         if idinfo['aud'] != client_id:
             raise ValueError("Could not verify audience.")
         return {"id": idinfo['sub'], "email": idinfo.get("email", "web_user@example.com")}
@@ -49,7 +49,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
-from typing import Optional
+from typing import Optional, List, Dict
 
 class ChatRequest(BaseModel):
     message: str
@@ -206,6 +206,30 @@ async def get_packages(session_id: str):
 async def get_user_packages(user_id: str, current_user: dict = Depends(get_current_user)):
     packages = BookingService.get_user_packages(current_user['id'])
     return [p.model_dump() for p in packages]
+
+@app.post("/package/{package_id}/item/{item_id}/verify")
+async def verify_item_booking(package_id: str, item_id: str, user_id: str = Header(...)):
+    """
+    Manually marks an item as BOOKED (for external redirects).
+    """
+    try:
+        res = BookingService.verify_item_booking(user_id, package_id, item_id)
+        return res
+    except Exception as e:
+        logger.error(f"Error verifying item {item_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/package/{package_id}/sync")
+async def sync_bookings(package_id: str, user_id: str = Header(...)):
+    """
+    Syncs external bookings with Travelpayouts Statistics API.
+    """
+    try:
+        res = BookingService.sync_external_bookings(user_id, package_id)
+        return res
+    except Exception as e:
+        logger.error(f"Error syncing package {package_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/packages/{session_id}/{package_id}/book")
 async def book_package(session_id: str, package_id: str, request: BookRequest, current_user: dict = Depends(get_current_user)):

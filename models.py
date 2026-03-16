@@ -15,6 +15,8 @@ class BookingStatus(str, Enum):
     BOOKED = "booked"
     FAILED = "failed"
     PARTIAL = "partial"
+    DREAMING = "dreaming"
+    PENDING_EXTERNAL = "pending_external"
 
 class PackageItem(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -34,6 +36,7 @@ class Package(BaseModel):
     items: List[PackageItem] = []
     total_price: float = 0.0
     status: BookingStatus = BookingStatus.DRAFT
+    booking_window_opens_at: Optional[str] = None
     
     def calculate_total(self):
         self.total_price = sum(item.price for item in self.items)

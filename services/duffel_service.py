@@ -173,7 +173,7 @@ class DuffelService:
             date_info = f" on {offer['date']}" if 'date' in offer else ""
             summary += f"- **{offer['airline']}**{date_info} | {offer['price']}\n"
             summary += f"  Route: {offer['route']}\n" 
-            summary += f"  *ID: `{offer['id']}`* (Use this ID to book)\n"
+            summary += f"  BOOKING_ID: {offer['id']}\n"
         return summary
 
     def search_hotels(self, location_keyword: str, check_in: str, check_out: str) -> str:
@@ -233,6 +233,7 @@ class DuffelService:
             amount = rate.get("total_amount", "N/A")
             
             summary += f"- **{name}** | {currency} {amount}\n"
+            summary += f"  BOOKING_ID: {item.get('id') or item.get('accommodation', {}).get('id')}\n"
             count += 1
             if count >= 5: break
             

@@ -22,3 +22,4 @@ amadeus
 google-genai
 sqlalchemy
 google-auth
+resend
