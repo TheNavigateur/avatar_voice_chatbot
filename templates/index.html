@@ -30,7 +30,7 @@
             display: none; justify-content: center; align-items: center;
         }
         .gsi-modal {
-            background: white; padding: 30px; border-radius: 12px;
+            background: white; padding: 30px; border-radius: var(--border-radius);
             text-align: center; max-width: 400px; width: 90%;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
@@ -76,9 +76,9 @@
         }
         .checkout-form label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
         .checkout-form input, .checkout-form select { 
-            width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 12px;
+            width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: var(--border-radius);
         }
-        .traveler-form { border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 20px; background: #fafafa; }
+        .traveler-form { border: 1px solid #eee; padding: 15px; border-radius: var(--border-radius); margin-bottom: 20px; background: #fafafa; }
 
         :root {
             --primary-color: #6366f1;
@@ -89,6 +89,7 @@
             --text-color: #1e293b;
             --bot-bubble-bg: #f1f5f9;
             --user-bubble-bg: #6366f1;
+            --border-radius: 6px;
         }
 
         * {
@@ -162,7 +163,7 @@
             font-size: 1rem;
             color: var(--text-color);
             cursor: pointer;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -248,7 +249,7 @@
             /* Fixed height for avatar */
             position: relative;
             background: #fff;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             overflow: hidden;
             display: flex;
@@ -304,7 +305,7 @@
             width: 140px;
             height: 165px;
             background: rgba(255, 255, 255, 0.95);
-            border-top-left-radius: 12px;
+            border-top-left-radius: var(--border-radius);
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
             overflow: visible;
             cursor: pointer;
@@ -336,7 +337,7 @@
             width: 100%;
             height: 100%;
             background: #f8fafc;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             overflow: hidden;
             display: block;
         }
@@ -551,7 +552,7 @@
             z-index: 20;
             background: rgba(255, 255, 255, 0.8);
             padding: 5px 10px;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             backdrop-filter: blur(2px);
         }
 
@@ -570,7 +571,7 @@
         .conversation-area {
             flex: 1;
             background: #fff;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             display: flex;
             flex-direction: column;
@@ -593,7 +594,7 @@
         /* --- Packages View --- */
         #packages-container {
             background: #fff;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             padding: 1.5rem;
             flex: 1;
@@ -603,7 +604,7 @@
         #package-details-overlay {
             /* Positioned relative to parent flex container now */
             background: #fff;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             padding: 2rem;
             flex: 1;
@@ -632,7 +633,7 @@
         /* --- Profile View --- */
         #view-profile {
             background: #fff;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             padding: 2rem;
             overflow-y: auto;
@@ -654,7 +655,7 @@
             display: flex;
             flex-direction: column;
             background: #fff;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 12px;
             margin-bottom: 12px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
@@ -676,7 +677,7 @@
                 margin-bottom: 0 !important;
                 flex-shrink: 0;
                 object-fit: cover;
-                border-radius: 12px 0 0 12px;
+                border-radius: var(--border-radius) 0 0 var(--border-radius);
             }
 
             .package-item-details {
@@ -688,7 +689,7 @@
         /* --- Review Carousel --- */
         .reviews-carousel {
             background: #f0f2f5;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 12px;
             margin-top: 10px;
             position: relative;
@@ -753,13 +754,13 @@
             height: 250px;
             background: #eee;
             overflow: hidden;
-            border-radius: 12px 0 0 12px;
+            border-radius: var(--border-radius) 0 0 var(--border-radius);
             /* For desktop side-by-side */
         }
 
         @media (max-width: 767px) {
             .image-slider {
-                border-radius: 12px 12px 0 0;
+                border-radius: var(--border-radius) var(--border-radius) 0 0;
             }
         }
 
@@ -858,7 +859,7 @@
             padding: 1rem;
             font-family: monospace;
             border: 1px solid #ddd;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             resize: vertical;
             font-size: 0.9rem;
         }
@@ -877,7 +878,7 @@
             background: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 8px 16px;
             cursor: pointer;
             font-weight: 600;
@@ -896,7 +897,7 @@
         /* Bubbles */
         .message-bubble {
             padding: 12px 16px;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             max-width: 85%;
             font-size: 0.95rem;
             line-height: 1.5;
@@ -1336,14 +1337,14 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-top: 1px solid #e2e8f0;
-            border-bottom-left-radius: 12px;
-            border-bottom-right-radius: 12px;
+            border-bottom-left-radius: var(--border-radius);
+            border-bottom-right-radius: var(--border-radius);
         }
 
         #chat-input {
             flex: 1;
             padding: 12px 16px;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             border: 1px solid #e2e8f0;
             background: white;
             color: var(--text-color);
@@ -1369,7 +1370,7 @@
             color: white;
             border: none;
             padding: 0 20px;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -1412,7 +1413,7 @@
         .product-propose-tile {
             flex: 0 0 280px;
             background: #fff;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             border: 1px solid #e0e0e0;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             overflow: hidden;
@@ -1487,7 +1488,7 @@
             color: #fff;
             border: none;
             padding: 10px;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             font-weight: 600;
             cursor: pointer;
             transition: filter 0.2s;
@@ -1516,7 +1517,7 @@
             margin-top: 15px;
             background: #fff;
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 15px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
@@ -1559,7 +1560,7 @@
             background: #fff;
             color: var(--primary-color);
             border: 2px solid var(--primary-color);
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 8px 20px;
             font-size: 0.9rem;
             font-weight: 600;
@@ -1597,7 +1598,7 @@
             background: #10b981;
             color: white;
             border: none;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 8px 25px;
             font-size: 0.9rem;
             font-weight: 600;
@@ -1625,7 +1626,7 @@
             background: var(--primary-color);
             color: #fff;
             border: none;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 8px 18px;
             font-size: 0.85rem;
             font-weight: 700;
@@ -1688,7 +1689,7 @@
             background: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 8px 24px;
             font-weight: 600;
             cursor: pointer;
@@ -1705,7 +1706,7 @@
         .shoe-size-selector-container {
             background: #fff;
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 15px;
             margin-top: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -1724,7 +1725,7 @@
             background: #f1f5f9;
             border: none;
             padding: 4px 12px;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             font-size: 0.8rem;
             font-weight: 600;
             cursor: pointer;
@@ -1749,7 +1750,7 @@
         .size-btn {
             background: #fff;
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             height: 40px;
             display: flex;
             align-items: center;
@@ -1789,7 +1790,7 @@
 
         .option-group {
             background: #f8fafc;
-            border-radius: 12px;
+            border-radius: var(--border-radius);
             padding: 12px;
             border: 1px solid #e2e8f0;
         }
@@ -3353,11 +3354,11 @@
 
         const container = document.createElement('div');
         container.id = 'dynamic-start-container';
-        container.style.cssText = "display: flex; gap: 10px; justify-content: center; margin-top: 1rem; margin-bottom: 1rem;";
+        container.style.cssText = "width: 100%; margin-top: 1rem; margin-bottom: 1rem;";
 
         const startBtn = document.createElement('button');
         startBtn.className = 'action-btn start-btn';
-        startBtn.style.cssText = "background: var(--primary-color); color: #fff; padding: 12px 24px; font-size: 1rem; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);";
+        startBtn.style.cssText = "width: 100%; background: var(--primary-color); color: #fff; padding: 15px; font-size: 0.82rem; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);";
         startBtn.textContent = 'Make my holiday!';
         
         // Add hover effect manually since it's dynamic
@@ -3602,7 +3603,7 @@
         return `
             <div class="say-reply-container">
                 <button class="say-reply-btn" onclick="startListeningFromBotMessage(this)">
-                    <i class="ph ph-microphone"></i> Say your reply
+                    <i class="ph ph-microphone"></i> Say my reply
                 </button>
                 <div class="listening-animation">
                     <div class="listening-bar" style="height: 8px;"></div>
@@ -4469,7 +4470,7 @@
                 [...packages].reverse().forEach(pkg => {
                     // Summary Card
                     const card = document.createElement('div');
-                    card.style.cssText = "background: #f9f9f9; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);";
+                    card.style.cssText = "background: #f9f9f9; border: 1px solid #eee; border-radius: var(--border-radius); padding: 15px; margin-bottom: 15px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);";
                     card.onmouseover = () => card.style.transform = "translateY(-2px)";
                     card.onmouseout = () => card.style.transform = "none";
                     card.onclick = () => showPackageDetails(pkg);
@@ -4480,7 +4481,7 @@
                     card.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <h3 style="margin:0; color:#333; font-size: 1.1rem;">${statusIcon} ${pkg.title}</h3>
-                            <span style="font-size:0.8rem; color:#666; background: #e0e0e0; padding: 2px 8px; border-radius: 12px;">${pkg.type}</span>
+                            <span style="font-size:0.8rem; color:#666; background: #e0e0e0; padding: 2px 8px; border-radius: var(--border-radius);">${pkg.type}</span>
                         </div>
                         <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #666;">${itemCount} items &bull; Click to view details</p>
                     `;
@@ -4764,7 +4765,7 @@
                 // Extract the destination name from the item name (e.g. "Why the Whitsundays?" → "the Whitsundays")
                 const bannerTitle = banner.name || '✨ Why we chose this for you';
                 html += `
-                    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); border-radius: 12px; padding: 22px 24px; margin-bottom: 24px; box-shadow: 0 6px 20px rgba(15,52,96,0.35); position: relative; overflow: hidden;">
+                    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); border-radius: var(--border-radius); padding: 22px 24px; margin-bottom: 24px; box-shadow: 0 6px 20px rgba(15,52,96,0.35); position: relative; overflow: hidden;">
                         <div style="position: absolute; top: -20px; right: -20px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%); border-radius: 50%;"></div>
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                             <span style="font-size: 1.4rem;">✨</span>
@@ -4888,7 +4889,7 @@
 
             // Checklist Section
             if (checklistItems.length > 0) {
-                html += `<div style="margin-bottom:25px; background: #fffaf0; border: 1px solid #ffe4b5; border-radius: 12px; padding: 15px;">
+                html += `<div style="margin-bottom:25px; background: #fffaf0; border: 1px solid #ffe4b5; border-radius: var(--border-radius); padding: 15px;">
                     <h4 style="margin:0 0 10px 0; color:#856404; font-size:1.1rem;">📝 Pre-holiday Checklist</h4>
                     <ul style="list-style:none; padding:0; margin:0;">`;
                 checklistItems.forEach(item => {
