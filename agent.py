@@ -46,6 +46,89 @@ def clean_location_from_title(title: str) -> str:
     t = re.sub(r'\s+', ' ', t).strip()
     return t
 
+def is_discovery_complete(profile_content: str, current_message: str = "", session_history: str = "") -> bool:
+    """ Checks if the 6 mandatory requirements are present specifically for the current intent. """
+    msg_only = (current_message or "").lower()
+    hist_only = (session_history or "").lower()
+    
+    # 1. Detect if a NEW intent was started in this session
+    vague_starts = [
+        "make my holiday", "make a holiday", "build me a trip", "plan a trip", 
+        "new holiday", "start a trip", "let's plan something", 
+        "start a new one", "brand new holiday", "new trip", "something else"
+    ]
+    
+    # Find the last time the user said a 'vague start' phrase
+    last_vague_idx = -1
+    for v in vague_starts:
+        idx = hist_only.rfind(v)
+        if idx > last_vague_idx:
+            last_vague_idx = idx
+            
+    # Check if the CURRENT message is a vague start
+    is_current_vague = any(v in msg_only for v in vague_starts)
+    
+    if is_current_vague:
+        logger.info(f"[PHASE_CHECK] Current message is a vague start. Forcing Discovery.")
+        return False
+        
+    # 2. Define the 'Search Space' for requirements
+    # If a new intent started recently, we ONLY look for requirements AFTER that point.
+    if last_vague_idx != -1:
+        # Intent started in this session. Only trust what was said SINCE then.
+        fresh_context = (hist_only[last_vague_idx:] + "\n" + msg_only).lower()
+        logger.info("[PHASE_CHECK] New intent detected in history. Using fresh context only.")
+        search_space = fresh_context
+    else:
+        # No vague start in recent history. Fallback to profile (likely continuing a specific trip).
+        search_space = ((profile_content or "") + "\n" + hist_only + "\n" + msg_only).lower()
+        logger.info("[PHASE_CHECK] No recent reset. Using profile + history.")
+    
+    combined = search_space # for the check logic below
+    
+    # Requirement 1: Origin
+    origin_ok = any(x in combined for x in ["origin", "departing", "flying from", "from:"])
+    
+    # Requirement 2: Duration
+    duration_ok = any(x in combined for x in ["duration", "how long", "weeks", "days", "nights"])
+    
+    # Requirement 3: Month
+    month_ok = any(x in combined for x in ["month", "when", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "jan ", "feb ", "mar ", "apr ", "jun ", "jul ", "aug ", "sep ", "oct ", "nov ", "dec ", "in 2 months", "in 1 week", "next month", "months from now", "weeks from now"])
+    
+    # Requirement 4: Budget
+    budget_ok = any(x in combined for x in ["budget", "cost", "spend", "$", "£", "€", "price range"])
+    
+    # Requirement 5: Vibe/Activities
+    # CRITICAL: We need more than just a single keyword like "beach" if a NEW intent was started.
+    # We look for a category (beach/ski) AND some descriptive intent (want/like/preference) or specific activities.
+    categories = ["beach", "ski", "city", "mountains", "nature", "culture"]
+    actions = ["activities", "interested in", "prefer", "like to", "want to", "visiting", "water park", "bike", "hike", "museum", "dining", "nightlife"]
+    
+    category_hit = any(c in combined for c in categories)
+    action_hit = any(a in combined for a in actions)
+    
+    # We consider Vibe OK if they've given both a category and some specific activities/preferences
+    # OR if they've used the word "vibe" explicitly.
+    vibe_ok = ("vibe" in combined) or (category_hit and action_hit)
+    
+    # Requirement 6: Group/Travellers
+    group_ok = any(x in combined for x in ["group", "travelling", "travellers", "wife", "son", "daughter", "kids", "children", "people", "adults", "me and"])
+
+    results = [origin_ok, duration_ok, month_ok, budget_ok, vibe_ok, group_ok]
+    is_complete = all(results)
+    
+    if not is_complete:
+        missing = []
+        if not origin_ok: missing.append("Origin")
+        if not duration_ok: missing.append("Duration")
+        if not month_ok: missing.append("Month")
+        if not budget_ok: missing.append("Budget")
+        if not vibe_ok: missing.append("Vibe")
+        if not group_ok: missing.append("Group")
+        logger.info(f"[PHASE_CHECK] Discovery incomplete. Missing: {missing}")
+        
+    return is_complete
+
 def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, item_name: str, item_type: str, image_url: str = None, images: list = None):
     # 0. Skip enrichment for generic "Planned" items to save time
     if "Planned" in item_name:
@@ -150,7 +233,7 @@ def _enrich_item_metadata(session_id: str, package_id: str, item: PackageItem, i
     return item
 
 # --- Tool Wrappers for Agent ---
-def create_new_package_tool(session_id: str, user_id: str, title: str, package_type: str = "mixed", start_date: str = None):
+def create_new_package_tool(session_id: str, user_id: str, title: str, description: str = None, package_type: str = "mixed", start_date: str = None):
     """
     Creates a new package for the user.
     Args:
@@ -191,6 +274,7 @@ def create_new_package_tool(session_id: str, user_id: str, title: str, package_t
         session_id=session_id, 
         user_id=user_id, 
         title=title, 
+        description=description,
         type=p_type, 
         status=status,
         booking_window_opens_at=window_opens_at
@@ -513,59 +597,82 @@ class VoiceAgent:
                 raise ValueError(f"Generic placeholder name '{name}' is FORBIDDEN. You MUST use a real, specific name (e.g. 'Saas-Fee Ski School Half-Day Lesson', 'La Ferme restaurant'). Use propose_itinerary_batch with real names for each day.")
 
         # Tools binding
-        def create_package_bound(title: str, package_type: str = "mixed", start_date: str = None):
-            return run_tool("create_package", create_new_package_tool, session_id=session_id, user_id=user_id, title=title, package_type=package_type, start_date=start_date)
+        def create_package_bound(title: str, description: str = None, package_type: str = "mixed", start_date: str = None):
+            return run_tool("create_package", create_new_package_tool, session_id=session_id, user_id=user_id, title=title, description=description, package_type=package_type, start_date=start_date)
             
-        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float, **kwargs):
+        def add_item_bound(package_id: str, item_name: str, item_type: str, price: float = 0.0, **kwargs):
+            # Alias support for single item additions
+            itype = (item_type or kwargs.get('type') or 'activity').lower()
+            name = (item_name or kwargs.get('title') or '').strip()
+            
+            # Validation
+            if not name:
+                return "FAILED: Name missing. Correct Format: {'name': 'Specific Venue Name', 'item_type': 'hotel/flight/activity/restaurant', ...}"
+            
             try:
-                validate_item_realism(item_name, item_type, price)
+                validate_item_realism(name, itype, price)
             except ValueError as ve:
                 return str(ve)
             # Guard: activities and restaurants MUST have a day number for itinerary display.
             # If missing, reject and force agent to use propose_itinerary_batch instead.
-            if item_type.lower() in ["activity", "restaurant"] and kwargs.get("day") is None:
+            if itype in ["activity", "restaurant"] and kwargs.get("day") is None:
                 return (
-                    f"ERROR: '{item_name}' has no 'day' number. "
+                    f"ERROR: '{name}' has no 'day' number. "
                     "Activities and restaurants MUST have a day integer (e.g. day=1). "
                     "CRITICAL: Do NOT call add_item_bound in a loop for a multi-day itinerary. "
                     "Instead, call propose_itinerary_batch_bound ONCE with ALL days in a single JSON list, "
                     "each item having a 'day' field (e.g. 1, 2, 3...). This is mandatory."
                 )
-            return run_tool("add_item", add_item_to_package_tool, session_id=session_id, package_id=package_id, item_name=item_name, item_type=item_type, price=price, **kwargs)
+            return run_tool("add_item", add_item_to_package_tool, session_id=session_id, package_id=package_id, item_name=name, item_type=itype, price=price, **kwargs)
 
         def propose_itinerary_batch_bound(items_json: str, package_id: str):
-            # Pre-validation for realism
+            # Pre-validation and Schema Auto-Fix
             try:
                 items_v = json.loads(items_json)
+                fixed_items = []
                 for idx, item_v in enumerate(items_v):
+                    # Alias support: title -> name, type -> item_type
                     name = (item_v.get('name') or item_v.get('title') or '').strip()
-                    itype = item_v.get('item_type', 'activity')
+                    itype = (item_v.get('item_type') or item_v.get('type') or 'activity').lower()
                     price = float(item_v.get('price', 0.0))
                     day = item_v.get('day')
 
-                    # Check for empty/null name — must be caught before anything else
+                    # Check for empty/null name
                     if not name:
                         raise ValueError(
-                            f"Item at index {idx} (type: {itype}, day: {day}) has an empty or missing 'name'. "
-                            "EVERY item MUST have a real venue/activity name. "
-                            "Use your knowledge of the destination to provide a specific real name "
-                            "(e.g. 'Nordkette Cable Car Innsbruck', 'Café Central', 'Ski School Morning Lesson'). "
-                            "NEVER leave 'name' as null, '', or omit it. Fix ALL items and resubmit the full batch."
+                            f"Item at index {idx} has an empty 'name'. "
+                            "Correct JSON Item Template: {'name': 'Specific Venue Name', 'day': 1, 'item_type': 'activity', 'price': 50.0, 'description': '...'}"
                         )
-                    # Check placeholder names
-                    validate_item_realism(name, itype, price)
-                    # Check day number for itinerary items
-                    if itype.lower() in ['activity', 'restaurant'] and day is None:
+                    
+                    # Check for day in itinerary items
+                    if itype in ['activity', 'restaurant'] and day is None:
                         raise ValueError(
-                            f"Item '{name}' at index {idx} (type: {itype}) is missing a 'day' integer. "
-                            "Every activity and restaurant MUST have a 'day' field (1-based integer). "
-                            "Rebuild your JSON with a 'day' field for every item covering Day 1 through the final day."
+                            f"Item '{name}' is missing a 'day' integer. "
+                            "Every activity/restaurant MUST have a 'day' field (e.g. 1, 2, 3). "
+                            "Correct JSON Item Template: {'name': '...', 'day': 1, 'item_type': 'activity', ...}"
                         )
+
+                    validate_item_realism(name, itype, price)
+                    
+                    # Update item with fixed aliases for the implementation call
+                    item_v['name'] = name
+                    item_v['item_type'] = itype
+                    fixed_items.append(item_v)
+                
+                # Re-serialize fixed items
+                items_json = json.dumps(fixed_items)
+                
             except Exception as e:
                 return f"BATCH REJECTED — fix these errors and resubmit: {e}"
             
             # Original tool logic wrapper
-            return run_tool("propose_itinerary_batch", propose_itinerary_batch_impl, items_json=items_json, package_id=package_id)
+            result = run_tool("propose_itinerary_batch", propose_itinerary_batch_impl, items_json=items_json, package_id=package_id)
+            
+            # Check for success and add a chunking reminder if it's a batch add
+            if isinstance(result, str) and "successfully added" in result.lower():
+                result += "\n\n[RELIABILITY REMINDER]: You MUST continue adding chunks sequentially (e.g., if you just did Days 1-3, you MUST now call this tool for Days 4-6) until YOU REACH THE LAST DAY of the traveller's requested duration. ONLY provide your text response once EVERY day of the trip has a full schedule."
+            
+            return result
 
         def remove_item_bound(package_id: str, item_id: str):
             return run_tool("remove_item", remove_item_from_package_tool, session_id=session_id, package_id=package_id, item_id=item_id)
@@ -784,193 +891,73 @@ class VoiceAgent:
                 logger.error(f"Error in propose_itinerary_batch_bound: {e}")
                 return f"Error adding batch items: {str(e)}"
 
+        # 1. Determine Phase and Load Prompt
+        session = self.session_service.get_session_sync(app_name="voice_bot_app", user_id=user_id, session_id=session_id)
+        session_history = ""
+        if session and session.events:
+            for event in session.events:
+                if hasattr(event, 'text') and event.text:
+                    session_history += event.text + "\n"
+                elif hasattr(event, 'content') and hasattr(event.content, 'parts'):
+                    for part in event.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            session_history += part.text + "\n"
+        
+        profile_content = ProfileService.get_profile(user_id)
+        discovery_complete = is_discovery_complete(profile_content, message, session_history)
+        
+        prompt_file = "prompts/builder_prompt.md" if discovery_complete else "prompts/discovery_prompt.md"
+        with open(prompt_file, "r") as f:
+            instruction_template = f.read()
+            
+        instruction = instruction_template.replace(
+            "{current_time}", current_time or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ).replace(
+            "{avatar_name}", avatar_name or 'Ray and Rae'
+        ).replace(
+            "{package_view_context}", package_view_context
+        ).replace(
+            "{global_context}", global_context
+        )
+
+        # 2. Define Toolsets (Guarding)
+        COMMON_TOOLS = [
+            log_reasoning,
+            save_user_info_bound,
+            list_all_packages,
+            find_packages,
+            get_package_details_bound
+        ]
+        
+        DISCOVERY_TOOLS = COMMON_TOOLS + [
+            perform_google_search_bound,
+            search_products_bound,
+            check_amazon_stock_bound,
+            search_amazon_bound,
+            search_amazon_with_reviews_bound
+        ]
+
+        BUILDER_TOOLS = COMMON_TOOLS + [
+            perform_google_search_bound, 
+            search_flights_duffel, 
+            search_hotels_duffel,
+            search_hotels_amadeus,
+            search_activities_amadeus,
+            create_package_bound, 
+            add_item_bound,
+            remove_item_bound,
+            delete_package_bound,
+            propose_itinerary_batch_bound
+        ]
+
+        active_tools = BUILDER_TOOLS if discovery_complete else DISCOVERY_TOOLS
+        logger.info(f"[PHASE_GUARD] Discovery Complete: {discovery_complete}. Using {prompt_file} with {len(active_tools)} tools.")
+
         agent = Agent(
             name="ray_and_rae",
             model=model,
-            tools=[
-                perform_google_search_bound, 
-                search_flights_duffel, 
-                search_hotels_duffel,
-                search_hotels_amadeus,
-                search_activities_amadeus,
-                search_products_bound, 
-                check_amazon_stock_bound, 
-                search_amazon_bound, 
-                create_package_bound, 
-                add_item_bound,
-                remove_item_bound,
-                save_user_info_bound,
-                search_amazon_with_reviews_bound,
-                list_all_packages,
-                find_packages,
-                get_package_details_bound,
-                delete_package_bound,
-                log_reasoning,
-                propose_itinerary_batch_bound
-            ],
-            instruction=f"""
-            ### -1. TODAY'S DATE (GROUND TRUTH — HIGHEST PRIORITY):
-            - **TODAY IS: {current_time or datetime.now().strftime('%Y-%m-%d %H:%M:%S')}**. This is the authoritative source of truth.
-            - **YEAR AWARENESS**: The current year is 2026. If you see trips for 2027 in your history, those are future plans. You can and MUST plan trips for both 2026 and 2027.
-            - **RELATIVE DATES**: When a traveller says "in 2 weeks", calculate it from TODAY (March 2026). Do NOT say it's impossible.
-            - **CRITICAL**: Existing packages in your history are FUTURE PLANS. Use them for context but do NOT let them confuse you about what day it is TODAY.
-
-            - **Phase 0 (Triage)**: Mandatory check if New or Continuing. 
-                - **RE-DISCOVERY MANDATE**: For every NEW intent, you MUST ask for: 1. **Origin** (Where from?), 2. **Duration** (How long?), and 3. **Month** (When?). 
-                - **STRICT INDEPENDENCE**: NEVER assume these logistics are the same as a previous trip.
-                - **DESTINATION PRIVACY**: Do NOT ask for the destination. Do NOT ask "Where are you going?". You must select it internally in Phase 4 based on the traveller's vibe and timing.
-                - **VAGUE INTENT HANDLING**: If the traveller says something vague like "Make my holiday!" or "Build me a trip", DO NOT ask for a destination. Instead, ask for their **preferred vibe/activities** (Phase 3) along with logistics so you can select the perfect spot for them.
-                - **MODIFYING vs CREATING**: If the user says "Change my trip..." or "Actually, instead of the Gold Coast...", you MUST still create a NEW package for the new destination/theme. Never "overwrite" a Gold Coast trip with Swiss items.
-            - **PACKAGE TITLE PROTOCOL**: Package titles MUST include the destination, month and year of travel (e.g., "Gold Coast Family Holiday Oct 2026"). This helps the traveller identify their trips in the list.
-            - **Phase 1 (Logistics)**: Confirm Origin, Duration, and Travel Month.
-            - **Phase 2 (Budget)**: Establish clear budget range.
-            - **Phase 3 (Soulful Discovery)**: Ask about "Vibe", "Pace", and specific "Activities".
-            - **Phase 3.5 (Group & Rhythm)**: Establish WHO is traveling and their SLEEP/WAKE RHYTHM.
-            - **Phase 4 (Silent Selection)**: Internally select "Anchor Spot".
-                - **ONE-STEP BOOKING PRIORITY**: Your primary goal is to build a "One-Step Booking" itinerary. 1-click booking only works for items with a `BOOKING_ID` (from search results). 
-                - **SEARCH-FIRST MANDATE**: You MUST run `search_flights_duffel` and `search_hotels_duffel` for every trip.
-                - **ID ENFORCEMENT**: Extract the `BOOKING_ID` from the search results and pass it into the `offer_id` (flights) or `stay_id` (hotels) field of the `data` dictionary. 
-                - **TRANSPARENCY RULE**: If you find the perfect item but it has NO `BOOKING_ID` (e.g. from a web search or Amadeus), you MUST tell the traveller *before* you build the itinerary: "I've found a great option, but it will require a separate manual step to complete the booking. Should I look for a 1-click bookable alternative instead?"
-                - **STRICT FLIGHTS**: Flights MUST have an `offer_id`. Hallucinating a flight without an ID is a failure of the one-step promise.
-                - **HOTEL FALLBACK**: If `search_hotels_duffel` fails (e.g. 403 error), you MUST explicitly state: "Direct 1-click booking for this hotel is currently unavailable on our platform. I've added it with a 'Complete Reservation' link so you can finish it easily on Booking.com."
-                - **LOG_REASONING**: Always note which tool you used and why.
-            - **Phase 6 (Instantaneous Silent Build)**: Build the ENTIRE holiday using multiple sequential calls to `propose_itinerary_batch_bound` — **one call per chunk of 3 days**.
-                - **CHUNKED CALLING STRATEGY**: For a 14-day trip, make 5 calls: Days 1-3, Days 4-6, Days 7-9, Days 10-12, Days 13-14. Each call contains ~6-9 items. Do NOT attempt to fit all days into one giant call.
-                - **WHY**: Smaller batches let you think of real specific names for each venue. A batch of 6 items is easy; a batch of 48 items leads to null names and rejection.
-                - **NO BLANK DAYS**: All days from Day 1 to Day N MUST be covered across all chunks.
-                - **ITEM NAMING — MANDATORY**:
-                    - Every item MUST have a real, specific name. NEVER leave `"name"` as `null`, `""`, or omit it.
-                    - ❌ FORBIDDEN: `null`, `""`, `"Planned Activity"`, `"Planned Restaurant"`, `"Planned Hotel"`, `"Planned Flight"`, `"Activity"`, `"Restaurant"`.
-                    - ✅ REQUIRED: Real venue/activity names you know. If unsure of the exact name, invent a plausible local name (e.g. `"Restaurant Alpenblick Innsbruck"`, `"Ski School Morning Group Lesson Innsbruck"`).
-                    - Examples: `"Nordkette Cable Car Innsbruck"`, `"Goldener Adler Restaurant"`, `"Air India DEL-MUC Flight"`, `"Ibis Innsbruck"`, `"Patscherkofel Ski Area Morning Run"`.
-                - **DAY NUMBERS — MANDATORY FOR ACTIVITIES & RESTAURANTS**:
-                    - Every `activity` and `restaurant` MUST have `"day"` as an integer (e.g. `1`, `2`, `3`...).
-                    - ❌ NEVER submit `"day": null` or omit `"day"` for these types.
-                - **VALIDATION RETRY**: If a chunk is rejected (`BATCH REJECTED`), fix only the named errors in that chunk and resubmit it. Never give up — a blank package is a failure.
-                - **TIME-AWARE SCHEDULING**: 
-                    - Respect the traveller's **sleep/wake rhythm** (from their profile) as the day's boundaries. Default to 08:00 - 22:00 if not specified.
-                    - Use `time` (e.g. "09:00") and `duration_hours` (e.g. 2.5) for EVERY activity and dining recommendation.
-                - **REALISTIC FLOW & BUFFERS**:
-                    - **JOURNEY TIME**: Account for ~30-60 mins of travel between activities that aren't at the same location.
-                    - **BUFFER TIME**: Include dedicated slots (at least 1-2 hours daily) for snacks, shopping, or spontaneous discovery (items like "Local Market Exploration" or "Free Time & Coffee" are fine as names).
-                    - **LOGICAL SLOT ALLOCATION**: Do NOT just "prefer adding early activities first". Build the day based on when the activity *actually* makes sense (e.g., sunrise hikes early, stargazing late, fine dining in the evening).
-                    - **ENTIRE DAY COVERAGE**: Add activities only if they logically fit within the remaining "wake" hours. If an activity is long (6+ hours), let it be the anchor for the day.
-                - **DINING**: Always include Lunch and Dinner recommendations with appropriate durations (1.5 - 2 hours).
-                - **ITINERARY DENSITY**: Focus on a "bookable" flow. If an activity is short, add a buffer or another item. If it's long, let it breathe.
-                - **ACTIVITIES & RESTAURANTS — HOW TO NAME THEM**:
-                    - You do NOT need to call a search tool for every activity or restaurant. Use your built-in knowledge of the destination.
-                    - Gemini knows real ski schools, mountain restaurants, cable cars, apres-ski bars, and local restaurants for any ski resort.
-                    - Example for an Innsbruck ski trip: `"Nordkette Cable Car & Panorama Walk"`, `"Café Central Innsbruck"`, `"Innsbruck Ski School Half-Day Group Lesson"`, `"Stiftskeller Restaurant"`, `"Patscherkofel Race Slope Morning Run"`.
-                    - At checkout, the system automatically generates a **Viator (via TravelPayouts) booking deep-link** for every activity using its name. So a real name = a real bookable link for the traveller.
-                    - You MUST name every activity and restaurant with a real, specific venue name you know from your training data. No searching required.
-                - **PRICING & FAR-FUTURE**:
-                    - If a search tool returns no results (common for dates >330 days away), you MUST provide a **REALISTIC ESTIMATED PRICE** (e.g. $150-$300 for a hotel, $50 for a dinner).
-                    - **NEVER** use 0.0 as a price for activities, hotels, or restaurants. If you don't have the exact price, estimate based on the traveller's budget level.
-                    - If you are estimating, mention "(Estimated Price)" in the item description.
-                - **DREAMING PHASE — STRICT RULES**:
-                    - The ONLY signal that determines 'dreaming' is the literal text `STATUS: dreaming` in the `create_package` tool response.
-                    - If `create_package` returns `STATUS: draft` → the trip is **bookable right now**. Say nothing about booking windows, wait times, or dreaming.
-                    - **HARD WORD BAN**: If `create_package` returned `STATUS: draft`, you are FORBIDDEN from using these words: 'dreaming', 'dreaming phase', 'not yet bookable', 'bookings open in', 'booking window opens', '11 months', '330 days', or any phrase implying the trip is unbookable.
-                    - **NO REASONING**: Do NOT try to calculate if a trip is dreaming yourself. Trust the tool. If the tool says `draft`, it IS bookable.
-                    - Example: Jan 2027 trip created in March 2026 → `STATUS: draft` → tell the user: "This is all set and ready to be booked!"
-                    - Example: April 2026 trip requested on 15 March 2026 → `STATUS: draft` → say **nothing** about booking windows. Build it and present it as fully bookable.
-                    - Example: A trip 400+ days away → `STATUS: dreaming` → say: "I've built your plan — official bookings open around [date from tool], so you can explore this now and we'll lock it in when the window opens."
-
-            ### 1. THINKING TRANSPARENCY:
-            - You MUST call `log_reasoning` as the VERY FIRST tool at the start of EVERY turn.
-            - **STRICT PERSONA (2nd Person)**: In `log_reasoning`, you MUST refer to the human as "You".
-            - **WORD BAN**: You are STRICTLY FORBIDDEN from using the word "user", "the user", or "user's" in your logs.
-
-            ### 2. SILENT ACTION MANDATE (CRITICAL):
-            - **NO NARRATION**: NEVER narrate your tool uses, actions, or status (e.g., "I've created a package", "I'm adding...", "I am searching for...").
-            - **BANNED PHRASES**: Never say ANY of the following (or variations): "I've created a package", "I've added...", "I'm searching for...", "I've found...", "Looking at...", "Let me just...", "Hold tight", "I will need to select", "Selecting a location for you", "To create your trip I will...", "Calculating...", "Working on it".
-            - **DISCOVERY SPEECH PROTOCOL (Phases 1-4)**: Your speech during discovery MUST consist ONLY of a brief acknowledgment (1 short sentence max) and a direct discovery question. NO sensory descriptions, NO vibe-setting blurbs, NO poetic imagery, NO descriptive paragraphs. Save all descriptive content for the package itinerary descriptions.
-            - **NO FAILURE NARRATION**: If a tool fails or you have trouble finding something, NEVER tell the traveller. SILENTLY pivot to an alternative (e.g., Google Search if Amadeus fails) or add a best-estimate manually. The traveller should never hear about your "trouble".
-            - **DEFERRAL BAN**: NEVER say "I will work on it", "I'll build it for you", "I'm doing that now", or "I will need to...". Instead, just DO it immediately in the same turn. NEVER announce what you are ABOUT to do.
-            - **SILENT BUILD**: Execute `propose_itinerary_batch_bound` IMMEDIATELY once requirements are met. Do NOT ask for permission to build.
-            - **NO BLURBS**: Your chat responses must be SHORT and FUNCTIONAL. No multi-sentence descriptive paragraphs about snow-covered peaks or crisp mountain air. That content belongs in package item descriptions, not chat.
-
-            ### 3. DESTINATION SOVEREIGNTY & ID SECRECY:
-            - **DESTINATION SOVEREIGNTY**: Once the "vibe" (Phase 3) is established, you MUST NOT ask for approval of a destination or region (e.g., "Do you have any interest in the Austrian Alps?").
-            - **SILENT SELECTION**: You MUST select the destination internally based on the traveller's vision. Then `perform_google_search_bound` or `search_hotels_amadeus` silently.
-            - **BANNED PHRASES**: "Do you have any interest in...", "How about...", "What do you think of...", "Should we look at...", "Would you like to explore...", "I was thinking of...".
-            - **ANONYMITY**: NEVER name any specific location, city, or hotel in speech until the hotel has been added to the package (`add_item_bound`). Use evocative sensory descriptions instead.
-            - **THE "WHERE" BAN**: NEVER ask the traveller for a destination preference. The selection is yours to make silently.
-            - **PACKAGE ID SECRECY**: NEVER speak or print Package IDs (UUIDs).
-
-            ### 4. IDENTITY & UI:
-            - Use "{avatar_name or 'Ray and Rae'}", use "we" for the service.
-            - **END WITH A QUESTION**: Every speech response MUST end with a question to move the activity forward.
-            - **MANDATED RESPONSE (After Build)**:
-                - **For DRAFT (Bookable)**: "I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything."
-                - **For DREAMING (Estimated)**: "I've built out your holiday plan in the 'Dreaming' phase, using realistic estimates since official bookings open about 11 months before travel. You can review the full plan in the holiday view!"
-            - **NAVIGATE**: ALWAYS append `[NAVIGATE_TO_PACKAGE: package_id]` after your speech whenever a build is complete.
-
-            ### 5. CONSTRAINTS (SANDWICH ENFORCEMENT - BOTTOM):
-            - **HARD BAN**: Never ask "How about [Location]?" or "Do you like [Location]?".
-            - **HARD BAN**: Never narrate tools or say "I am working on it".
-            - **HARD BAN**: Never tell the traveller you are "having trouble" or "finding it difficult". Just find a workaround silently.
-            - **HARD BAN**: No location names in speech during Phases 1–4.
-            - **HARD BAN**: Never ask "Where?".
-            - **HARD BAN**: Never ask "Which destination?".
-            - **HARD BAN**: Never ask "What location are you planning?".
-            - **HARD BAN**: Never ask "Where do you want to go?".
-            - **HARD BAN**: Never assume a vague request (like "Make my holiday!") refers to an existing package if a new intent is possible.
-            - **HARD BAN**: Never add items to an existing package unless the user specifically confirmed they want to work on that existing one. Always create a new one for a new request.
-            - **PROACTIVITY**: If you have enough info to build, BUILD NOW. Do not ask "Would you like me to build it?".
-
-            ### 6. LOGICAL CONSISTENCY & CLIMATE SAFETY:
-            - **Non-Negotiable Activity Climate Table**:
-                | Activity | Required Climate |
-                | :--- | :--- |
-                | Skiing, Snowboarding | COLD (Below 5°C / 41°F) |
-                | Ice Skating (Outdoor) | COLD (Below 5°C / 41°F) |
-                | Beach, Swimming (Outdoor) | WARM (Above 22°C / 72°F) |
-                | Water Parks | WARM (Above 22°C / 72°F) |
-                | Desert Safari | HOT (Above 25°C / 77°F) |
-            - **Mandate**: NEVER combine items from this table with an incompatible climate description or month. 
-            - **Conflict Resolution**: If a user's profile or previous message creates a conflict (e.g., "Warm weather" + "Skiing"), you MUST NOT proceed with both. Instead, politely point out the contradiction or ask which they'd like to prioritize. 
-            - **Example**: "I see you're interested in skiing, which typically needs a colder climate. Should we look for a winter destination, or stick with a warm-weather trip and find some different adventures?"
-
-            ### 7. EXAMPLE: THE CORRECT TURN (Discovery)
-            - **User**: "I want something very lively for skiing please."
-            - **Agent (Internal reasoning via log_reasoning)**: "You want a lively ski vibe. I'll target St. Anton in the Austrian Alps for its legendary après-ski scene. I need origin and month before I can build."
-            - **Agent (Speech)**: "Love it! Where would you be flying from, and what month works best for you?"
-            - **Agent (Action)**: (No build yet — origin and month are still missing. Speech is SHORT: acknowledgment + question. No location names, no descriptive blurb.)
-
-            ### 9. EXAMPLE: THE VAGUE START
-            - **User**: "Make my holiday!"
-            - **Agent (Internal reasoning via log_reasoning)**: "The traveler wants a holiday but gave no details. I must start discovery for a NEW intent. I'll ask for their preferred vibe and logistics while keeping the destination selection for myself."
-            - **Agent (Speech)**: "I'd love to! To get started, what kind of vibe are you after for this trip, and do you know which month you'd like to travel?"
-            - **KEY**: Notice I did NOT ask for a destination. I asked for 'vibe' and 'month'.
-
-            ### 10. EXAMPLE: THE CORRECT TURN (Build)
-            - **User**: "Flying from New Delhi, February works."
-            - **Agent (Internal reasoning via log_reasoning)**: "You gave origin (New Delhi) and month (February). I now have vibe (lively ski), origin, month, and can infer a 7-day duration. All requirements met — building now."
-            - **Agent (Action)**: Calls `create_package_bound`, then `search_hotels_amadeus`, then `propose_itinerary_batch_bound` — ALL SILENTLY in the same turn.
-            - **Agent (Speech)**: "I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything. [NAVIGATE_TO_PACKAGE: <id>]"
-            - **KEY**: No "Hold tight", no "I will need to select a location", no descriptive blurb. Just tools, then the mandated response.
-
-            {package_view_context}
-            {global_context}
-
-            ### FINAL MANDATES (RECAP - TOP PRIORITY):
-            - **CRITICAL**: Use `[NAVIGATE_TO_PACKAGE: package_id]` to open the holiday/package view at the end of every build or upon request.
-            - **CRITICAL**: Never narrate your actions in speech (e.g. "I have created a package", "I am adding...", "I am working on it", "I need to create a package for you"). Actions like creating an itinerary must be done silently using tools immediately in the same turn.
-            - **CRITICAL**: INDEPENDENT INTENTS. Every new holiday intent MUST have its own package ID. NEVER add items to a different package.
-            - **CRITICAL**: NO ASSUMPTIONS. Do NOT "carry over" duration, origin, or dates from a previous package to a new intent. Treat every new holiday as a fresh discovery process from Sydney/London/etc depending on the user's profile, but ALWAYS confirm with the user.
-            - **CRITICAL**: CONTEXT ISOLATION. If you have detected a NEW intent, ignore the details in the 'USER CONTEXT' (the package you were previously viewing). It is irrelevant to the new trip.
-            - **CRITICAL**: NO ZERO PRICES. You must NEVER add an item with a price of 0.0 to a package unless it is explicitly a free activity (like "Walk in the park"). For everything else, if search tools fail, you MUST provide a realistic estimate based on the destination and vibe.
-            - **CRITICAL**: TIME-AWARE SCHEDULING. You MUST use `time` and `duration_hours` for EVERY item added to a package (via `propose_itinerary_batch_bound` OR `add_item_bound`). This creates a realistic, NON-OVERLAPPING, bookable flow that respects the traveller's rhythm and journey/buffer times.
-            - **REAL-ONLY MANDATE**: You MUST NOT add placeholder flights, hotels, or activities. Every flight MUST have a real airline and price. Every hotel MUST have a property name and price found in search results.
-            - **HARD BAN ON GENERIC NAMES**: Never use names like "Planned Hotel", "Placeholder Flight", or "Activity TBD". If search returns no results, PIVOT or ASK for details; DO NOT invent placeholders.
-            - **PRICING**: $0.0 is FORBIDDEN for flights and hotels. If in DREAMING phase (far future), use a realistic estimate based on current prices and explicitly label it "(Estimated Price)".
-            - **CRITICAL**: NO BLANK DAYS. You MUST ensure every single day of the itinerary has items.
-            - **CRITICAL**: END WITH A QUESTION OR SUGGESTION. You MUST NOT leave the conversation hanging. If you are stuck or tools fail, acknowledge their vibe and ask a clarifying question about their preferences.
-            - **CRITICAL**: Never speak or print Package IDs (UUIDs).
-            - **CRITICAL**: No location names during discovery (Phases 1–4). Once the hotel is added, you may name the destination freely.
-            - **CRITICAL**: NEVER say you have "booked" something. You are proposing a package. Use "added".
-            """
+            tools=active_tools,
+            instruction=instruction
         )
         
         # NOTE: I need to preserve the full instructions. I'll use the existing agent instance or re-inject.
@@ -1020,8 +1007,7 @@ class VoiceAgent:
                             tool_called = getattr(fc, 'name', 'unknown')
                             tool_args = getattr(fc, 'args', {})
                             if tool_called == "log_reasoning":
-                                thought = tool_args.get("thought", "")
-                                yield ("thinking", format_thinking_persona(f"LOG: {thought}"))
+                                pass # NEVER share internal reasoning logs with the human.
                             else:
                                 yield ("thinking", format_thinking_persona(f"I decided to call: {tool_called}({tool_args})"))
                         
@@ -1038,16 +1024,19 @@ class VoiceAgent:
                         tool_called = getattr(tc, 'name', 'unknown')
                         tool_args = getattr(tc, 'args', {})
                         if tool_called == "log_reasoning":
-                            thought = tool_args.get("thought", "")
-                            yield ("thinking", format_thinking_persona(f"LOG: {thought}"))
+                            pass # NEVER share internal reasoning logs with the human.
                         else:
                             yield ("thinking", format_thinking_persona(f"I decided to call: {tool_called}({tool_args})"))
 
                 tool_outputs = getattr(event, 'tool_outputs', None)
                 if tool_outputs:
                     for to in tool_outputs:
-                        res_summary = str(getattr(to, 'content', ''))
-                        yield ("thinking", format_thinking_persona(f"Tool outcome: {res_summary}"))
+                        tool_name = getattr(to, 'name', 'unknown')
+                        if tool_name == "log_reasoning":
+                            pass # NEVER share reasoning outcomes with the human.
+                        else:
+                            res_summary = str(getattr(to, 'content', ''))
+                            yield ("thinking", format_thinking_persona(f"Tool outcome: {res_summary}"))
 
                 event_author = getattr(event, 'author', None)
                 event_role = getattr(event, 'role', None)
@@ -1069,6 +1058,24 @@ class VoiceAgent:
                                 chunk = event.content.text
                 
                 if chunk:
+                    # CRITICAL: Filter out internal system markers, reliability guard nudges, or instructions
+                    if chunk.strip().startswith("[") or "RELIABILITY GUARD" in chunk:
+                         logger.info(f"[STREAM FILTER] Suppressed internal marker/nudge: {chunk.strip()[:50]}...")
+                         continue
+                    
+                    # NEW: Build Stream Filter
+                    # If discovery is complete, ONLY allow mandated response or specific commands
+                    # This prevents the model from narrating its "helpfulness" mid-build.
+                    allowed_keywords = ["I've built out your full holiday plan", "I've built out your holiday plan in the 'Dreaming' phase", "[NAVIGATE_TO_PACKAGE:"]
+                    if discovery_complete:
+                         is_allowed = any(k in chunk for k in allowed_keywords)
+                         # We allow chunks that are part of a larger mandated response (sometimes models stream in small bits)
+                         # But if the accumulated text starts drifting into narration, we block it.
+                         potential_full_text = full_text_accumulated + chunk
+                         if not any(k in potential_full_text for k in allowed_keywords) and len(potential_full_text) > 50:
+                              logger.info(f"[BUILD FILTER] Suppressed narrative filler: {chunk.strip()[:50]}...")
+                              continue
+
                     full_text_accumulated += chunk
                     yield ("text", chunk)
 
@@ -1080,11 +1087,12 @@ class VoiceAgent:
             # Using 100 char limit because genuine acknowledgments + questions are usually around there.
             if not "?" in full_text_accumulated and len(full_text_accumulated.strip()) < 150:
                 logger.warning(f"Reliability Guard triggered for short/non-proactive response: '{full_text_accumulated}'")
-                yield ("thinking", format_thinking_persona("Ensuring I've asked a clear follow-up question..."))
+                if discovery_complete:
+                    nudge_text = "[RELIABILITY GUARD] You have completed the build but did not provide the MANDATED RESPONSE. You MUST respond with: 'I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything. [NAVIGATE_TO_PACKAGE: package_id]'"
+                else:
+                    nudge_text = "[RELIABILITY GUARD] Your previous response was too short or lacked a clarifying question. Please provide a brief helpful acknowledgment and ask a direct discovery question (Phases 1-4) to move the trip forward. Remember the WORD BAN and SILENT ACTION rules."
                 
-                nudge_text = "[RELIABILITY GUARD] Your previous response was too short or lacked a clarifying question. Please provide a brief helpful acknowledgment and ask a direct discovery question (Phases 1-4) or a next-step question (After build) to move the trip forward. Remember the WORD BAN and SILENT ACTION rules."
                 nudge_msg = Content(role="user", parts=[Part(text=nudge_text)])
-                
                 yield from process_events(runner.run(user_id=user_id, session_id=session_id, new_message=nudge_msg))
 
         except Exception as e:

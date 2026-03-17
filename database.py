@@ -102,6 +102,7 @@ def init_db():
             session_id TEXT NOT NULL,
             user_id TEXT,
             title TEXT,
+            description TEXT,
             type TEXT,
             status TEXT,
             total_price REAL,
@@ -144,6 +145,13 @@ def init_db():
     if not DATABASE_URL:
         try:
             c.execute("ALTER TABLE packages ADD COLUMN booking_window_opens_at TIMESTAMP")
+        except Exception:
+            pass # Already exists
+
+    # Simple migration: add description if it doesn't exist (Only for SQLite locally)
+    if not DATABASE_URL:
+        try:
+            c.execute("ALTER TABLE packages ADD COLUMN description TEXT")
         except Exception:
             pass # Already exists
     

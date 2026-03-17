@@ -32,6 +32,7 @@ class Package(BaseModel):
     session_id: str
     user_id: str = "web_user" # Default for now
     title: str = "New Package"
+    description: Optional[str] = None
     type: PackageType = PackageType.MIXED
     items: List[PackageItem] = []
     total_price: float = 0.0

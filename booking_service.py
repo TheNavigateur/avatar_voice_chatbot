@@ -47,6 +47,7 @@ class BookingService:
                 session_id=row['session_id'],
                 user_id=row['user_id'] if row['user_id'] else "web_user",
                 title=row['title'],
+                description=row['description'],
                 type=PackageType(row['type']),
                 status=BookingStatus(row['status']),
                 total_price=row['total_price'],
@@ -98,6 +99,7 @@ class BookingService:
                 session_id=row['session_id'],
                 user_id=row['user_id'] if row['user_id'] else "web_user",
                 title=row['title'],
+                description=row['description'],
                 type=PackageType(row['type']),
                 status=BookingStatus(row['status']),
                 total_price=row['total_price'],
@@ -145,6 +147,7 @@ class BookingService:
             session_id=row['session_id'],
             user_id=row['user_id'] if row['user_id'] else "web_user",
             title=row['title'],
+            description=row['description'] if 'description' in row.keys() else None,
             type=PackageType(row['type']),
             status=BookingStatus(row['status']),
             total_price=row['total_price'],
@@ -200,21 +203,21 @@ class BookingService:
         return packages
 
     @staticmethod
-    def create_package(session_id: str, title: str, type: PackageType = PackageType.MIXED, user_id: str = "web_user", status: BookingStatus = BookingStatus.DRAFT, booking_window_opens_at: str = None) -> Package:
+    def create_package(session_id: str, title: str, description: str = None, type: PackageType = PackageType.MIXED, user_id: str = "web_user", status: BookingStatus = BookingStatus.DRAFT, booking_window_opens_at: str = None) -> Package:
         conn = get_db_connection()
         c = conn.cursor()
         
         new_id = str(uuid.uuid4())
         c.execute("""
-            INSERT INTO packages (id, session_id, user_id, title, type, status, total_price, booking_window_opens_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (new_id, session_id, user_id, title, type.value, status.value, 0.0, booking_window_opens_at))
+            INSERT INTO packages (id, session_id, user_id, title, description, type, status, total_price, booking_window_opens_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (new_id, session_id, user_id, title, description, type.value, status.value, 0.0, booking_window_opens_at))
         
         conn.commit()
         conn.close()
         
         # Return object
-        return Package(id=new_id, session_id=session_id, user_id=user_id, title=title, type=type, status=status, booking_window_opens_at=booking_window_opens_at)
+        return Package(id=new_id, session_id=session_id, user_id=user_id, title=title, description=description, type=type, status=status, booking_window_opens_at=booking_window_opens_at)
 
     @staticmethod
     def add_item_to_package(session_id: str, package_id: str, item: PackageItem) -> Optional[Package]:
