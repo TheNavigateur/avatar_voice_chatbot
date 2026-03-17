@@ -76,7 +76,7 @@
         }
         .checkout-form label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
         .checkout-form input, .checkout-form select { 
-            width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px;
+            width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 12px;
         }
         .traveler-form { border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 20px; background: #fafafa; }
 
@@ -162,7 +162,7 @@
             font-size: 1rem;
             color: var(--text-color);
             cursor: pointer;
-            border-radius: 10px;
+            border-radius: 12px;
             transition: all 0.2s;
             display: flex;
             align-items: center;
@@ -248,7 +248,7 @@
             /* Fixed height for avatar */
             position: relative;
             background: #fff;
-            border-radius: 15px;
+            border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             overflow: hidden;
             display: flex;
@@ -336,7 +336,7 @@
             width: 100%;
             height: 100%;
             background: #f8fafc;
-            border-radius: 10px;
+            border-radius: 12px;
             overflow: hidden;
             display: block;
         }
@@ -551,7 +551,7 @@
             z-index: 20;
             background: rgba(255, 255, 255, 0.8);
             padding: 5px 10px;
-            border-radius: 8px;
+            border-radius: 12px;
             backdrop-filter: blur(2px);
         }
 
@@ -570,7 +570,7 @@
         .conversation-area {
             flex: 1;
             background: #fff;
-            border-radius: 15px;
+            border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             display: flex;
             flex-direction: column;
@@ -593,7 +593,7 @@
         /* --- Packages View --- */
         #packages-container {
             background: #fff;
-            border-radius: 15px;
+            border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             padding: 1.5rem;
             flex: 1;
@@ -603,7 +603,7 @@
         #package-details-overlay {
             /* Positioned relative to parent flex container now */
             background: #fff;
-            border-radius: 15px;
+            border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             padding: 2rem;
             flex: 1;
@@ -632,7 +632,7 @@
         /* --- Profile View --- */
         #view-profile {
             background: #fff;
-            border-radius: 15px;
+            border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
             padding: 2rem;
             overflow-y: auto;
@@ -654,7 +654,7 @@
             display: flex;
             flex-direction: column;
             background: #fff;
-            border-radius: 10px;
+            border-radius: 12px;
             padding: 12px;
             margin-bottom: 12px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
@@ -676,7 +676,7 @@
                 margin-bottom: 0 !important;
                 flex-shrink: 0;
                 object-fit: cover;
-                border-radius: 8px 0 0 8px;
+                border-radius: 12px 0 0 12px;
             }
 
             .package-item-details {
@@ -688,7 +688,7 @@
         /* --- Review Carousel --- */
         .reviews-carousel {
             background: #f0f2f5;
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 12px;
             margin-top: 10px;
             position: relative;
@@ -753,13 +753,13 @@
             height: 250px;
             background: #eee;
             overflow: hidden;
-            border-radius: 8px 0 0 8px;
+            border-radius: 12px 0 0 12px;
             /* For desktop side-by-side */
         }
 
         @media (max-width: 767px) {
             .image-slider {
-                border-radius: 8px 8px 0 0;
+                border-radius: 12px 12px 0 0;
             }
         }
 
@@ -858,7 +858,7 @@
             padding: 1rem;
             font-family: monospace;
             border: 1px solid #ddd;
-            border-radius: 8px;
+            border-radius: 12px;
             resize: vertical;
             font-size: 0.9rem;
         }
@@ -877,7 +877,7 @@
             background: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 8px 16px;
             cursor: pointer;
             font-weight: 600;
@@ -1316,17 +1316,15 @@
         @keyframes pulse {
             0% {
                 transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(238, 82, 83, 0.7);
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
             }
-
             70% {
                 transform: scale(1.1);
-                box-shadow: 0 0 0 10px rgba(238, 82, 83, 0);
+                box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
             }
-
             100% {
                 transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(238, 82, 83, 0);
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
             }
         }
 
@@ -1338,14 +1336,14 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-top: 1px solid #e2e8f0;
-            border-bottom-left-radius: 16px;
-            border-bottom-right-radius: 16px;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
         }
 
         #chat-input {
             flex: 1;
             padding: 12px 16px;
-            border-radius: 25px;
+            border-radius: 12px;
             border: 1px solid #e2e8f0;
             background: white;
             color: var(--text-color);
@@ -1371,16 +1369,16 @@
             color: white;
             border: none;
             padding: 0 20px;
-            border-radius: 25px;
+            border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         #send-btn:hover {
-            transform: translateY(-2px);
+            transform: scale(1.02);
             filter: brightness(1.1);
-            box-shadow: 0 4px 12px rgba(238, 82, 83, 0.3);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
         }
 
         .conversation-area {
@@ -1448,6 +1446,7 @@
             margin-bottom: 8px;
             display: -webkit-box;
             -webkit-line-clamp: 2;
+            line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
             line-height: 1.3;
@@ -1488,7 +1487,7 @@
             color: #fff;
             border: none;
             padding: 10px;
-            border-radius: 8px;
+            border-radius: 12px;
             font-weight: 600;
             cursor: pointer;
             transition: filter 0.2s;
@@ -1560,7 +1559,7 @@
             background: #fff;
             color: var(--primary-color);
             border: 2px solid var(--primary-color);
-            border-radius: 20px;
+            border-radius: 12px;
             padding: 8px 20px;
             font-size: 0.9rem;
             font-weight: 600;
@@ -1572,7 +1571,7 @@
         .option-btn:hover {
             background: var(--primary-color);
             color: #fff;
-            transform: translateY(-2px);
+            transform: scale(1.02);
             box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
         }
 
@@ -1598,24 +1597,71 @@
             background: #10b981;
             color: white;
             border: none;
-            border-radius: 20px;
-            padding: 8px 24px;
-            font-weight: 700;
+            border-radius: 12px;
+            padding: 8px 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
-            font-size: 0.9rem;
-            margin-top: 5px;
-            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.1);
         }
 
         .submit-btn:hover {
-            background: #059669;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            filter: brightness(1.1);
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
         }
 
-        .submit-btn:active {
-            transform: translateY(0);
+        /* Manual Listening UI */
+        .say-reply-container {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 32px;
+        }
+
+        .say-reply-btn {
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 8px 18px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .say-reply-btn:hover {
+            transform: scale(1.02);
+            filter: brightness(1.1);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .say-reply-btn i {
+            font-size: 1.1rem;
+        }
+
+        /* Reactive Listening Animation */
+        .listening-animation {
+            display: none; /* Shown via JS */
+            align-items: center;
+            gap: 3px;
+            height: 24px;
+            padding: 0;
+        }
+
+        .listening-bar {
+            width: 3px;
+            height: 4px;
+            min-height: 4px;
+            background: var(--primary-color);
+            border-radius: 2px;
+            transition: height 0.1s ease;
         }
 
         .checklist-column-header {
@@ -1642,7 +1688,7 @@
             background: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 20px;
+            border-radius: 12px;
             padding: 8px 24px;
             font-weight: 600;
             cursor: pointer;
@@ -1678,7 +1724,7 @@
             background: #f1f5f9;
             border: none;
             padding: 4px 12px;
-            border-radius: 15px;
+            border-radius: 12px;
             font-size: 0.8rem;
             font-weight: 600;
             cursor: pointer;
@@ -1703,7 +1749,7 @@
         .size-btn {
             background: #fff;
             border: 1px solid #e2e8f0;
-            border-radius: 8px;
+            border-radius: 12px;
             height: 40px;
             display: flex;
             align-items: center;
@@ -1943,7 +1989,7 @@
             <div class="conversation-area">
                 <div id="transcript"></div>
                 <div class="chat-input-container">
-                    <input type="text" id="chat-input" placeholder="Prefer to type? Click here" autocomplete="off">
+                    <input type="text" id="chat-input" placeholder="Reply" autocomplete="off">
                     <button id="send-btn" onclick="sendChatMessage()">Send</button>
                 </div>
             </div>
@@ -3136,6 +3182,7 @@
     let statusInterval = null; // Fix: Declare statusInterval to avoid ReferenceError
     let currentBotMsgContentEl = null; // Track the active bot message container
     let currentBotMsgDiv = null;      // Track the active bot message bubble element
+    let currentThinkingTrace = [];    // Track the current response's thinking events
     let currentFullResponse = "";      // Track the response as it streams
     let currentChatAbortController = null; // To allow interrupting fetch/stream
 
@@ -3152,12 +3199,9 @@
         };
 
         recognition.onend = () => {
-            console.log(`[Recognition] onend at ${new Date().toLocaleTimeString()}. States: isConversationActive=${isConversationActive}, isBotSpeaking=${isBotSpeaking}, isProcessing=${isProcessing}`);
-
-            // Wait briefly before attempting to restart to avoid collisions
-            setTimeout(() => {
-                restartRecognitionIfPossible();
-            }, 100);
+            console.log(`[Recognition] onend at ${new Date().toLocaleTimeString()}.`);
+            // Auto-restart disabled as per user request
+            if (typeof stopListeningAnimation === 'function') stopListeningAnimation();
         };
 
         window.restartRecognitionIfPossible = function () {
@@ -3275,7 +3319,9 @@
 
         // Just start listening
         setBotStatusMessage("Ready! Speak to initiate...", 'right');
-        restartRecognitionIfPossible();
+        try {
+            recognition.start();
+        } catch (e) { console.warn(e); }
     }
 
     function stopConversationMode() {
@@ -3311,7 +3357,20 @@
 
         const startBtn = document.createElement('button');
         startBtn.className = 'action-btn start-btn';
+        startBtn.style.cssText = "background: var(--primary-color); color: #fff; padding: 12px 24px; font-size: 1rem; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);";
         startBtn.textContent = 'Make my holiday!';
+        
+        // Add hover effect manually since it's dynamic
+        startBtn.onmouseover = () => {
+            startBtn.style.transform = "scale(1.02)";
+            startBtn.style.filter = "brightness(1.1)";
+            startBtn.style.boxShadow = "0 4px 12px rgba(99, 102, 241, 0.2)";
+        };
+        startBtn.onmouseout = () => {
+            startBtn.style.transform = "scale(1)";
+            startBtn.style.filter = "brightness(1)";
+            startBtn.style.boxShadow = "none";
+        };
         
         // Calling startConversationMode will initialize audio and send 'Hi!'
         startBtn.onclick = startConversationMode;
@@ -3523,10 +3582,9 @@
         const wrapperId = stableId || ('trace-container-' + Math.random().toString(36).substr(2, 9));
         const innerBubbleId = 'bubble-' + Math.random().toString(36).substr(2, 9);
 
-        // Use 'is-processing' class to trigger aurora animation
-        // Use 'expanded' class by default for the new layout
+        // REMOVED 'expanded' class by default
         return `
-            <div id="${innerBubbleId}" class="thinking-bubble expanded ${isProcessing ? 'is-processing' : ''}">
+            <div id="${innerBubbleId}" class="thinking-bubble ${isProcessing ? 'is-processing' : ''}">
                 <div class="thinking-bubble-header" onclick="document.getElementById('${innerBubbleId}').classList.toggle('expanded'); setTimeout(scrollTranscriptToBottom, 50);">
                     <div class="thinking-bubble-title">
                         <i class="ph ph-brain"></i> Train of Thought
@@ -3535,6 +3593,23 @@
                 </div>
                 <div class="thinking-bubble-content">
                     ${curatedTrace.map(item => `<div class="trace-item">${item}</div>`).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderManualListeningHtml() {
+        return `
+            <div class="say-reply-container">
+                <button class="say-reply-btn" onclick="startListeningFromBotMessage(this)">
+                    <i class="ph ph-microphone"></i> Say your reply
+                </button>
+                <div class="listening-animation">
+                    <div class="listening-bar" style="height: 8px;"></div>
+                    <div class="listening-bar" style="height: 14px;"></div>
+                    <div class="listening-bar" style="height: 10px;"></div>
+                    <div class="listening-bar" style="height: 6px;"></div>
+                    <div class="listening-bar" style="height: 12px;"></div>
                 </div>
             </div>
         `;
@@ -3577,6 +3652,8 @@
             traceHtml = renderThinkingTraceHtml(thinkingTrace);
         }
 
+        const listeningHtml = (sender === 'Bot') ? renderManualListeningHtml() : '';
+
         if (sender === 'Bot' && traceHtml) {
             div.innerHTML = `
                 <div class="thinking-trace-standalone">
@@ -3587,6 +3664,7 @@
                     <div class="${sender === 'Bot' ? 'bot-content-text' : ''}">${displayContent}</div>
                     <div class="bot-protocol-checklist">${checklistHtml}</div>
                     <div class="bot-protocol-options">${optionsHtml}</div>
+                    ${listeningHtml}
                 </div>
             `;
         } else {
@@ -3597,6 +3675,7 @@
                     <div class="bot-protocol-checklist">${checklistHtml}</div>
                     <div class="bot-protocol-options">${optionsHtml}</div>
                     ${sender === 'You' ? traceHtml : ''}
+                    ${listeningHtml}
                 </div>
             `;
         }
@@ -4021,6 +4100,91 @@
         clearBotStatusMessage();
     }
 
+    let microphoneStream = null;
+    let microphoneAnalyser = null;
+    let microphoneDataArray = null;
+    let listeningAnimRequest = null;
+    let currentListeningAnimationEl = null;
+
+    window.startListeningFromBotMessage = async function(btn) {
+        interruptBot();
+        
+        // Ensure AudioContext works
+        if (typeof initAudio === 'function') initAudio();
+
+        const container = btn.parentElement;
+        const animation = container.querySelector('.listening-animation');
+        btn.style.display = 'none';
+        animation.style.display = 'flex';
+        currentListeningAnimationEl = animation;
+
+        isConversationActive = true;
+        isBotSpeaking = false;
+        isProcessing = false;
+
+        try {
+            await startListeningAnimation();
+            recognition.start();
+        } catch (e) {
+            console.error("[Mic] Failed to start:", e);
+            btn.style.display = 'flex';
+            animation.style.display = 'none';
+        }
+    };
+
+    async function startListeningAnimation() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+        
+        try {
+            if (!microphoneStream) {
+                microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const micContext = new AudioContext();
+                const source = micContext.createMediaStreamSource(microphoneStream);
+                microphoneAnalyser = micContext.createAnalyser();
+                microphoneAnalyser.fftSize = 64;
+                source.connect(microphoneAnalyser);
+                microphoneDataArray = new Uint8Array(microphoneAnalyser.frequencyBinCount);
+            }
+
+            function update() {
+                if (!currentListeningAnimationEl) return;
+                
+                microphoneAnalyser.getByteFrequencyData(microphoneDataArray);
+                const bars = currentListeningAnimationEl.querySelectorAll('.listening-bar');
+                
+                bars.forEach((bar, i) => {
+                    // Use a few bins to get varied movement
+                    const val = microphoneDataArray[i % microphoneDataArray.length] || 0;
+                    const height = 4 + (val / 255) * 18;
+                    bar.style.height = `${height}px`;
+                });
+                
+                listeningAnimRequest = requestAnimationFrame(update);
+            }
+            update();
+        } catch (e) {
+            console.warn("[Mic] Animation error:", e);
+        }
+    }
+
+    function stopListeningAnimation() {
+        if (listeningAnimRequest) {
+            cancelAnimationFrame(listeningAnimRequest);
+            listeningAnimRequest = null;
+        }
+        if (currentListeningAnimationEl) {
+            const container = currentListeningAnimationEl.parentElement;
+            if (container) {
+                // Hide the whole container after a short delay to feel smooth
+                setTimeout(() => {
+                    container.style.display = 'none';
+                    currentListeningAnimationEl = null;
+                }, 300);
+            }
+        }
+    }
+
     let speechQueue = [];
     let isPlayingQueue = false;
 
@@ -4030,6 +4194,7 @@
         isPlayingQueue = true;
         const speechItem = speechQueue.shift();
         const textToSpeak = speechItem.text;
+        const traceToPass = speechItem.trace || [];
 
         try {
             // Re-apply protocol stripping for safety (though it should be stripped before queuing)
@@ -4069,7 +4234,7 @@
 
                 if (speechQueue.length === 0) {
                     isBotSpeaking = false;
-                    restartRecognitionIfPossible();
+                    // Auto-restart disabled
                 } else {
                     processSpeechQueue();
                 }
@@ -4089,35 +4254,18 @@
                 startSpeaking();
                 updateAudioVolumeGlobal();
                 clearBotStatusMessage();
-
+                
                 // Stop thinking messages once speech starts
                 hasStartedSpeakingThisResponse = true;
                 stopProcessingStatus();
 
-                // Initialize UI bubble if it's the first audio segment
+                // Initialize UI bubble if it's not already created by the stream logic
                 if (!currentBotMsgDiv) {
-                    currentBotMsgDiv = addMessage('Bot', '');
+                    currentBotMsgDiv = addMessage('Bot', textToSpeak, traceToPass);
                     currentBotMsgContentEl = currentBotMsgDiv.querySelector('.bot-content-text');
-                    console.log("[TTS] Created botMsgDiv on speech start.");
+                    console.log("[TTS] Fallback bubble created on speech start.");
 
                     // Immediately render any protocols accumulated so far
-                    if (currentFullResponse.includes('[') || currentFullResponse.includes(']')) {
-                        const { checklistHtml, optionsHtml } = parseProtocols(currentFullResponse);
-                        const checklistContainer = currentBotMsgDiv.querySelector('.bot-protocol-checklist');
-                        const optionsContainer = currentBotMsgDiv.querySelector('.bot-protocol-options');
-                        if (checklistContainer && checklistHtml) checklistContainer.innerHTML = checklistHtml;
-                        if (optionsContainer && optionsHtml) optionsContainer.innerHTML = optionsHtml;
-                    }
-                }
-
-                // Initialize UI bubble if it's the first audible segment
-                if (!currentBotMsgDiv) {
-                    // Create bubble with first chunk already included
-                    currentBotMsgDiv = addMessage('Bot', textToSpeak);
-                    currentBotMsgContentEl = currentBotMsgDiv.querySelector('.bot-content-text');
-                    console.log("[TTS] Created botMsgDiv on speech start with text:", textToSpeak);
-
-                    // Immediately render any protocols accumulated in previous silent chunks
                     if (currentFullResponse.includes('[') || currentFullResponse.includes(']')) {
                         const { checklistHtml, optionsHtml } = parseProtocols(currentFullResponse);
                         const checklistContainer = currentBotMsgDiv.querySelector('.bot-protocol-checklist');
@@ -4155,7 +4303,7 @@
             stopSpeaking();
             if (speechQueue.length === 0) {
                 isBotSpeaking = false;
-                restartRecognitionIfPossible();
+                // Auto-restart disabled
             } else {
                 processSpeechQueue();
             }
@@ -4209,7 +4357,7 @@
         ttsText = ttsText.replace(/\*/g, '').replace(/_/g, '').trim();
 
         if (ttsText) {
-            speechQueue.push({ text: ttsText });
+            speechQueue.push({ text: ttsText, trace: [...currentThinkingTrace] });
             processSpeechQueue();
         }
     }
@@ -4321,7 +4469,7 @@
                 [...packages].reverse().forEach(pkg => {
                     // Summary Card
                     const card = document.createElement('div');
-                    card.style.cssText = "background: #f9f9f9; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);";
+                    card.style.cssText = "background: #f9f9f9; border: 1px solid #eee; border-radius: 12px; padding: 15px; margin-bottom: 15px; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.05);";
                     card.onmouseover = () => card.style.transform = "translateY(-2px)";
                     card.onmouseout = () => card.style.transform = "none";
                     card.onclick = () => showPackageDetails(pkg);
@@ -4332,7 +4480,7 @@
                     card.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <h3 style="margin:0; color:#333; font-size: 1.1rem;">${statusIcon} ${pkg.title}</h3>
-                            <span style="font-size:0.8rem; color:#666; background: #e0e0e0; padding: 2px 8px; border-radius: 10px;">${pkg.type}</span>
+                            <span style="font-size:0.8rem; color:#666; background: #e0e0e0; padding: 2px 8px; border-radius: 12px;">${pkg.type}</span>
                         </div>
                         <p style="margin: 5px 0 0 0; font-size: 0.9rem; color: #666;">${itemCount} items &bull; Click to view details</p>
                     `;
@@ -4435,7 +4583,7 @@
     window.renderImageSlider = function (images, altText) {
         if (!images || !Array.isArray(images) || images.length === 0) return '';
         if (images.length === 1) {
-            return `<img src="${images[0]}" class="slide-img" style="border-radius: 8px 0 0 8px; width: 100%; object-fit: cover;" alt="${altText}">`;
+            return `<img src="${images[0]}" class="slide-img" style="border-radius: 12px 0 0 12px; width: 100%; object-fit: cover;" alt="${altText}">`;
         }
 
         const sliderId = 'slider-' + Math.random().toString(36).substr(2, 9);
@@ -4616,7 +4764,7 @@
                 // Extract the destination name from the item name (e.g. "Why the Whitsundays?" → "the Whitsundays")
                 const bannerTitle = banner.name || '✨ Why we chose this for you';
                 html += `
-                    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); border-radius: 14px; padding: 22px 24px; margin-bottom: 24px; box-shadow: 0 6px 20px rgba(15,52,96,0.35); position: relative; overflow: hidden;">
+                    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); border-radius: 12px; padding: 22px 24px; margin-bottom: 24px; box-shadow: 0 6px 20px rgba(15,52,96,0.35); position: relative; overflow: hidden;">
                         <div style="position: absolute; top: -20px; right: -20px; width: 120px; height: 120px; background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%); border-radius: 50%;"></div>
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                             <span style="font-size: 1.4rem;">✨</span>
@@ -4740,7 +4888,7 @@
 
             // Checklist Section
             if (checklistItems.length > 0) {
-                html += `<div style="margin-bottom:25px; background: #fffaf0; border: 1px solid #ffe4b5; border-radius: 10px; padding: 15px;">
+                html += `<div style="margin-bottom:25px; background: #fffaf0; border: 1px solid #ffe4b5; border-radius: 12px; padding: 15px;">
                     <h4 style="margin:0 0 10px 0; color:#856404; font-size:1.1rem;">📝 Pre-holiday Checklist</h4>
                     <ul style="list-style:none; padding:0; margin:0;">`;
                 checklistItems.forEach(item => {
@@ -4750,7 +4898,7 @@
 
                     html += `
                         <li style="display:flex; align-items:flex-start; margin-bottom: 8px; font-size: 0.95rem;">
-                            <span style="margin-right: 10px;">☐</span>
+                            <span style="margin-right: 12px;">☐</span>
                             <div style="flex:1;">
                                 <div style="font-weight:600;">${item.name}</div>
                                 ${item.description ? `<div style="font-size:0.85rem; color:#666; margin-top:2px;">${item.description}</div>` : ''}
@@ -4885,7 +5033,7 @@
                                 <div style="font-size:1.1rem; font-weight:700; color:var(--primary-color);">${dayLabel}</div>
                                 ${dayDate ? `<div style="font-size:0.85rem; color:#888; margin-top:2px;">${dayDate}</div>` : ''}
                             </div>
-                            <div style="display:grid; gap:10px;">
+                            <div style="display:grid; gap:12px;">
                     `;
 
                     dayActivities.forEach(activity => {
@@ -4914,9 +5062,9 @@
                                     ${activity.description ? `<div style="font-size:0.8rem; color:#666; line-height:1.4; margin-top:8px;">${activity.description}</div>` : ''}
                                     
                                     ${bookingLink ? `
-                                        <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
-                                            <a href="${bookingLink}" target="_blank" style="display:inline-block; color:#4f46e5; text-decoration:none; font-weight:bold; font-size:0.85rem; padding:6px 12px; background:rgba(79,70,229,0.1); border-radius:6px;">Complete on External Site &rarr;</a>
-                                            ${activity.status === 'pending_external' ? `<button onclick="verifyExternalBooking('${pkg.id}', '${activity.id}')" style="background:none; border:1px solid #ddd; color:#666; padding:5px 10px; border-radius:6px; font-size:0.75rem; cursor:pointer;">Verify</button>` : ''}
+                                        <div style="margin-top:12px; display:flex; gap:12px; align-items:center;">
+                                            <a href="${bookingLink}" target="_blank" style="display:inline-block; color:#4f46e5; text-decoration:none; font-weight:bold; font-size:0.85rem; padding:6px 12px; background:rgba(79,70,229,0.1); border-radius:12px;">Complete on External Site &rarr;</a>
+                                            ${activity.status === 'pending_external' ? `<button onclick="verifyExternalBooking('${pkg.id}', '${activity.id}')" style="background:none; border:1px solid #ddd; color:#666; padding:5px 12px; border-radius:12px; font-size:0.75rem; cursor:pointer;">Verify</button>` : ''}
                                         </div>
                                     ` : ''}
                                     ${reviewCarouselHtml}
@@ -4949,10 +5097,10 @@
                         ${btnText} (${sym}${travelTotal})
                     </button>
                     ${pkg.status === 'failed' ? '<p style="font-size:0.85rem; color:#dc3545; margin-top:5px; font-weight:bold;">Previous attempt failed. You can retry now.</p>' : ''}
-                    ${pkg.status === 'partial' ? `<p style="font-size:0.85rem; color:#f59e0b; margin-top:10px; font-weight:bold; background:#fff7ed; padding:15px; border-radius:8px; border:1px solid #fed7aa; text-align:center;">
+                    ${pkg.status === 'partial' ? `<p style="font-size:0.85rem; color:#f59e0b; margin-top:12px; font-weight:bold; background:#fff7ed; padding:15px; border-radius:12px; border:1px solid #fed7aa; text-align:center;">
                         ⏳ Travel Essentials (Hotels/Flights) are Secured, but Activities require external booking.<br>
                         <span style="font-weight:normal; color:#ea580c; font-size:0.8rem; display:block; margin:5px 0 10px 0;">Click 'Complete Reservation' on each activity. Once done, use the sync button below to automatically verify.</span>
-                        <button id="sync-bookings-btn" onclick="syncExternalBookings('${pkg.id}')" style="background:#f97316; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; font-size:0.85rem;">Sync with Travelpayouts 🔄</button>
+                        <button id="sync-bookings-btn" onclick="syncExternalBookings('${pkg.id}')" style="background:#f97316; color:#fff; border:none; padding:8px 16px; border-radius:12px; font-weight:bold; cursor:pointer; font-size:0.85rem;">Sync with Travelpayouts 🔄</button>
                     </p>` : '<p style="font-size:0.8rem; color:#888; margin-top:5px;">Secure 1-Click Payment for Travel Essentials</p>'}
                 </div>
             `;
@@ -5167,7 +5315,7 @@
         hasStartedSpeakingThisResponse = false; // Reset for new response
         let responseStarted = false; // Flag to track if bot response has started
         currentFullResponse = ""; // Reset stream tracker
-        let currentThinkingTrace = [];
+        currentThinkingTrace = []; // Reset global stream tracker
         let currentThinkingDiv = null;
         currentBotMsgDiv = null;  // Reset placeholder tracker
         startProcessingStatus(text);
@@ -5226,7 +5374,6 @@
                                 if (data.chunk) {
                                     if (!responseStarted) {
                                         responseStarted = true;
-                                        // Animation stop is now handled in addMessage() when the Bot bubble physically appears
                                     }
                                     currentFullResponse += data.chunk;
                                     currentChunk += data.chunk;
@@ -5238,7 +5385,7 @@
                                         currentChunk = "";
                                     }
 
-                                    // Early protocol rendering ONLY if speech has already started
+                                    // Early protocol rendering if bubble exists (from TTS fallback)
                                     if (currentBotMsgDiv && (currentFullResponse.includes('[') || currentFullResponse.includes(']'))) {
                                         const { checklistHtml, optionsHtml } = parseProtocols(currentFullResponse);
                                         const checklistContainer = currentBotMsgDiv.querySelector('.bot-protocol-checklist');
@@ -5271,8 +5418,8 @@
             stopProcessingStatus();
             isProcessing = false;
 
-            // Manual restart as speech is finished and isProcessing is reset
-            restartRecognitionIfPossible();
+            // Manual restart disabled
+            // restartRecognitionIfPossible();
 
             // Re-render full bot response for protocols
             if (currentBotMsgDiv) {
