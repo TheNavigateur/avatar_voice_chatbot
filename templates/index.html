@@ -19,7 +19,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lateef:wght@200;300;400;500;600;700;800;900&family=Fontdiner+Swanky&family=Space+Mono:wght@400;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lateef:wght@200;300;400;500;600;700;800;900&family=Fontdiner+Swanky&family=Space+Mono:wght@400;700&family=Homemade+Apple&family=Josefin+Sans:wght@100..700&family=Ms+Madi&family=LINE+Seed+JP:wght@400;700&family=Bungee+Hairline&display=swap"
         rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://accounts.google.com/gsi/client" async></script>
@@ -160,7 +160,7 @@
             border: none;
             text-align: left;
             padding: 12px 15px;
-            font-size: 1rem;
+            font-size: 0.87rem;
             color: var(--text-color);
             cursor: pointer;
             border-radius: var(--border-radius);
@@ -168,7 +168,8 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            font-weight: 500;
+            font-family: 'Homemade Apple', cursive;
+            font-weight: 400;
         }
 
         .nav-item:hover {
@@ -881,7 +882,13 @@
             border-radius: var(--border-radius);
             padding: 8px 16px;
             cursor: pointer;
-            font-weight: 600;
+            font-weight: 400;
+            font-family: 'LINE Seed JP', sans-serif;
+        }
+
+        button, .action-btn {
+            font-family: 'LINE Seed JP', sans-serif;
+            font-weight: 400;
         }
 
         .action-btn.secondary {
@@ -934,6 +941,10 @@
             border-bottom-right-radius: 2px;
         }
 
+        .user-content-text {
+            font-family: 'Homemade Apple', cursive;
+        }
+
         .bot-message .message-bubble {
             background: var(--bot-bubble-bg);
             color: var(--text-color);
@@ -942,6 +953,9 @@
 
         .bot-content-text {
             white-space: pre-wrap;
+            font-family: 'Ms Madi', cursive;
+            font-size: 1.55rem; /* Increased size specifically for Ms Madi font; revert if changing font */
+            line-height: 1;
         }
 
         /* Train of Thought (Refined Minimalist Layout) */
@@ -1169,6 +1183,25 @@
             border-bottom: none;
         }
 
+        .bot-status-message {
+            margin: 0;
+            max-width: 85%;
+            font-family: 'Bungee Hairline', cursive;
+            font-size: 0.7rem;
+            color: black;
+            opacity: 1;
+        }
+
+        .bot-status-message-left {
+            align-self: flex-start;
+            text-align: left;
+        }
+
+        .bot-status-message-right {
+            align-self: flex-end;
+            text-align: right;
+        }
+
         /* Inline spinner for the current thinking message */
         @keyframes status-spin {
             to { transform: rotate(360deg); }
@@ -1371,7 +1404,8 @@
             border: none;
             padding: 0 20px;
             border-radius: var(--border-radius);
-            font-weight: 600;
+            font-family: 'LINE Seed JP', sans-serif;
+            font-weight: 400;
             cursor: pointer;
             transition: all 0.2s;
         }
@@ -1627,9 +1661,9 @@
             color: #fff;
             border: none;
             border-radius: var(--border-radius);
-            padding: 8px 18px;
+            padding: 12px 22px;
             font-size: 0.85rem;
-            font-weight: 700;
+            font-weight: 400;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -3565,6 +3599,7 @@
     }
 
     function renderThinkingTraceHtml(thinkingTrace, stableId = null, isProcessing = false) {
+        return ''; // TEMPORARILY HIDDEN BY USER REQUEST
         if (!thinkingTrace || thinkingTrace.length === 0) return '';
 
         // Only show curated items (Tool results/outcomes)
@@ -3616,6 +3651,16 @@
         `;
     }
 
+    function getCurrentBotName() {
+        if (!avatarSelector) return 'Bot';
+        const val = avatarSelector.value;
+        if (val === 'glb_ray') return 'Ray';
+        if (val === 'glb_rae') return 'Rae';
+        // Fallback for other avatars: capitalize name
+        const name = val.replace('glb_', '').replace('vrm_', '');
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+
     function addMessage(sender, text, thinkingTrace = []) {
         if (sender === 'You') {
             clearBotStatusMessage();
@@ -3626,7 +3671,9 @@
 
         const { displayContent, checklistHtml, optionsHtml, navigateId } = parseProtocols(text);
 
+        let displaySender = sender;
         if (sender === 'Bot') {
+            displaySender = getCurrentBotName();
             // Find and collapse any expanded thinking bubbles when a bot message appears
             document.querySelectorAll('.thinking-bubble').forEach(bubble => {
                 bubble.classList.remove('expanded');
@@ -3661,8 +3708,8 @@
                     ${traceHtml}
                 </div>
                 <div class="message-bubble">
-                    <div class="bubble-sender">${sender}</div>
-                    <div class="${sender === 'Bot' ? 'bot-content-text' : ''}">${displayContent}</div>
+                    <div class="bubble-sender">${displaySender}</div>
+                    <div class="${sender === 'Bot' ? 'bot-content-text' : 'user-content-text'}">${displayContent}</div>
                     <div class="bot-protocol-checklist">${checklistHtml}</div>
                     <div class="bot-protocol-options">${optionsHtml}</div>
                     ${listeningHtml}
@@ -3671,8 +3718,8 @@
         } else {
             div.innerHTML = `
                 <div class="message-bubble">
-                    <div class="bubble-sender">${sender}</div>
-                    <div class="${sender === 'Bot' ? 'bot-content-text' : ''}">${displayContent}</div>
+                    <div class="bubble-sender">${displaySender}</div>
+                    <div class="${sender === 'Bot' ? 'bot-content-text' : 'user-content-text'}">${displayContent}</div>
                     <div class="bot-protocol-checklist">${checklistHtml}</div>
                     <div class="bot-protocol-options">${optionsHtml}</div>
                     ${sender === 'You' ? traceHtml : ''}
@@ -4001,17 +4048,8 @@
         }
 
         const div = document.createElement('div');
-        if (align === 'right') {
-            div.className = 'bot-status-message bot-status-message-right';
-        } else {
-            div.className = 'bot-status-message bot-status-message-left';
-        }
-
-        let alignSelf = 'center';
-        if (align === 'left') alignSelf = 'flex-start';
-        if (align === 'right') alignSelf = 'flex-end';
-
-        div.style.cssText = `text-align: ${align}; align-self: ${alignSelf}; color: #888; font-style: italic; margin: 0; font-size: 0.85em; opacity: 0.8; max-width: 85%;`;
+        div.className = `bot-status-message bot-status-message-${align}`;
+        div.style.textAlign = align;
 
         if (align === 'left') {
             // Render with animated spinner icon in front of the current (latest) message
@@ -4175,14 +4213,22 @@
             listeningAnimRequest = null;
         }
         if (currentListeningAnimationEl) {
-            const container = currentListeningAnimationEl.parentElement;
-            if (container) {
-                // Hide the whole container after a short delay to feel smooth
-                setTimeout(() => {
-                    container.style.display = 'none';
-                    currentListeningAnimationEl = null;
-                }, 300);
-            }
+            const animation = currentListeningAnimationEl;
+            const container = animation.parentElement;
+            const btn = container ? container.querySelector('.say-reply-btn') : null;
+
+            // Hide the animation and determine if we should show the button or hide the whole area
+            setTimeout(() => {
+                if (isProcessing) {
+                    // Message was actually sent, hide the whole interaction container
+                    if (container) container.style.display = 'none';
+                } else {
+                    // No message sent (mic timeout, error, or manual stop), restore the button
+                    animation.style.display = 'none';
+                    if (btn) btn.style.display = 'flex';
+                }
+                currentListeningAnimationEl = null;
+            }, 300);
         }
     }
 
@@ -5094,14 +5140,14 @@
             const btnText = (pkg.status === 'partial') ? "Complete Booking" : "Book Holiday Now";
             html += `
                 <div style="text-align:center; margin-top:20px;">
-                    <button id="main-booking-btn" onclick="openCheckout('${pkg.id}', ${travelTotal})" class="action-btn" style="background:#28a745; font-size:1.1rem; padding:10px 30px;">
+                    <button id="main-booking-btn" onclick="openCheckout('${pkg.id}', ${travelTotal})" class="action-btn" style="background:#28a745; font-size:1.1rem; padding:10px 30px; font-family:'LINE Seed JP', sans-serif; font-weight:400;">
                         ${btnText} (${sym}${travelTotal})
                     </button>
                     ${pkg.status === 'failed' ? '<p style="font-size:0.85rem; color:#dc3545; margin-top:5px; font-weight:bold;">Previous attempt failed. You can retry now.</p>' : ''}
                     ${pkg.status === 'partial' ? `<p style="font-size:0.85rem; color:#f59e0b; margin-top:12px; font-weight:bold; background:#fff7ed; padding:15px; border-radius:12px; border:1px solid #fed7aa; text-align:center;">
                         ⏳ Travel Essentials (Hotels/Flights) are Secured, but Activities require external booking.<br>
                         <span style="font-weight:normal; color:#ea580c; font-size:0.8rem; display:block; margin:5px 0 10px 0;">Click 'Complete Reservation' on each activity. Once done, use the sync button below to automatically verify.</span>
-                        <button id="sync-bookings-btn" onclick="syncExternalBookings('${pkg.id}')" style="background:#f97316; color:#fff; border:none; padding:8px 16px; border-radius:12px; font-weight:bold; cursor:pointer; font-size:0.85rem;">Sync with Travelpayouts 🔄</button>
+                        <button id="sync-bookings-btn" onclick="syncExternalBookings('${pkg.id}')" style="background:#f97316; color:#fff; border:none; padding:8px 16px; border-radius:12px; font-weight:400; cursor:pointer; font-size:0.85rem; font-family:'LINE Seed JP', sans-serif;">Sync with Travelpayouts 🔄</button>
                     </p>` : '<p style="font-size:0.8rem; color:#888; margin-top:5px;">Secure 1-Click Payment for Travel Essentials</p>'}
                 </div>
             `;
