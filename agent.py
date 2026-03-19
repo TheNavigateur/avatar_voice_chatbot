@@ -910,7 +910,8 @@ class VoiceAgent:
                 if hasattr(event, 'text') and event.text:
                     text = event.text
                 elif hasattr(event, 'content') and hasattr(event.content, 'parts'):
-                    texts = [p.text for p in event.content.parts if hasattr(p, 'text')]
+                    # CRITICAL: Only collect parts that actually have text to avoid TypeErrors when joining
+                    texts = [p.text for p in event.content.parts if getattr(p, 'text', None)]
                     text = "\n".join(texts)
                 
                 if text:
@@ -1082,10 +1083,9 @@ class VoiceAgent:
                     allowed_keywords = ["I've built out your full holiday plan", "I've built out your holiday plan in the 'Dreaming' phase", "[NAVIGATE_TO_PACKAGE:"]
                     if discovery_complete:
                          is_allowed = any(k in chunk for k in allowed_keywords)
-                         # We allow chunks that are part of a larger mandated response (sometimes models stream in small bits)
-                         # But if the accumulated text starts drifting into narration, we block it.
+                         # Softened filter: only block if we have a substantial amount of text that is NOT the allowed keyword.
                          potential_full_text = full_text_accumulated + chunk
-                         if not any(k in potential_full_text for k in allowed_keywords) and len(potential_full_text) > 50:
+                         if not any(k in potential_full_text for k in allowed_keywords) and len(potential_full_text) > 250:
                               logger.info(f"[BUILD FILTER] Suppressed narrative filler: {chunk.strip()[:50]}...")
                               continue
 
