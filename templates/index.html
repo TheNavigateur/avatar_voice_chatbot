@@ -1897,6 +1897,15 @@
             flex-wrap: wrap;
             gap: 8px;
         }
+        @keyframes pulse-orange {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        .pulse-action {
+            animation: pulse-orange 2s infinite;
+            border: 2px solid #f59e0b !important;
+        }
     </style>
     <!-- Import Maps -->
     <script type="importmap">
@@ -1994,6 +2003,8 @@
                         <input type="tel" name="phone" placeholder="+1..." required>
                     </div>
                 </div>
+
+                <div id="checkout-status-msg" style="display:none; padding:12px; border-radius:8px; margin-bottom:15px; font-size:0.9rem; font-weight:600; text-align:center;"></div>
 
                 <div style="background:#f1f5f9; padding:15px; border-radius:10px; margin-bottom:20px;">
                     <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.1rem;">
@@ -5150,14 +5161,14 @@
                         const bookingRef = (activity.metadata && activity.metadata.booking_reference) ? activity.metadata.booking_reference : null;
 
                         html += `
-                            <div class="package-item-responsive" style="padding:0; overflow:hidden;">
+                            <div class="package-item-responsive ${activity.status === 'pending_external' ? 'pulse-action' : ''}" style="padding:0; overflow:hidden;">
                                 ${renderImageSlider(images, activity.name)}
                                 <div class="package-item-details" style="padding:12px;">
                                     <div style="font-weight:600; color:#333; margin-bottom:6px; font-size:0.95rem;">${activity.name}</div>
                                     <div style="font-size:0.85rem; color:#666; margin-bottom:4px;">${sym}${activity.price}</div>
                                     
                                     ${activity.status === 'booked' ? `<div style="font-size:0.85rem; color:#28a745; font-weight:bold; margin-bottom:4px;">✅ Confirmed (Ref: ${bookingRef || 'API'})</div>` : ''}
-                                    ${activity.status === 'pending_external' ? `<div style="font-size:0.85rem; color:#f59e0b; font-weight:bold; margin-bottom:4px;">⚠️ Redirect Action Required</div>` : ''}
+                                    ${activity.status === 'pending_external' ? `<div style="font-size:0.85rem; color:#f59e0b; font-weight:bold; margin-bottom:4px; display:inline-block; padding:2px 8px; background:rgba(245,158,11,0.1); border-radius:8px;">⚠️ Redirect Action Required</div>` : ''}
                                     
                                     ${rating ? `<div style="font-size:0.8rem; color:#f39c12; margin-top:4px;">⭐ ${rating}/5 ${!reviews && reviewLink ? `<a href="${reviewLink}" target="_blank" style="color:var(--primary-color); text-decoration:none;">See reviews</a>` : ''}</div>` : ''}
                                     ${activity.description ? `<div style="font-size:0.8rem; color:#666; line-height:1.4; margin-top:8px;">${activity.description}</div>` : ''}
@@ -5600,19 +5611,40 @@
                 body: JSON.stringify({ travelers: travelers })
             });
             const data = await res.json();
+            const statusMsg = document.getElementById('checkout-status-msg');
+            
             if (res.ok) {
-                alert("Success! " + (data.message || "Your holiday is booked."));
-                closeCheckout();
-                // Refresh list and reopening details
-                const pkgs = await updatePackages();
-                const p = pkgs.find(p => p.id === packageId);
-                if (p) showPackageDetails(p);
+                if (statusMsg) {
+                    statusMsg.style.display = 'block';
+                    statusMsg.style.background = '#dcfce7';
+                    statusMsg.style.color = '#166534';
+                    statusMsg.innerText = data.message || "Success! Your holiday is booked.";
+                }
+                
+                setTimeout(async () => {
+                    closeCheckout();
+                    // Refresh list and reopening details
+                    const pkgs = await updatePackages();
+                    const p = pkgs.find(p => p.id === packageId);
+                    if (p) showPackageDetails(p);
+                }, 2000);
             } else {
-                alert("Booking failed: " + (data.message || data.detail || "General error"));
+                if (statusMsg) {
+                    statusMsg.style.display = 'block';
+                    statusMsg.style.background = '#fee2e2';
+                    statusMsg.style.color = '#991b1b';
+                    statusMsg.innerText = "Booking failed: " + (data.message || data.detail || "General error");
+                }
             }
         } catch (e) {
             console.error(e);
-            alert("Booking error.");
+            const statusMsg = document.getElementById('checkout-status-msg');
+            if (statusMsg) {
+                statusMsg.style.display = 'block';
+                statusMsg.style.background = '#fee2e2';
+                statusMsg.style.color = '#991b1b';
+                statusMsg.innerText = "Booking connection error.";
+            }
         } finally {
             clearBotStatusMessage();
             if (btn) {

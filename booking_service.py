@@ -347,10 +347,12 @@ class BookingService:
                         else:
                             # Fallback if API call fails
                             item.status = BookingStatus.PENDING_EXTERNAL
+                            item.metadata['booking_link'] = BookingService.build_duffel_search_link(item)
                             logger.info(f"Duffel Flight API failed for {item.name}, falling back to external link.")
                     else:
                         # FALLBACK: No direct booking ID found.
                         item.status = BookingStatus.PENDING_EXTERNAL
+                        item.metadata['booking_link'] = BookingService.build_duffel_search_link(item)
                         logger.info(f"No Duffel Offer ID for {item.name}, setting to PENDING_EXTERNAL.")
 
                 # 2. Hotels (Duffel Stays API with fallback)
@@ -363,12 +365,14 @@ class BookingService:
                             item.metadata['booking_reference'] = booking.get('id')
                             item.status = BookingStatus.BOOKED
                         else:
-                            # Fallback if API call fails but we has an ID
+                            # Fallback if API call fails but we had an ID
                             item.status = BookingStatus.PENDING_EXTERNAL
+                            item.metadata['booking_link'] = BookingService.build_travelpayouts_hotel_link(item)
                             logger.info(f"Duffel Stays API failed for {item.name}, falling back to external link.")
                     else:
                         # FALLBACK: No direct booking ID found.
                         item.status = BookingStatus.PENDING_EXTERNAL
+                        item.metadata['booking_link'] = BookingService.build_travelpayouts_hotel_link(item)
                         logger.info(f"No Duffel ID for {item.name}, setting to PENDING_EXTERNAL for affiliate booking.")
 
                 # 3. Activities (Travelpayouts Redirect)
@@ -426,12 +430,14 @@ class BookingService:
             except Exception as e:
                 logger.error(f"Failed to trigger booking email: {e}")
 
-        msg = "Booking processed."
+        msg = "Reservation process completed."
         if failed_items:
             # Use the captured error message if available
-            msg = f"Booking failed for {failed_items[0].name}: {locals().get('first_error', 'General error')}"
+            msg = f"Processing issue for {failed_items[0].name}. Please try again later."
             if len(failed_items) > 1:
                 msg += f" (and {len(failed_items)-1} other items)"
+        elif any(i.status == BookingStatus.PENDING_EXTERNAL for i in package.items):
+             msg = "Reservation process completed. Some items require you to complete the booking on the provider's site."
 
         return {
             "status": "success" if not failed_items else "partial",
