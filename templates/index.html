@@ -120,7 +120,11 @@
         }
 
         .sidebar-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             text-align: center;
+            margin-bottom: 2rem;
         }
 
         .sidebar-header h2 {
@@ -133,11 +137,70 @@
         .sidebar-subtitle {
             font-size: 0.85rem;
             color: #000;
-            margin: -0.04rem 0px 2rem 0;
+            margin: -0.04rem 0px 0 0;
             font-weight: 800;
             font-family: 'Lateef', serif;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+        }
+
+        .dev-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            background: rgba(99, 102, 241, 0.08);
+            color: var(--primary-color);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            border-radius: 12px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            margin-top: 8px;
+            cursor: help;
+            position: relative;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .dev-tooltip {
+            visibility: hidden;
+            width: 220px;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 12px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 150%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            font-size: 0.75rem;
+            font-weight: 400;
+            line-height: 1.5;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            pointer-events: none;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        .dev-badge:hover .dev-tooltip {
+            visibility: visible;
+            opacity: 1;
+            transform: translateX(-50%) translateY(-5px);
+        }
+
+        .dev-tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #1e293b transparent transparent transparent;
         }
 
         .sidebar-logo {
@@ -1853,6 +1916,7 @@
         <img src="/static/icons/logo.svg" class="sidebar-logo" alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
         <div class="sidebar-subtitle">Holidays and More...</div>
+        <span class="dev-badge">IN DEVELOPMENT<span class="dev-tooltip">This app is in active development. Real booking is currently disabled and prices shown may not be accurate.</span></span>
     </div>
     <nav class="sidebar-nav">
         <button class="nav-item active" onclick="switchView('chat')">
@@ -1885,6 +1949,7 @@
             alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
         <div class="mobile-subtitle">Holidays and More...</div>
+        <span class="dev-badge">IN DEVELOPMENT<span class="dev-tooltip">This app is in active development. Real booking is currently disabled and prices shown may not be accurate.</span></span>
     </div>
     <div style="width: 24px;"></div> <!-- Spacer for symmetry -->
 </header>
