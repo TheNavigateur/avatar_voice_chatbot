@@ -233,7 +233,8 @@ async def sync_bookings(package_id: str, user_id: str = Header(...)):
 
 @app.post("/api/packages/{session_id}/{package_id}/book")
 async def book_package(session_id: str, package_id: str, request: BookRequest, current_user: dict = Depends(get_current_user)):
-    package = BookingService.get_package(session_id, package_id)
+    # Relax session_id check for booking to avoid 404s on session mismatch if user is authenticated
+    package = BookingService.get_package(None, package_id)
     if not package or package.user_id != current_user['id']:
         raise HTTPException(status_code=404, detail="Package not found")
     
@@ -242,7 +243,8 @@ async def book_package(session_id: str, package_id: str, request: BookRequest, c
 
 @app.delete("/api/packages/{session_id}/{package_id}/items/{item_id}")
 async def delete_package_item(session_id: str, package_id: str, item_id: str, current_user: dict = Depends(get_current_user)):
-    package = BookingService.get_package(session_id, package_id)
+    # Relax session_id check for item deletion
+    package = BookingService.get_package(None, package_id)
     if not package or package.user_id != current_user['id']:
         raise HTTPException(status_code=403, detail="Forbidden")
     pkg = BookingService.remove_item_from_package(session_id, package_id, item_id)

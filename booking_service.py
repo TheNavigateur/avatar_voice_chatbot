@@ -115,10 +115,13 @@ class BookingService:
         return packages
 
     @staticmethod
-    def get_package(session_id: str, package_id: str) -> Optional[Package]:
+    def get_package(session_id: Optional[str], package_id: str) -> Optional[Package]:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM packages WHERE id = ? AND session_id = ?", (package_id, session_id))
+        if session_id and session_id != "any":
+            c.execute("SELECT * FROM packages WHERE id = ? AND session_id = ?", (package_id, session_id))
+        else:
+            c.execute("SELECT * FROM packages WHERE id = ?", (package_id,))
         row = c.fetchone()
         
         if not row:
