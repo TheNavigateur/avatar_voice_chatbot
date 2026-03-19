@@ -42,15 +42,18 @@ class BookingService:
                     metadata=meta
                 ))
             
+            # Check for existing keys to prevent KeyError/IndexError if schema is out of sync
+            row_keys = row.keys()
+            
             packages.append(Package(
                 id=pkg_id,
                 session_id=row['session_id'],
-                user_id=row['user_id'] if row['user_id'] else "web_user",
+                user_id=row['user_id'] if 'user_id' in row_keys else "web_user",
                 title=row['title'],
-                description=row['description'],
-                type=PackageType(row['type']),
-                status=BookingStatus(row['status']),
-                total_price=row['total_price'],
+                description=row['description'] if 'description' in row_keys else None,
+                type=PackageType(row['type']) if 'type' in row_keys else PackageType.MIXED,
+                status=BookingStatus(row['status']) if 'status' in row_keys else BookingStatus.DRAFT,
+                total_price=row['total_price'] if 'total_price' in row_keys else 0.0,
                 items=items
             ))
         conn.close()
@@ -94,15 +97,18 @@ class BookingService:
                     metadata=meta
                 ))
             
+            # Check for existing keys to prevent KeyError/IndexError
+            row_keys = row.keys()
+            
             packages.append(Package(
                 id=pkg_id,
                 session_id=row['session_id'],
-                user_id=row['user_id'] if row['user_id'] else "web_user",
+                user_id=row['user_id'] if 'user_id' in row_keys else "web_user",
                 title=row['title'],
-                description=row['description'],
-                type=PackageType(row['type']),
-                status=BookingStatus(row['status']),
-                total_price=row['total_price'],
+                description=row['description'] if 'description' in row_keys else None,
+                type=PackageType(row['type']) if 'type' in row_keys else PackageType.MIXED,
+                status=BookingStatus(row['status']) if 'status' in row_keys else BookingStatus.DRAFT,
+                total_price=row['total_price'] if 'total_price' in row_keys else 0.0,
                 items=items
             ))
         conn.close()
@@ -142,16 +148,19 @@ class BookingService:
                 metadata=meta
             ))
         
+        # Check for existing keys to prevent KeyError/IndexError
+        row_keys = row.keys()
+        
         pkg = Package(
             id=pkg_id,
             session_id=row['session_id'],
-            user_id=row['user_id'] if row['user_id'] else "web_user",
+            user_id=row['user_id'] if 'user_id' in row_keys else "web_user",
             title=row['title'],
-            description=row['description'] if 'description' in row.keys() else None,
-            type=PackageType(row['type']),
-            status=BookingStatus(row['status']),
-            total_price=row['total_price'],
-            booking_window_opens_at=row['booking_window_opens_at'],
+            description=row['description'] if 'description' in row_keys else None,
+            type=PackageType(row['type']) if 'type' in row_keys else PackageType.MIXED,
+            status=BookingStatus(row['status']) if 'status' in row_keys else BookingStatus.DRAFT,
+            total_price=row['total_price'] if 'total_price' in row_keys else 0.0,
+            booking_window_opens_at=row['booking_window_opens_at'] if 'booking_window_opens_at' in row_keys else None,
             items=items
         )
         conn.close()

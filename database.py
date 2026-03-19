@@ -134,26 +134,21 @@ def init_db():
         )
     ''')
     
-    # Simple migration: add user_id if it doesn't exist (Only for SQLite locally)
-    if not DATABASE_URL:
-        try:
-            c.execute("ALTER TABLE packages ADD COLUMN user_id TEXT")
-        except Exception:
-            pass # Already exists
+    # Migrations: Add missing columns if they don't exist
+    try:
+        c.execute("ALTER TABLE packages ADD COLUMN user_id TEXT")
+    except Exception:
+        pass # Already exists
             
-    # Simple migration: add booking_window_opens_at if it doesn't exist (Only for SQLite locally)
-    if not DATABASE_URL:
-        try:
-            c.execute("ALTER TABLE packages ADD COLUMN booking_window_opens_at TIMESTAMP")
-        except Exception:
-            pass # Already exists
+    try:
+        c.execute("ALTER TABLE packages ADD COLUMN booking_window_opens_at TIMESTAMP")
+    except Exception:
+        pass # Already exists
 
-    # Simple migration: add description if it doesn't exist (Only for SQLite locally)
-    if not DATABASE_URL:
-        try:
-            c.execute("ALTER TABLE packages ADD COLUMN description TEXT")
-        except Exception:
-            pass # Already exists
+    try:
+        c.execute("ALTER TABLE packages ADD COLUMN description TEXT")
+    except Exception:
+        pass # Already exists
     
     # Package Items Table
     c.execute('''

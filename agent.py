@@ -52,42 +52,56 @@ def is_discovery_complete(profile_content: str, current_message: str = "", sessi
     hist_only = (session_history or "").lower()
     
     # 1. Detect if a NEW intent was started in this session
+    # We look for word-based triggers to avoid fragile substring matches (e.g. "new holiday" vs "new ski holiday")
     vague_starts = [
         "make my holiday", "make a holiday", "build me a trip", "plan a trip", 
-        "new holiday", "start a trip", "let's plan something", 
-        "start a new one", "brand new holiday", "new trip", "something else"
+        "start a trip", "let's plan something", 
+        "start a new one", "brand new holiday", "something else"
     ]
     
-    # Find the last time the user said a 'vague start' phrase
+    # More robust check for "new holiday" or "new trip" including variations like "new ski holiday"
+    is_reset_requested = any(v in msg_only for v in vague_starts) or \
+                         (("new" in msg_only) and ("holiday" in msg_only or "trip" in msg_only or "plan" in msg_only))
+                         
+    if is_reset_requested:
+        logger.info(f"[PHASE_CHECK] New intent detected in current message. Forcing Discovery.")
+        return False
+
+    # Find the last time the history contains a 'vague start' or a reset invitation from Ray
     last_vague_idx = -1
-    for v in vague_starts:
+    all_vague_markers = vague_starts + ["new holiday", "new trip", "new plan"]
+    for v in all_vague_markers:
         idx = hist_only.rfind(v)
         if idx > last_vague_idx:
             last_vague_idx = idx
             
-    # Check if the CURRENT message is a vague start
-    is_current_vague = any(v in msg_only for v in vague_starts)
-    
-    if is_current_vague:
-        logger.info(f"[PHASE_CHECK] Current message is a vague start. Forcing Discovery.")
-        return False
-        
     # 2. Define the 'Search Space' for requirements
     # If a new intent started recently, we ONLY look for requirements AFTER that point.
     if last_vague_idx != -1:
         # Intent started in this session. Only trust what was said SINCE then.
-        fresh_context = (hist_only[last_vague_idx:] + "\n" + msg_only).lower()
+        search_space = (hist_only[last_vague_idx:] + "\nUser: " + msg_only).lower()
         logger.info("[PHASE_CHECK] New intent detected in history. Using fresh context only.")
-        search_space = fresh_context
     else:
         # No vague start in recent history. Fallback to profile (likely continuing a specific trip).
-        search_space = ((profile_content or "") + "\n" + hist_only + "\n" + msg_only).lower()
+        search_space = ((profile_content or "") + "\n" + hist_only + "\nUser: " + msg_only).lower()
         logger.info("[PHASE_CHECK] No recent reset. Using profile + history.")
     
-    combined = search_space # for the check logic below
+    # CRITICAL: We only want to satisfy requirements based on what the USER said.
+    # We filter the search space to only lines starting with "User: " or "Profile: " (implied)
+    # However, since profile_content doesn't have prefixes, we'll just split and filter the session history parts.
+    
+    lines = search_space.split('\n')
+    user_context = ""
+    for line in lines:
+        if line.startswith("agent:") or line.startswith("model:"):
+            continue # Skip agent's own questions
+        user_context += line + "\n"
+    
+    combined = user_context.lower()
     
     # Requirement 1: Origin
-    origin_ok = any(x in combined for x in ["origin", "departing", "flying from", "from:"])
+    origin_ok = any(x in combined for x in ["origin", "departing", "flying from", "from:"]) or \
+                (any(city in combined for city in ["london", "paris", "new york", "berlin", "tokyo", "manchester"])) # Common origins fallback
     
     # Requirement 2: Duration
     duration_ok = any(x in combined for x in ["duration", "how long", "weeks", "days", "nights"])
@@ -99,20 +113,15 @@ def is_discovery_complete(profile_content: str, current_message: str = "", sessi
     budget_ok = any(x in combined for x in ["budget", "cost", "spend", "$", "£", "€", "price range"])
     
     # Requirement 5: Vibe/Activities
-    # CRITICAL: We need more than just a single keyword like "beach" if a NEW intent was started.
-    # We look for a category (beach/ski) AND some descriptive intent (want/like/preference) or specific activities.
     categories = ["beach", "ski", "city", "mountains", "nature", "culture"]
-    actions = ["activities", "interested in", "prefer", "like to", "want to", "visiting", "water park", "bike", "hike", "museum", "dining", "nightlife"]
+    actions = ["activities", "interested in", "prefer", "like to", "want to", "visiting", "water park", "bike", "hike", "museum", "dining", "nightlife", "various", "child friendly"]
     
     category_hit = any(c in combined for c in categories)
     action_hit = any(a in combined for a in actions)
-    
-    # We consider Vibe OK if they've given both a category and some specific activities/preferences
-    # OR if they've used the word "vibe" explicitly.
     vibe_ok = ("vibe" in combined) or (category_hit and action_hit)
     
     # Requirement 6: Group/Travellers
-    group_ok = any(x in combined for x in ["group", "travelling", "travellers", "wife", "son", "daughter", "kids", "children", "people", "adults", "me and"])
+    group_ok = any(x in combined for x in ["group", "travelling", "travellers", "wife", "husband", "son", "daughter", "kids", "children", "child", "people", "adults", "me and", "family"])
 
     results = [origin_ok, duration_ok, month_ok, budget_ok, vibe_ok, group_ok]
     is_complete = all(results)
@@ -896,12 +905,16 @@ class VoiceAgent:
         session_history = ""
         if session and session.events:
             for event in session.events:
+                role = getattr(event, 'role', 'unknown').lower()
+                text = ""
                 if hasattr(event, 'text') and event.text:
-                    session_history += event.text + "\n"
+                    text = event.text
                 elif hasattr(event, 'content') and hasattr(event.content, 'parts'):
-                    for part in event.content.parts:
-                        if hasattr(part, 'text') and part.text:
-                            session_history += part.text + "\n"
+                    texts = [p.text for p in event.content.parts if hasattr(p, 'text')]
+                    text = "\n".join(texts)
+                
+                if text:
+                    session_history += f"{role}: {text}\n"
         
         profile_content = ProfileService.get_profile(user_id)
         discovery_complete = is_discovery_complete(profile_content, message, session_history)
