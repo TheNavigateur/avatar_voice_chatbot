@@ -1237,12 +1237,14 @@
         }
 
         .bot-status-message {
-            margin: 0;
-            max-width: 85%;
+            margin: 2px 0;
+            max-width: 90%;
             font-family: 'Bungee Hairline', cursive;
-            font-size: 0.7rem;
-            color: black;
-            opacity: 1;
+            font-size: 0.65rem;
+            color: #64748b;
+            font-weight: 300;
+            line-height: 1.1;
+            letter-spacing: 0.01em;
         }
 
         .bot-status-message-left {
@@ -1262,13 +1264,13 @@
 
         .status-spinner {
             display: inline-block;
-            width: 0.75em;
-            height: 0.75em;
+            width: 0.65rem;
+            height: 0.65rem;
             border-radius: 50%;
-            border: 1.5px solid currentColor;
+            border: 0.8px solid currentColor;
             border-top-color: transparent;
             vertical-align: middle;
-            margin-right: 0.35em;
+            margin-right: 0.4rem;
             animation: status-spin 0.8s linear infinite;
             flex-shrink: 0;
             position: relative;
@@ -1362,8 +1364,8 @@
             .sidebar {
                 position: fixed;
                 left: -260px;
-                /* Hide off-screen */
-                top: 85px; /* flow under the mobile header */
+                /* Hide off-screen; top is set dynamically by JS to match mobile-header height */
+                top: 0;
                 bottom: 0;
                 border-right: 1px solid rgba(0, 0, 0, 0.08);
                 z-index: 1000;
@@ -1379,7 +1381,6 @@
 
             .mobile-header {
                 display: flex;
-                height: 85px; /* explicit height for anchor */
                 box-sizing: border-box;
             }
 
@@ -1734,6 +1735,11 @@
         }
 
         /* Reactive Listening Animation */
+        /* Watertight CSS UI State */
+        body:not(.manual-listening-active) .listening-animation {
+            display: none !important;
+        }
+
         .listening-animation {
             display: none; /* Shown via JS */
             align-items: center;
@@ -2983,7 +2989,7 @@
         regionSel.onchange = (e) => {
             window.currentRegion = e.target.value;
             localStorage.setItem('user_region', window.currentRegion);
-            if (window.updatePackages) window.updatePackages();
+            if (window.updatePackages && window.currentUser) window.updatePackages();
         };
         avatarSelector.parentNode.insertBefore(regionSel, avatarSelector);
     }
@@ -3012,7 +3018,7 @@
                 if (sel) sel.value = detectedRegion;
 
                 // Refresh Packages
-                if (window.updatePackages) window.updatePackages();
+                if (window.updatePackages && window.currentUser) window.updatePackages();
             })
             .catch(err => console.warn("Region detection failed:", err));
     }
@@ -3155,6 +3161,10 @@
     const transcriptDiv = document.getElementById('transcript');
 
     let sessionId = localStorage.getItem('chat_session_id');
+    let isManualListeningActive = false;
+    let pendingInterruptOnend = false; // State guard for recognition.onend
+    let botSpeechEpoch = 0; // Epoch counter for stale TTS handlers
+    let lastManualStartTime = 0;
     let isSimMode = true; // Default to simulation mode for testing
     let currentBookingPackageId = null;
 
@@ -3180,16 +3190,19 @@
         currentBookingPackageId = null;
     }
 
-    // --- Auth Logic ---
-    let googleAuthToken = sessionStorage.getItem('googleAuthToken');
+    // --- Auth Logic (Sync with session storage immediately) ---
+    window.googleAuthToken = sessionStorage.getItem('googleAuthToken');
+    window.currentUser = window.googleAuthToken ? { id: 'restored_user', email: 'restored@example.com' } : null;
     let pendingAuthCallback = null;
 
     function handleCredentialResponse(response) {
-        googleAuthToken = response.credential;
-        sessionStorage.setItem('googleAuthToken', googleAuthToken);
+        window.googleAuthToken = response.credential;
+        sessionStorage.setItem('googleAuthToken', window.googleAuthToken);
+        window.currentUser = { id: 'authenticated_user', email: 'user@example.com' }; // Actual user state established
+        console.log('[Auth] User authenticated:', window.currentUser);
         document.getElementById('gsi-modal').style.display = 'none';
         
-        if (typeof updateSidebarAuthState === 'function') updateSidebarAuthState();
+        updateSidebarAuthState();
         
         if (pendingAuthCallback) {
             const cb = pendingAuthCallback;
@@ -3211,7 +3224,7 @@
         const signoutBtn = document.getElementById('sidebar-signout-btn');
         if (!gsiContainer || !signoutBtn) return;
         
-        if (googleAuthToken) {
+        if (window.googleAuthToken) {
             gsiContainer.style.display = 'none';
             signoutBtn.style.display = 'flex';
         } else {
@@ -3231,40 +3244,78 @@
     }
 
     window.addEventListener('load', () => {
-        setTimeout(updateSidebarAuthState, 1000); 
+        // Update UI immediately based on initial state
+        updateSidebarAuthState();
+        
+        // Initial render check
+        if (typeof renderStartButton === 'function') renderStartButton();
     });
 
     function requireAuth(callback) {
-        if (googleAuthToken) {
-            callback();
-        } else {
-            pendingAuthCallback = callback;
-            const modal = document.getElementById('gsi-modal');
+        if (window.currentUser) {
+            if (typeof callback === 'function') callback();
+            return;
+        }
+        pendingAuthCallback = callback;
+        const modal = document.getElementById('gsi-modal');
+        if (modal) {
             modal.style.display = 'flex';
             
-            if (!document.getElementById('gsi-button-container').hasChildNodes()) {
+            // Ensure close button exists
+            if (!document.getElementById('gsi-modal-close')) {
+                const closeBtn = document.createElement('button');
+                closeBtn.id = 'gsi-modal-close';
+                closeBtn.innerHTML = '&times;';
+                closeBtn.style.cssText = "position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; font-size: 2rem; cursor: pointer; z-index: 10001;";
+                closeBtn.onclick = () => { 
+                    modal.style.display = 'none';
+                    pendingAuthCallback = null;
+                };
+                modal.appendChild(closeBtn);
+            }
+
+            const btnContainer = document.getElementById('gsi-button-container');
+            if (btnContainer && !btnContainer.hasChildNodes() && window.google && google.accounts) {
                 google.accounts.id.initialize({
                     client_id: '645972259055-dcknu49vj5h6kaeaml1facanoesv4epl.apps.googleusercontent.com',
                     callback: handleCredentialResponse
                 });
                 google.accounts.id.renderButton(
-                    document.getElementById("gsi-button-container"),
+                    btnContainer,
                     { theme: "outline", size: "large", type: "standard", shape: "rectangular", text: "continue_with" }
                 );
+                
+                // Add a small helper note if GSI fails to load/render (e.g. Origin mismatch)
+                setTimeout(() => {
+                    if (btnContainer && !btnContainer.hasChildNodes()) {
+                        console.warn("[Auth] GSI Button failed to render. Check console for Origin mismatch.");
+                        const note = document.createElement('p');
+                        note.style.cssText = "font-size: 0.75rem; color: #ef4444; margin-top: 10px; text-align: center;";
+                        note.textContent = "Google Sign-In origin mismatch. Please check your GS Console settings for localhost:8001.";
+                        btnContainer.appendChild(note);
+                    }
+                }, 1500);
             }
         }
     }
 
     async function fetchWithAuth(url, options = {}) {
         if (!options.headers) options.headers = {};
-        if (googleAuthToken) {
-            options.headers['Authorization'] = `Bearer ${googleAuthToken}`;
+        if (window.googleAuthToken) {
+            options.headers['Authorization'] = `Bearer ${window.googleAuthToken}`;
         }
         const res = await fetch(url, options); // FIXED: was fetchWithAuth
         if (res.status === 401 || res.status === 403) {
-            sessionStorage.removeItem('googleAuthToken');
-            googleAuthToken = null;
-            requireAuth(() => window.location.reload());
+            // Only log out and pop modal if this was a user-initiated action (POST/PUT/DELETE)
+            const method = (options.method || 'GET').toUpperCase();
+            if (method !== 'GET') {
+                sessionStorage.removeItem('googleAuthToken');
+                window.googleAuthToken = null;
+                window.currentUser = null;
+                requireAuth(() => window.location.reload());
+            } else {
+                console.warn("[Auth] Background GET failed with 401. Not logging out yet.");
+            }
             throw new Error("Authentication failed");
         }
         return res;
@@ -3294,14 +3345,23 @@
         recognition.lang = 'en-US';
 
         recognition.onstart = () => {
-            console.log(`[Recognition] Started at ${new Date().toLocaleTimeString()}`);
-            setBotStatusMessage("Listening...", 'right');
+            console.log(`[DBG][Recognition] onstart at ${Date.now()}. isManualListeningActive=${isManualListeningActive}`);
         };
 
         recognition.onend = () => {
-            console.log(`[Recognition] onend at ${new Date().toLocaleTimeString()}.`);
+            const elapsed = window.lastInterruptionTime ? (Date.now() - window.lastInterruptionTime) : 'N/A';
+            console.log(`[DBG][Recognition] onend. msFromInterrupt=${elapsed}, isManual=${isManualListeningActive}, animEl=${!!currentListeningAnimationEl}`);
+            
+            // If this is the stale onend from interruptBot()'s recognition.stop(), consume the flag and ignore.
+            if (pendingInterruptOnend) {
+                pendingInterruptOnend = false;
+                console.log(`[DBG][Recognition] SUPPRESSING stale onend from interrupt stop.`);
+                return;
+            }
+
+            console.log(`[DBG][Recognition] Processing legitimate onend → calling stopListeningAnimation(true).`);
             // Auto-restart disabled as per user request
-            if (typeof stopListeningAnimation === 'function') stopListeningAnimation();
+            if (typeof stopListeningAnimation === 'function') stopListeningAnimation(true);
         };
 
         window.restartRecognitionIfPossible = function () {
@@ -3323,6 +3383,14 @@
         };
 
         recognition.onresult = async (event) => {
+            if (isProcessing) return; // Prevent double processing
+            isManualListeningActive = false;
+
+            // Clear manual-listening lock if it exists
+            const activeManual = document.querySelector('.say-reply-container[data-manual-listening="true"]');
+            if (activeManual) delete activeManual.dataset.manualListening;
+            isManualListeningActive = false; // Reset this state on result
+
             if (isProcessing) return; // Prevent double processing
 
             let transcript = '';
@@ -3349,24 +3417,34 @@
 
             // Silence 'aborted' errors as they are often side effects of intentional stops or state transitions
             if (event.error === 'aborted') {
-                console.log('[Recognition] Silencing "aborted" error.');
-                return;
+                console.log(`[DBG][Recognition] onerror=aborted. isManual=${isManualListeningActive}, msFromManualStart=${Date.now() - lastManualStartTime}`);
+                // If manual listening was active, keep it active for a short period to allow for retries or user action
+                if (isManualListeningActive && (Date.now() - lastManualStartTime < 1000)) { // Allow 1 second grace period
+                    console.log(`[DBG][Recognition] Aborted within grace period → keeping manual state, returning.`);
+                    return;
+                }
+                console.log(`[DBG][Recognition] Aborted OUTSIDE grace period, falling through to general error handler.`);
             }
+
+            // Real error: Clear manual-listening lock if it exists
+            const activeManual = document.querySelector('[data-manual-listening="true"]');
+            if (activeManual) delete activeManual.dataset.manualListening;
+            isManualListeningActive = false;
 
             // If we are currently processing a request or the bot is speaking, 
             // we ignore most recognition errors to avoid UI noise (like "no-speech" timeouts)
             if (isProcessing || isBotSpeaking) {
                 console.log(`[Recognition] Ignoring error "${event.error}" while processing/speaking.`);
+                stopListeningAnimation(true);
                 return;
             }
 
             if (event.error === 'no-speech') {
-                setBotStatusMessage("Still listening...", 'right');
-                // Mic will restart automatically via onend 
+                // Mic will restart automatically via onend or can be restarted by user
+                stopListeningAnimation(true);
             } else {
                 setBotStatusMessage("Error: " + event.error, 'center');
-                // DO NOT reset isProcessing here - it should only be reset by the chat flow
-                // or explicit interaction. Resetting it here causes race conditions with mic restart.
+                stopListeningAnimation(true);
             }
         };
 
@@ -3428,6 +3506,7 @@
         isConversationActive = false;
         isBotSpeaking = false;
         isProcessing = false;
+        isManualListeningActive = false; // Reset manual listening state
 
         if (recognition) {
             try { recognition.stop(); } catch (e) { }
@@ -3448,12 +3527,15 @@
 
     // Helper to Render Start Button
     function renderStartButton() {
-        // Avoid duplicates
-        if (document.getElementById('dynamic-start-container')) return;
-
-        const container = document.createElement('div');
-        container.id = 'dynamic-start-container';
-        container.style.cssText = "width: 100%;";
+        // Ensure container is clean and attached
+        let container = document.getElementById('dynamic-start-container');
+        if (container) {
+            container.innerHTML = ''; // Clear it to re-render fresh button
+        } else {
+            container = document.createElement('div');
+            container.id = 'dynamic-start-container';
+            container.style.cssText = "width: 100%; margin-top: 10px;";
+        }
 
         const startBtn = document.createElement('button');
         startBtn.className = 'action-btn start-btn';
@@ -3487,6 +3569,10 @@
     window.renderStartButton = renderStartButton;
     window.startConversationMode = startConversationMode;
     window.startVoiceConversationMode = startVoiceConversationMode;
+    window.requireAuth = requireAuth;
+    window.handleCredentialResponse = handleCredentialResponse;
+    window.signOut = typeof signOut !== 'undefined' ? signOut : window.signOut;
+    window.interruptBot = interruptBot;
 
 
     function parseProtocols(text) {
@@ -3700,12 +3786,14 @@
     }
 
     function renderManualListeningHtml() {
+        // If we are currently in manual listening mode (locked), start with animation visible
+        const showAnim = isManualListeningActive;
         return `
             <div class="say-reply-container">
-                <button class="say-reply-btn" onclick="startListeningFromBotMessage(this)">
+                <button class="say-reply-btn" style="display: ${showAnim ? 'none' : 'flex'}" onclick="startListeningFromBotMessage(this)">
                     <i class="ph ph-microphone"></i> Say my reply
                 </button>
-                <div class="listening-animation">
+                <div class="listening-animation" style="display: ${showAnim ? 'flex' : 'none'}">
                     <div class="listening-bar" style="height: 8px;"></div>
                     <div class="listening-bar" style="height: 14px;"></div>
                     <div class="listening-bar" style="height: 10px;"></div>
@@ -3730,6 +3818,11 @@
         if (sender === 'You') {
             clearBotStatusMessage();
         }
+        
+        // Remove ALL existing manual listening UI from historic messages before adding a new one
+        // This ensures only the newest Bot message will have the 'Say my reply' button
+        document.querySelectorAll('.say-reply-container').forEach(el => el.remove());
+
         const div = document.createElement('div');
         const isUser = sender === 'You';
         div.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
@@ -3829,6 +3922,8 @@
         // 3. Reset states
         isBotSpeaking = false;
         isProcessing = false;
+        botSpeechEpoch++; // Invalidate stale TTS handlers
+        isManualListeningActive = false; // Reset manual listening state
 
         // 4. Abort ongoing network request if any
         if (currentChatAbortController) {
@@ -3843,7 +3938,8 @@
 
         // 6. Stop recognition to avoid collisions
         if (recognition) {
-            try { recognition.stop(); } catch (e) { }
+            pendingInterruptOnend = true; // Mark the next onend as stale
+            try { recognition.stop(); } catch (e) { pendingInterruptOnend = false; }
         }
     }
 
@@ -4108,7 +4204,10 @@
             if (prevLeft.length > 0) {
                 const lastPrev = prevLeft[prevLeft.length - 1];
                 const textNode = lastPrev.querySelector('.status-msg-text');
-                if (textNode) lastPrev.innerHTML = textNode.textContent;
+                // Ensure we remove spinner but don't add extra styling
+                if (textNode) {
+                    lastPrev.innerHTML = textNode.textContent;
+                }
             }
         }
 
@@ -4211,57 +4310,136 @@
     let currentListeningAnimationEl = null;
 
     window.startListeningFromBotMessage = async function(btn) {
-        interruptBot();
-        
-        // Ensure AudioContext works
+        console.log(`[DBG] startListeningFromBotMessage called. isBotSpeaking=${isBotSpeaking}, isProcessing=${isProcessing}`);
+        // 1. Capture user gesture IMMEDIATELY for ALL AudioContexts
         if (typeof initAudio === 'function') initAudio();
+        
+        // Ensure mic context exists and is resumed directly in the click handler
+        if (!window.micContext) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            window.micContext = new AudioContext();
+        }
+        if (window.micContext.state === 'suspended') {
+            window.micContext.resume();
+        }
+        console.log(`[DBG] micContext state: ${window.micContext.state}`);
+
+        // 2. Clear ANY existing voice UI across the whole DOM
+        scrubAllVoiceUI();
+
+        // 3. Interrupt bot
+        window.lastInterruptionTime = Date.now();
+        interruptBot();
 
         const container = btn.parentElement;
         const animation = container.querySelector('.listening-animation');
+        
+        // 3. Set state
+        lastManualStartTime = Date.now();
+        isManualListeningActive = true;
+        document.body.classList.add('manual-listening-active'); // CSS Enforce
+        container.dataset.manualListening = "true";
+        
         btn.style.display = 'none';
         animation.style.display = 'flex';
         currentListeningAnimationEl = animation;
-
+        
         isConversationActive = true;
         isBotSpeaking = false;
         isProcessing = false;
 
-        try {
-            await startListeningAnimation();
-            recognition.start();
-        } catch (e) {
-            console.error("[Mic] Failed to start:", e);
-            btn.style.display = 'flex';
-            animation.style.display = 'none';
-        }
+        // Start animation immediately
+        // We use a small delay for recognition.start but NOT for the animation itself
+        startListeningAnimation();
+
+        // Start recognition with small delay to allow interruptBot to settle
+        const tryStart = async (retries = 3) => {
+            console.log(`[DBG] tryStart called (retries=${retries}). msFromInterrupt=${Date.now() - window.lastInterruptionTime}`);
+            try {
+                recognition.start();
+                pendingInterruptOnend = false; // State clean: the engine is running. Any future onend belongs to this session.
+                console.log(`[DBG] recognition.start() SUCCEEDED at ${Date.now()}.`);
+            } catch (e) {
+                const msg = e.message || String(e);
+                console.warn(`[DBG] recognition.start() THREW (retries: ${retries}):`, msg);
+                if (retries > 0 && (msg.includes('active') || msg.includes('started') || msg.includes('stopping'))) {
+                    setTimeout(() => tryStart(retries - 1), 150);
+                } else {
+                    console.error(`[DBG] Recognition PERMANENTLY failed to start.`);
+                    if (container) delete container.dataset.manualListening;
+                    stopListeningAnimation(true);
+                }
+            }
+        };
+
+        // 6. SAFETY TIMEOUT: If after 15 seconds we are still in "Manual Listening" mode without any result/end, force kill it.
+        setTimeout(() => {
+            if (container && container.dataset.manualListening === "true") {
+                console.warn("[Mic] Safety timeout reached. Forcing animation stop.");
+                stopListeningAnimation(true);
+            }
+        }, 15000);
+
+        setTimeout(tryStart, 150);
     };
 
     async function startListeningAnimation() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
         
+        // 1. Force stop any previous loop before starting new one
+        if (listeningAnimRequest) {
+            cancelAnimationFrame(listeningAnimRequest);
+            listeningAnimRequest = null;
+        }
+
         try {
-            if (!microphoneStream) {
+            // 2. Ensure microphone stream is active
+            if (!microphoneStream || microphoneStream.getAudioTracks()[0].readyState === 'ended') {
                 microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            }
+            
+            // 3. Ensure AudioContext is active
+            if (!window.micContext) {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                const micContext = new AudioContext();
-                const source = micContext.createMediaStreamSource(microphoneStream);
-                microphoneAnalyser = micContext.createAnalyser();
-                microphoneAnalyser.fftSize = 64;
-                source.connect(microphoneAnalyser);
-                microphoneDataArray = new Uint8Array(microphoneAnalyser.frequencyBinCount);
+                window.micContext = new AudioContext();
+            }
+            if (window.micContext.state === 'suspended') {
+                await window.micContext.resume();
             }
 
+            // ROBUSTNESS: Ensure context stays running for the first 2 seconds (kick it if needed)
+            if (window.micKickInterval) clearInterval(window.micKickInterval);
+            window.micKickInterval = setInterval(() => {
+                if (window.micContext && window.micContext.state === 'suspended') {
+                    window.micContext.resume();
+                }
+            }, 500);
+            setTimeout(() => { if (window.micKickInterval) clearInterval(window.micKickInterval); }, 2500);
+
+            // 4. Force re-connection of source and analyser nodes to ensure animation starts reliably
+            const source = window.micContext.createMediaStreamSource(microphoneStream);
+            microphoneAnalyser = window.micContext.createAnalyser();
+            microphoneAnalyser.fftSize = 64;
+            source.connect(microphoneAnalyser);
+            microphoneDataArray = new Uint8Array(microphoneAnalyser.frequencyBinCount);
+
             function update() {
-                if (!currentListeningAnimationEl) return;
+                if (!isManualListeningActive) return; // Clean exit if state is off
                 
                 microphoneAnalyser.getByteFrequencyData(microphoneDataArray);
-                const bars = currentListeningAnimationEl.querySelectorAll('.listening-bar');
                 
-                bars.forEach((bar, i) => {
-                    // Use a few bins to get varied movement
-                    const val = microphoneDataArray[i % microphoneDataArray.length] || 0;
-                    const height = 4 + (val / 255) * 18;
-                    bar.style.height = `${height}px`;
+                // dynamically query since DOM replacement might swap the element
+                document.querySelectorAll('.listening-animation').forEach(animEl => {
+                    // Only animate visible ones
+                    if (window.getComputedStyle(animEl).display === 'none') return;
+                    
+                    const bars = animEl.querySelectorAll('.listening-bar');
+                    bars.forEach((bar, i) => {
+                        // Use a few bins to get varied movement
+                        const val = microphoneDataArray[i % microphoneDataArray.length] || 0;
+                        const height = 4 + (val / 255) * 18;
+                        bar.style.height = `${height}px`;
+                    });
                 });
                 
                 listeningAnimRequest = requestAnimationFrame(update);
@@ -4272,28 +4450,63 @@
         }
     }
 
-    function stopListeningAnimation() {
+    // Watertight cleanup for ALL voice UI elements in the DOM
+    function scrubAllVoiceUI() {
+        console.log('[Mic] scrubAllVoiceUI() cleaning entire DOM.');
         if (listeningAnimRequest) {
             cancelAnimationFrame(listeningAnimRequest);
             listeningAnimRequest = null;
         }
+        if (window.micKickInterval) {
+            clearInterval(window.micKickInterval);
+            window.micKickInterval = null;
+        }
+        document.querySelectorAll('.listening-animation').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.say-reply-btn').forEach(el => {
+            // Only restore if not currently processing
+            if (!isProcessing) el.style.display = 'flex';
+        });
+        document.querySelectorAll('[data-manual-listening]').forEach(el => delete el.dataset.manualListening);
+        isManualListeningActive = false;
+        document.body.classList.remove('manual-listening-active'); // CSS Enforce
+        currentListeningAnimationEl = null;
+    }
+
+    function stopListeningAnimation(force = false) {
+        if (window.micKickInterval) {
+            clearInterval(window.micKickInterval);
+            window.micKickInterval = null;
+        }
+        if (listeningAnimRequest) {
+            cancelAnimationFrame(listeningAnimRequest);
+            listeningAnimRequest = null;
+        }
+
+        // Global scrub if forced (definitive end of session)
+        if (force) {
+            scrubAllVoiceUI();
+            return;
+        }
+
         if (currentListeningAnimationEl) {
             const animation = currentListeningAnimationEl;
             const container = animation.parentElement;
-            const btn = container ? container.querySelector('.say-reply-btn') : null;
 
-            // Hide the animation and determine if we should show the button or hide the whole area
-            setTimeout(() => {
-                if (isProcessing) {
-                    // Message was actually sent, hide the whole interaction container
-                    if (container) container.style.display = 'none';
+            // Lock handling
+            if (container && container.dataset.manualListening === "true") {
+                if (Date.now() - lastManualStartTime > 500) {
+                    delete container.dataset.manualListening;
+                    isManualListeningActive = false;
+                    
+                    if (isProcessing) {
+                        if (container) container.style.display = 'none';
+                    } else {
+                        scrubAllVoiceUI();
+                    }
                 } else {
-                    // No message sent (mic timeout, error, or manual stop), restore the button
-                    animation.style.display = 'none';
-                    if (btn) btn.style.display = 'flex';
+                    console.log("[Mic] stopListeningAnimation blocked by short startup lock.");
                 }
-                currentListeningAnimationEl = null;
-            }, 300);
+            }
         }
     }
 
@@ -4307,6 +4520,8 @@
         const speechItem = speechQueue.shift();
         const textToSpeak = speechItem.text;
         const traceToPass = speechItem.trace || [];
+        const myEpoch = botSpeechEpoch; // Capture epoch for this chunk
+
 
         try {
             // Re-apply protocol stripping for safety (though it should be stripped before queuing)
@@ -4341,6 +4556,8 @@
 
             const onEndedHandler = () => {
                 audio.removeEventListener('ended', onEndedHandler);
+                if (myEpoch !== botSpeechEpoch) return; // Stale check
+                
                 isPlayingQueue = false;
                 stopSpeaking();
 
@@ -4355,6 +4572,8 @@
 
             const onPlayingHandler = () => {
                 audio.removeEventListener('playing', onPlayingHandler);
+                if (myEpoch !== botSpeechEpoch) return; // Stale check
+                
                 console.log("[TTS] playing event triggered. textToSpeak:", textToSpeak, "currentBotMsgDiv exists:", !!currentBotMsgDiv);
 
                 // Double check recognition is stopped when speech actually starts
@@ -4546,9 +4765,15 @@
     }
 
     function toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('open');
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('open');
         const hamburgerBtn = document.getElementById('hamburger-btn');
         if (hamburgerBtn) hamburgerBtn.classList.toggle('open');
+        // Dynamically position sidebar below the mobile header
+        const mobileHeader = document.querySelector('.mobile-header');
+        if (mobileHeader) {
+            sidebar.style.top = mobileHeader.offsetHeight + 'px';
+        }
     }
 
     // --- Package Logic (List & Details) ---
@@ -5360,8 +5585,8 @@
         // Switch to Chat by default
         switchView('chat');
 
-        // Restore Packages if session exists
-        if (sessionId) {
+        // Restore Packages if session exists AND user is authenticated
+        if (sessionId && window.currentUser) {
             updatePackages();
         }
 
@@ -5404,6 +5629,7 @@
 
     async function _sendChatMessage(textOverride) {
         initAudio(); // Crucial: Initialize audio on every user interaction
+        scrubAllVoiceUI();
         interruptBot();
 
         // Stop daydream bubbles as soon as a conversation message is posted
@@ -5551,6 +5777,13 @@
         } catch (e) {
             if (e.name === 'AbortError') {
                 console.log('[Chat] Stream aborted (interrupted by user).');
+                // Finalize the UI for the aborted message so it doesn't linger and grab the next stream
+                if (currentBotMsgDiv) {
+                    addMessage('Bot', currentFullResponse, currentThinkingTrace);
+                    currentBotMsgDiv.remove();
+                    currentBotMsgDiv = null;
+                    currentBotMsgContentEl = null;
+                }
                 return;
             }
             console.error("Chat message failed:", e);
