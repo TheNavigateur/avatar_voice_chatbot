@@ -3377,7 +3377,6 @@
                 console.log(`[Recognition] Restart skipped. Reason: ${!isConversationActive ? 'Inactive' : (isBotSpeaking ? 'Bot Speaking' : 'Processing')}`);
                 // Fix: Only clear the LISTENING status, don't clear THINKING status
                 const tDiv = document.getElementById('transcript');
-                const rightMessages = tDiv.querySelectorAll('.bot-status-message-right');
                 rightMessages.forEach(msg => msg.remove());
             }
         };
@@ -3411,7 +3410,6 @@
             // Standardizing on sendChatMessage for all inputs
             sendChatMessage(text);
         };
-
         recognition.onerror = (event) => {
             console.error('[Recognition] Error:', event.error);
 
