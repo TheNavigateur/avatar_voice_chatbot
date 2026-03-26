@@ -15,7 +15,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Ray and Rae - Holidays and More...</title>
+    <title>Ray and Rae - Vibe-a-Holiday!</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -41,7 +41,7 @@
         /* Simulation Banner */
         .simulation-banner {
             position: fixed;
-            bottom: 15px;
+            top: 15px;
             right: 15px;
             background: rgba(30, 41, 59, 0.7);
             color: rgba(255, 255, 255, 0.9);
@@ -308,8 +308,9 @@
 
         /* Avatar Area Top */
         .avatar-area {
-            flex: 0 0 320px;
-            /* Fixed height for avatar */
+            flex: 1;
+            min-height: 120px;
+            /* Fills remaining space */
             position: relative;
             background: #fff;
             border-bottom: 1px solid rgba(0, 0, 0, 0.08);
@@ -631,7 +632,7 @@
 
         /* Conversation Area Bottom */
         .conversation-area {
-            flex: 1;
+            flex: 0 0 50dvh;
             background: #fff;
             display: flex;
             flex-direction: column;
@@ -933,13 +934,21 @@
             color: white;
             border: none;
             border-radius: var(--border-radius);
-            padding: 8px 16px;
+            padding: 10px 22px 7.5px;
             cursor: pointer;
-            font-weight: 400;
-            font-family: 'LINE Seed JP', sans-serif;
+            font-weight: 600;
+            font-size: 0.84rem;
+            font-family: 'Homemade Apple', cursive;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        button, .action-btn {
+        .action-btn:hover {
+            transform: scale(1.02);
+            filter: brightness(1.1);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        button {
             font-family: 'LINE Seed JP', sans-serif;
             font-weight: 400;
         }
@@ -1396,7 +1405,8 @@
             }
 
             .avatar-area {
-                flex: 0 0 280px;
+                flex: 1;
+                min-height: 120px;
             }
         }
 
@@ -1449,24 +1459,6 @@
             border-color: var(--primary-color);
             background: white;
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        #send-btn {
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 0 20px;
-            border-radius: var(--border-radius);
-            font-family: 'LINE Seed JP', sans-serif;
-            font-weight: 400;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        #send-btn:hover {
-            transform: scale(1.02);
-            filter: brightness(1.1);
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
         }
 
         .conversation-area {
@@ -1930,7 +1922,7 @@
     <div class="sidebar-header">
         <img src="/static/icons/logo.svg" class="sidebar-logo" alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
-        <div class="sidebar-subtitle">Holidays and More...</div>
+        <div class="sidebar-subtitle">Vibe-a-Holiday!</div>
         <span class="dev-badge">IN DEVELOPMENT<span class="dev-tooltip">This app is in active development. Real booking is currently disabled and prices shown may not be accurate.</span></span>
     </div>
     <nav class="sidebar-nav">
@@ -1963,7 +1955,7 @@
         <img src="/static/icons/logo.svg" class="sidebar-logo" style="width: 40px; margin-bottom: 0;"
             alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
-        <div class="mobile-subtitle">Holidays and More...</div>
+        <div class="mobile-subtitle">Vibe-a-Holiday!</div>
         <span class="dev-badge">IN DEVELOPMENT<span class="dev-tooltip">This app is in active development. Real booking is currently disabled and prices shown may not be accurate.</span></span>
     </div>
     <div style="width: 24px;"></div> <!-- Spacer for symmetry -->
@@ -2096,7 +2088,7 @@
                 <div id="transcript"></div>
                 <div class="chat-input-container">
                     <input type="text" id="chat-input" placeholder="Reply" autocomplete="off">
-                    <button id="send-btn" onclick="sendChatMessage()">Send</button>
+                    <button id="send-btn" class="action-btn" onclick="sendChatMessage()">Send</button>
                 </div>
             </div>
         </div>
@@ -3537,20 +3529,8 @@
 
         const startBtn = document.createElement('button');
         startBtn.className = 'action-btn start-btn';
-        startBtn.style.cssText = "width: 100%; background: var(--primary-color); color: #fff; padding: 15px; font-size: 0.82rem; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);";
+        startBtn.style.cssText = "width: 100%;";
         startBtn.textContent = 'Make my holiday!';
-        
-        // Add hover effect manually since it's dynamic
-        startBtn.onmouseover = () => {
-            startBtn.style.transform = "scale(1.02)";
-            startBtn.style.filter = "brightness(1.1)";
-            startBtn.style.boxShadow = "0 4px 12px rgba(99, 102, 241, 0.2)";
-        };
-        startBtn.onmouseout = () => {
-            startBtn.style.transform = "scale(1)";
-            startBtn.style.filter = "brightness(1)";
-            startBtn.style.boxShadow = "none";
-        };
         
         // Calling startConversationMode will initialize audio and send 'Hi!'
         startBtn.onclick = startConversationMode;
@@ -5974,24 +5954,26 @@
         currentDaydreamIndex = (currentDaydreamIndex + 1) % daydreamExperiences.length;
 
         const rect = container.getBoundingClientRect();
+        const scale = rect.height / 320;
 
         // --- TUNABLE PARAMETERS ---
-        const trailStartY = 80;       // Vertical start (pixels from top)
-        const trailStartXOffset = 90;  // Horizontal start shift
-        const horizontalOffset = 180;  // Distance to main bubble center
-        const bubbleTop = 15;          // Bubble vertical position
-        const arcHeight = 10;          // Height of the curve peak
-        const bubbleRadius = 54;       // Distance from center to stop dots (edge)
+        const trailStartY = 80 * scale;       // Vertical start (pixels from top)
+        const trailStartXOffset = 90 * scale;  // Horizontal start shift
+        const horizontalOffset = 180 * scale;  // Distance to main bubble center
+        const bubbleTop = 15 * scale;          // Bubble vertical position
+        const arcHeight = 10 * scale;          // Height of the curve peak
+        const bubbleSize = 130 * scale;        // Dynamic bubble size
+        const bubbleRadius = 54 * scale;       // Distance from center to stop dots (edge)
         const trailSpacingExp = 1.9;   // Spacing exponent (smaller = dots further from start)
         const trailDotCount = 2;       // Number of trailing dots
-        const trailDotMinSize = 10;    // Size of the smallest dot
-        const trailDotMaxSize = 20;    // Size of the largest dot
+        const trailDotMinSize = 10 * scale;    // Size of the smallest dot
+        const trailDotMaxSize = 20 * scale;    // Size of the largest dot
 
         // RESPONSIVE ANCHORING: Use offsets from head center (50%)
         const mainCenterOffsetX = horizontalOffset * daydreamSide;
         daydreamSide *= -1;
 
-        const mainCenterY = bubbleTop + 65;
+        const mainCenterY = bubbleTop + (bubbleSize / 2);
         const startOffsetX = trailStartXOffset * (mainCenterOffsetX > 0 ? 1 : -1);
 
         const totalDist = Math.hypot(mainCenterOffsetX - startOffsetX, mainCenterY - trailStartY);
@@ -6031,8 +6013,10 @@
         const bubble = document.createElement('div');
         bubble.className = 'daydream-bubble float-l3';
         bubble.title = experience.title;
+        bubble.style.width = `${bubbleSize}px`;
+        bubble.style.height = `${bubbleSize}px`;
 
-        const targetLeftOffset = mainCenterOffsetX - 65;
+        const targetLeftOffset = mainCenterOffsetX - (bubbleSize / 2);
         bubble.style.left = `calc(50% + ${targetLeftOffset}px)`;
         bubble.style.top = `${bubbleTop}px`;
 
