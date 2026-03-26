@@ -3182,8 +3182,31 @@
         currentBookingPackageId = null;
     }
 
+    function isTokenExpired(token) {
+        if (!token) return true;
+        try {
+            // JWT format: header.payload.signature
+            const payloadBase64 = token.split('.')[1];
+            // Fix base64 padding
+            const padded = payloadBase64.padEnd(payloadBase64.length + (4 - payloadBase64.length % 4) % 4, '=');
+            const decodedJson = atob(padded);
+            const payload = JSON.parse(decodedJson);
+            // Exp is in seconds, convert to ms
+            return Date.now() > (payload.exp * 1000);
+        } catch (e) {
+            console.warn("Failed to decode token", e);
+            return true;
+        }
+    }
+
     // --- Auth Logic (Sync with session storage immediately) ---
-    window.googleAuthToken = sessionStorage.getItem('googleAuthToken');
+    let storedToken = sessionStorage.getItem('googleAuthToken');
+    if (storedToken && isTokenExpired(storedToken)) {
+        console.log('[Auth] Stored token is expired, clearing.');
+        sessionStorage.removeItem('googleAuthToken');
+        storedToken = null;
+    }
+    window.googleAuthToken = storedToken;
     window.currentUser = window.googleAuthToken ? { id: 'restored_user', email: 'restored@example.com' } : null;
     let pendingAuthCallback = null;
 

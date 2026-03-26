@@ -11,6 +11,7 @@ from tools.search_tool import perform_google_search
 from tools.market_tools import search_products, check_amazon_stock, search_amazon, search_hotels, search_amazon_with_reviews
 from services.duffel_service import DuffelService
 from services.amadeus_service import AmadeusService
+from services.get_your_guide_service import GetYourGuideService
 from services.image_search_service import ImageSearchService
 from services.google_places_service import GooglePlacesService
 from services.correction_engine import CorrectionEngine
@@ -56,41 +57,51 @@ def is_discovery_complete(profile_content: str, current_message: str = "", sessi
     vague_starts = [
         "make my holiday", "make a holiday", "build me a trip", "plan a trip", 
         "start a trip", "let's plan something", 
-        "start a new one", "brand new holiday", "something else"
+        "start a new one", "brand new holiday", "something else",
+        "changed my mind", "instead", "another trip", "something different",
+        "actually I want", "plan a new", "start a new"
     ]
     
     # More robust check for "new holiday" or "new trip" including variations like "new ski holiday"
+    # Check if the current message contains a reset request
     is_reset_requested = any(v in msg_only for v in vague_starts) or \
                          (("new" in msg_only) and ("holiday" in msg_only or "trip" in msg_only or "plan" in msg_only))
-                         
-    if is_reset_requested:
-        logger.info(f"[PHASE_CHECK] New intent detected in current message. Forcing Discovery.")
-        return False
-
-    # Find the last time the history contains a 'vague start' or a reset invitation from Ray
-    last_vague_idx = -1
+    
     all_vague_markers = vague_starts + ["new holiday", "new trip", "new plan"]
+    
+    # Find the last time a reset was requested in the history
+    hist_only = session_history.lower()
+    last_vague_idx = -1
     for v in all_vague_markers:
         idx = hist_only.rfind(v)
         if idx > last_vague_idx:
             last_vague_idx = idx
-            
-    # 2. Define the 'Search Space' for requirements
-    # If a new intent started recently, we ONLY look for requirements AFTER that point.
-    if last_vague_idx != -1:
-        # Intent started in this session. Only trust what was said SINCE then.
-        search_space = (hist_only[last_vague_idx:] + "\nUser: " + msg_only).lower()
-        logger.info("[PHASE_CHECK] New intent detected in history. Using fresh context only.")
+
+    # Search Space Strategy:
+    # 1. If the CURRENT message is a reset, we ONLY use the current message to check requirements.
+    #    (This forces the agent to ask/confirm everything else in the next turn, satisfying 'double check' mandate).
+    # 2. If the history contains a reset, we only use history FROM that point onwards.
+    # 3. We always include the current message.
+    
+    if is_reset_requested:
+        logger.info(f"[PHASE_CHECK] New intent detected in current message. Isolating context to current turn.")
+        combined = msg_only
+    elif last_vague_idx != -1:
+        # Intent started after a reset in history. ONLY use recent history.
+        logger.info(f"[PHASE_CHECK] Using history since last reset marker.")
+        combined = (hist_only[last_vague_idx:] + "\nUser: " + msg_only).lower()
     else:
-        # No vague start in recent history. Fallback to profile (likely continuing a specific trip).
-        search_space = ((profile_content or "") + "\n" + hist_only + "\nUser: " + msg_only).lower()
-        logger.info("[PHASE_CHECK] No recent reset. Using profile + history.")
+        # Standard continuation. Use only session history for requirements.
+        # CRITICAL: Do NOT use the profile for satisfying the discovery checklist.
+        # It should ONLY be used for personalisation by the LLM later.
+        logger.info(f"[PHASE_CHECK] Using session history only (isolating from profile requirements).")
+        combined = (hist_only + "\nUser: " + msg_only).lower()
     
     # CRITICAL: We only want to satisfy requirements based on what the USER said.
     # We filter the search space to only lines starting with "User: " or "Profile: " (implied)
     # However, since profile_content doesn't have prefixes, we'll just split and filter the session history parts.
     
-    lines = search_space.split('\n')
+    lines = combined.split('\n')
     user_context = ""
     for line in lines:
         if line.startswith("agent:") or line.startswith("model:"):
@@ -110,20 +121,40 @@ def is_discovery_complete(profile_content: str, current_message: str = "", sessi
     month_ok = any(x in combined for x in ["month", "when", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december", "jan ", "feb ", "mar ", "apr ", "jun ", "jul ", "aug ", "sep ", "oct ", "nov ", "dec ", "in 2 months", "in 1 week", "next month", "months from now", "weeks from now"])
     
     # Requirement 4: Budget
-    budget_ok = any(x in combined for x in ["budget", "cost", "spend", "$", "£", "€", "price range"])
-    
-    # Requirement 5: Vibe/Activities
-    categories = ["beach", "ski", "city", "mountains", "nature", "culture"]
-    actions = ["activities", "interested in", "prefer", "like to", "want to", "visiting", "water park", "bike", "hike", "museum", "dining", "nightlife", "various", "child friendly"]
+    budget_ok = any(x in combined for x in ["budget", "cost", "spend", "spending", "$", "£", "€", "price range", "limit", "amount"])
+    # Requirement 5: Vibe & Activities (Phase 3)
+    categories = ["beach", "ski", "snowboard", "city", "mountains", "nature", "culture", "theme park", "water park", "safari", "island", "rural", "countryside"]
+    actions = ["explore", "visit", "see", "do ", "eat ", "dining", "riding", "scenic", "relax", "adventure", "surfing", "skiing", "snowboarding", "hiking", "cycling", "relaxing", "sightseeing", "shopping"]
+    vibes = ["fun", "lively", "quiet", "peaceful", "party", "luxury", "budget", "romantic", "active", "lazy", "chill", "soulful"]
     
     category_hit = any(c in combined for c in categories)
     action_hit = any(a in combined for a in actions)
-    vibe_ok = ("vibe" in combined) or (category_hit and action_hit)
+    vibe_hit = any(v in combined for v in vibes)
     
-    # Requirement 6: Group/Travellers
-    group_ok = any(x in combined for x in ["group", "travelling", "travellers", "wife", "husband", "son", "daughter", "kids", "children", "child", "people", "adults", "me and", "family"])
+    vibe_ok = ("vibe" in combined) or (category_hit and action_hit) or vibe_hit or \
+                (any(x in combined for x in ["skiing", "surfing", "hiking", "beach"]))
+    
+    # Requirement 6: Group & Rhythm (Phase 3.5)
+    # We also check for 'rhythm', 'sleep', 'wake', 'morning', 'late' as indicators that 3.5 is handled.
+    group_keywords = ["group", "travelling", "travellers", "travelers", "wife", "husband", "son", "daughter", "kids", "children", "child", "people", "adults", "me and", "us", "couple", "solo", "myself", "we are", "family", "party of"]
+    rhythm_keywords = ["rhythm", "sleep", "wake", "morning", "late", "early riser", "sleep in", "nap"]
+    
+    group_ok = any(x in combined for x in group_keywords) or any(x in combined for x in rhythm_keywords)
 
     results = [origin_ok, duration_ok, month_ok, budget_ok, vibe_ok, group_ok]
+
+    # Heuristic: Phase Progression
+    # If the user has provided a lot of information and we have 5/6 requirements, 
+    # and the history is long, we can be slightly more lenient to avoid 'Discovery Loops'.
+    found_count = sum(results)
+    
+    # NEW: Semantic 'vibe' fallback. If the user has spoken a lot about 'what' they want to do 
+    # but didn't hit a keyword, we check for sentence length/complexity.
+    if not vibe_ok and len(combined.split()) > 30:
+        logger.info("[PHASE_CHECK] Vibe fallback: User has provided >30 words. Assuming vibe/context is present.")
+        vibe_ok = True
+        results[4] = True
+    
     is_complete = all(results)
     
     if not is_complete:
@@ -134,6 +165,14 @@ def is_discovery_complete(profile_content: str, current_message: str = "", sessi
         if not budget_ok: missing.append("Budget")
         if not vibe_ok: missing.append("Vibe")
         if not group_ok: missing.append("Group")
+        
+        # LENIENT COMPLETION (Heuristic)
+        # If we have 5/6 requirements, we ONLY consider it complete if the user provided 
+        # a long, descriptive message (indicating vibe/context) AND it's not the very start.
+        if sum(results) >= 5 and (not vibe_ok or not group_ok) and len(msg_only.split()) > 20:
+            logger.info(f"[PHASE_CHECK] Lenient completion: 5/6 met with long message (>20 words): '{msg_only[:50]}...'")
+            return True
+
         logger.info(f"[PHASE_CHECK] Discovery incomplete. Missing: {missing}")
         
     return is_complete
@@ -267,11 +306,12 @@ def create_new_package_tool(session_id: str, user_id: str, title: str, descripti
             target_date = datetime.strptime(start_date, "%Y-%m-%d")
             today = datetime.now()
             days_diff = (target_date - today).days
+            logger.info(f"[DREAMING_DEBUG] Today: {today}, Target: {target_date}, Days Diff: {days_diff}")
             
             # GDS Booking Window is officially 330 days for many airlines/hotels.
             # We use 330 as the standard threshold.
             if days_diff > 330:
-                logger.info(f"Target date {start_date} is {days_diff} days away (>330). Setting status to DREAMING.")
+                logger.info(f"[DREAMING_DEBUG] Threshold exceeded (330 days). Setting to DREAMING.")
                 status = BookingStatus.DREAMING
                 # Window opens 330 days before start
                 window_opens_at_dt = target_date - timedelta(days=330)
@@ -442,6 +482,7 @@ class VoiceAgent:
         # Services will be initialized per request or kept if thread-safe
         self.duffel_service = DuffelService()
         self.amadeus_service = AmadeusService()
+        self.gyg_service = GetYourGuideService()
 
     def process_message(self, user_id: str, session_id: str, message: str, region: str = "UK", package_id: str = None, avatar_name: str = None, current_time: str = None) -> str:
         """
@@ -592,7 +633,9 @@ class VoiceAgent:
                 logger.error(f"Tool {name} failed: {error_msg}")
                 CorrectionEngine.record_failure(name, params, error_msg, package_id=package_id)
                 
-                # Return a safe error message for the agent to pivot
+                # Return a phase-aware error message
+                if discovery_complete:
+                    return f"Error from {name}: {error_msg}. CRITICAL: Do not narrate this failure. Pivot to an alternative tool or, if out of options, provide the Mandated Build Response using your best estimates based on earlier search results. NEVER ask for more info or confirmation here."
                 return f"Error from {name}: {error_msg}. CRITICAL: Do not narrate this failure. Instead, pivot to an alternative tool or, if out of options, ask a discovery question to gain more context from the traveller so you can manually proceed. Every response MUST end with a question."
 
         def validate_item_realism(name: str, item_type: str, price: float, metadata: dict = None):
@@ -604,12 +647,18 @@ class VoiceAgent:
             placeholders = ["planned hotel", "planned flight", "planned activity", "planned restaurant", "placeholder", "tba", "to be advised"]
             if any(p in name.lower() for p in placeholders):
                 raise ValueError(f"Generic placeholder name '{name}' is FORBIDDEN. You MUST use a real, specific name (e.g. 'Saas-Fee Ski School Half-Day Lesson', 'La Ferme restaurant'). Use propose_itinerary_batch with real names for each day.")
+        
+        has_called_build_tool = False
 
         # Tools binding
         def create_package_bound(title: str, description: str = None, package_type: str = "mixed", start_date: str = None):
+            nonlocal has_called_build_tool
+            has_called_build_tool = True
             return run_tool("create_package", create_new_package_tool, session_id=session_id, user_id=user_id, title=title, description=description, package_type=package_type, start_date=start_date)
             
         def add_item_bound(package_id: str, item_name: str, item_type: str, price: float = 0.0, **kwargs):
+            nonlocal has_called_build_tool
+            has_called_build_tool = True
             # Alias support for single item additions
             itype = (item_type or kwargs.get('type') or 'activity').lower()
             name = (item_name or kwargs.get('title') or '').strip()
@@ -746,22 +795,33 @@ class VoiceAgent:
                             city_code_or_name=city_code_or_name, check_in=check_in, check_out=check_out, 
                             latitude=latitude, longitude=longitude, radius=radius)
 
-        def search_activities_amadeus(location: str, keyword: str = ""):
+        def search_activities_tool(location: str, keyword: str = ""):
+            """
+            Search for activities EXCLUSIVELY via GetYourGuide to ensure unified bundling.
+            """
             def _activity_exec(location, keyword):
                 search_keyword = keyword
                 if keyword.lower() in ["family", "kids", "children"]:
                     search_keyword = "family friendly"
-                amadeus_res = self.amadeus_service.search_activities_formatted(location, search_keyword)
-                if "No activities found" not in amadeus_res:
-                    return amadeus_res
+                
+                # Try GetYourGuide for bundling (PRIMARY)
+                gyg_res = self.gyg_service.search_activities_formatted(location, search_keyword)
+                if "No activities found" not in gyg_res:
+                    return gyg_res
+                
+                # SECONDARY: If specific keyword fails, try a broader GYG search for the location
                 if search_keyword:
-                    broad_res = self.amadeus_service.search_activities_formatted(location)
+                    logger.info(f"Specific GYG search for '{search_keyword}' failed. Trying broad search in {location}.")
+                    broad_res = self.gyg_service.search_activities_formatted(location)
                     if "No activities found" not in broad_res:
-                        return f"{broad_res}\n(Note: No specific matches for '{keyword}', showing general activities.)"
+                        return f"I couldn't find specific matches for '{search_keyword}', but here are some top activities in {location} available for unified booking:\n\n{broad_res}"
+                
+                # TERTIARY: Google Search only as a last resort for INFORMATION (no booking links)
+                # This helps the agent talk about things even if not bookable via GYG
                 query = f"Things to do in {location}"
                 if keyword: query = f"{keyword} in {location}"
                 google_res = perform_google_search(query, region=region)
-                return f"{google_res}\n(Note: Amadeus had no specific tours, falling back to Google Search results.)"
+                return f"{google_res}\n(Note to Agent: These are for information only. I currently only support unified booking through GetYourGuide, and none were found for this specific search.)"
             
             return run_tool("search_activities", _activity_exec, location=location, keyword=keyword)
 
@@ -830,6 +890,12 @@ class VoiceAgent:
                     item_type = data.get('item_type', 'activity')
                     day = data.get('day')
                     
+                    # Ensure activity_id is standardized for GYG bundling
+                    if item_type.lower() == 'activity':
+                        # Favor 'activity_id' but allow 'item_id' or 'ITEM_ID' fallback
+                        aid = data.get('activity_id') or data.get('item_id') or data.get('ITEM_ID')
+                        if aid: data['activity_id'] = aid
+                    
                     # Hard reject: no real name provided
                     if not item_name or not item_name.strip():
                         logger.warning(f"[BATCH FILTER] empty-name: type={item_type} day={day}")
@@ -845,6 +911,19 @@ class VoiceAgent:
                     if item_type.lower() in ['activity', 'restaurant'] and day is None:
                         logger.warning(f"[BATCH FILTER] missing-day: '{item_name}' type={item_type}")
                         return None
+                    
+                    # STRICT LINK SCRUBBING: 
+                    # If this is an activity, we ONLY allow GetYourGuide links. 
+                    # This prevents the LLM from carrying over Viator links from history or Google searches.
+                    if item_type.lower() == 'activity':
+                        scrub_keys = ['booking_link', 'product_url', 'url', 'link', 'review_link']
+                        for k in scrub_keys:
+                            if k in data:
+                                val = str(data[k]).lower()
+                                # Specifically target known non-GYG activity vendors
+                                if any(x in val for x in ['viator.com', 'travelpayouts', 'tp.media', 'amadeus.com']):
+                                    logger.info(f"[BATCH SCRUB] Removing non-GYG link from '{item_name}': {data[k]}")
+                                    del data[k]
                     
                     pkg_item = PackageItem(
                         name=item_name,
@@ -918,6 +997,24 @@ class VoiceAgent:
                     session_history += f"{role}: {text}\n"
         
         profile_content = ProfileService.get_profile(user_id)
+        
+        # Detect if this turn is a 'New Intent' (Reset) to ensure context isolation
+        vague_starts = [
+            "make my holiday", "make a holiday", "build me a trip", "plan a trip", 
+            "start a trip", "let's plan something", 
+            "start a new one", "brand new holiday", "something else",
+            "changed my mind", "instead", "another trip", "something different",
+            "actually I want", "plan a new", "start a new"
+        ]
+        is_reset = any(v in message.lower() for v in vague_starts) or \
+                   (("new" in message.lower()) and ("holiday" in message.lower() or "trip" in message.lower() or "plan" in message.lower()))
+        
+        if is_reset:
+            # CRITICAL: If starting a new intent, IGNORE the package we were previously viewing.
+            # This prevents item leakage between unrelated trips.
+            logger.info("[PHASE_GUARD] New intent/reset detected. Isolating context by clearing package_view_context.")
+            package_view_context = ""
+            
         discovery_complete = is_discovery_complete(profile_content, message, session_history)
         
         prompt_file = "prompts/builder_prompt.md" if discovery_complete else "prompts/discovery_prompt.md"
@@ -933,6 +1030,14 @@ class VoiceAgent:
         ).replace(
             "{global_context}", global_context
         )
+        
+        # PROACTIVITY NUDGE: Prevent stalling or double-checking once phase changes
+        if discovery_complete:
+            instruction += "\n\nCRITICAL: Discovery is 100% complete. DO NOT ask for confirmation. DO NOT narrate. START BUILDING IMMEDIATELY by calling 'log_reasoning' followed by 'create_package' and 'search_flights_duffel'."
+        else:
+            instruction += "\n\nCRITICAL: You are in Discovery. You MUST end every response with a direct question to the traveler about one of the missing requirements."
+        
+        instruction += f"\n\nPROFILE: {profile_content}"
 
         # 2. Define Toolsets (Guarding)
         COMMON_TOOLS = [
@@ -956,7 +1061,7 @@ class VoiceAgent:
             search_flights_duffel, 
             search_hotels_duffel,
             search_hotels_amadeus,
-            search_activities_amadeus,
+            search_activities_tool,
             create_package_bound, 
             add_item_bound,
             remove_item_bound,
@@ -1007,9 +1112,10 @@ class VoiceAgent:
              pass # This placeholder is no longer needed.
 
         full_text_accumulated = ""
+        has_success_marker_this_pass = False
 
         def process_events(events):
-            nonlocal full_text_accumulated
+            nonlocal full_text_accumulated, has_success_marker_this_pass
             for event in events:
                 # Broadly check for tool interactions in the event
                 content = getattr(event, 'content', None)
@@ -1027,6 +1133,10 @@ class VoiceAgent:
                         
                         fr = getattr(part, 'function_response', None)
                         if fr:
+                            tool_name = getattr(fr, 'name', 'unknown')
+                            if tool_name == "log_reasoning":
+                                continue # NEVER share logs with human
+                            
                             res_val = getattr(fr, 'response', {})
                             res_str = str(res_val.get('result', res_val)) if isinstance(res_val, dict) else str(res_val)
                             yield ("thinking", format_thinking_persona(f"Tool returned: {res_str}"))
@@ -1077,39 +1187,67 @@ class VoiceAgent:
                          logger.info(f"[STREAM FILTER] Suppressed internal marker/nudge: {chunk.strip()[:50]}...")
                          continue
                     
-                    # NEW: Build Stream Filter
-                    # If discovery is complete, ONLY allow mandated response or specific commands
-                    # This prevents the model from narrating its "helpfulness" mid-build.
-                    allowed_keywords = ["I've built out your full holiday plan", "I've built out your holiday plan in the 'Dreaming' phase", "[NAVIGATE_TO_PACKAGE:"]
+                    # BUILDER SILENCE RULE: 
+                    # If discovery is complete, we ONLY want to see the final Mandated Response.
+                    # We buffer all text until we see an allowed keyword or the END of the pass.
                     if discovery_complete:
-                         is_allowed = any(k in chunk for k in allowed_keywords)
-                         # Softened filter: only block if we have a substantial amount of text that is NOT the allowed keyword.
-                         potential_full_text = full_text_accumulated + chunk
-                         if not any(k in potential_full_text for k in allowed_keywords) and len(potential_full_text) > 250:
-                              logger.info(f"[BUILD FILTER] Suppressed narrative filler: {chunk.strip()[:50]}...")
-                              continue
-
-                    full_text_accumulated += chunk
-                    yield ("text", chunk)
+                        allowed_keywords = ["I've built out your full holiday plan", "I've built out your holiday plan in the 'Dreaming' phase", "[NAVIGATE_TO_PACKAGE:"]
+                        # If it's an allowed keyword, yield everything buffered + chunk
+                        if any(k in chunk for k in allowed_keywords):
+                            has_success_marker_this_pass = True
+                            yield ("text", full_text_accumulated + chunk)
+                            full_text_accumulated = "" # Reset buffer after yielding
+                        else:
+                            # Buffer it (but don't yield yet)
+                            full_text_accumulated += chunk
+                            logger.info(f"[BUILD FILTER] Buffering narrative: {chunk.strip()[:30]}...")
+                    else:
+                        full_text_accumulated += chunk
+                        yield ("text", chunk)
 
         try:
             # First pass
             yield from process_events(runner.run(user_id=user_id, session_id=session_id, new_message=msg))
 
-            # Reliability Guard: If no question or too short/broken, nudge the model.
-            # Using 100 char limit because genuine acknowledgments + questions are usually around there.
-            if not "?" in full_text_accumulated and len(full_text_accumulated.strip()) < 150:
+            # Reliability Guard Logic
+            # 1. We only nudge if there's NO question mark (?) 
+            # 2. AND we are NOT in the 'successful build' state (mandated response present in this pass)
+            # 3. AND the total text is short (indicating silence/failure)
+            
+            if not "?" in full_text_accumulated and not has_success_marker_this_pass and len(full_text_accumulated.strip()) < 150:
                 logger.warning(f"Reliability Guard triggered for short/non-proactive response: '{full_text_accumulated}'")
+                
+                # If we were buffering (discovery_complete=True) and no build happened,
+                # we should probably DISCARD the buffer and force a build.
+                if discovery_complete and not has_called_build_tool:
+                    logger.info("[RELIABILITY GUARD] Discarding buffer and forcing build pass.")
+                    full_text_accumulated = "" # Reset buffer for the second pass
+                
                 if discovery_complete:
-                    nudge_text = "[RELIABILITY GUARD] You have completed the build but did not provide the MANDATED RESPONSE. You MUST respond with: 'I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything. [NAVIGATE_TO_PACKAGE: package_id]'"
+                    if has_called_build_tool:
+                        # Case: Model built, but forgot the navigation Command/Confirmation
+                        nudge_text = "[RELIABILITY GUARD] You have completed the build but did not provide the MANDATED RESPONSE. You MUST respond with: '[NAVIGATE_TO_PACKAGE: package_id] I've built out your full holiday plan for you to review in the package view. Let me know if you'd like me to change anything.'"
+                    else:
+                        # Case: Model thinks discovery is done but hasn't actually called create_package yet
+                        nudge_text = "[RELIABILITY GUARD] Discovery is 100% complete, but you haven't started building yet. You are FORBIDDEN from asking more discovery questions. You MUST call 'create_package' and start building the itinerary SILENTLY now."
                 else:
+                    # Case: Still in discovery, but forgot the question
                     nudge_text = "[RELIABILITY GUARD] Your previous response was too short or lacked a clarifying question. Please provide a brief helpful acknowledgment and ask a direct discovery question (Phases 1-4) to move the trip forward. Remember the WORD BAN and SILENT ACTION rules."
                 
+                logger.info(f"[RELIABILITY GUARD] Sending Nudge: {nudge_text[:100]}...")
                 nudge_msg = Content(role="user", parts=[Part(text=nudge_text)])
+                
+                # If the first response was a logical failure (like "I have all info" but didn't build),
+                # we don't want the user to see the duplicate response logic if possible.
+                # However, since chunks were already yielded, we can't easily un-yield them.
+                # We'll just ensure the second pass is much stronger.
                 yield from process_events(runner.run(user_id=user_id, session_id=session_id, new_message=nudge_msg))
 
-        except Exception as e:
-            logger.error(f"Error running agent stream: {e}", exc_info=True)
+        except (RuntimeError, Exception) as e:
+            if "Event loop is closed" in str(e):
+                logger.warning(f"Event loop closed during agent stream: {e}")
+            else:
+                logger.error(f"Error running agent stream: {e}", exc_info=True)
             yield ("error", str(e))
 
 # Global instance

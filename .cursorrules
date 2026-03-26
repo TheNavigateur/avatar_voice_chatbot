@@ -1,0 +1,14 @@
+# AI Agent Guardrails & Guidelines
+
+## CRITICAL: Server Restart Policy
+You are strictly FORBIDDEN from telling the user to "test out the changes" you made to any backend Python files or frontend HTML/JS files without First RESTARTING the server or explicitly instructing the user to restart it.
+
+The server does NOT use hot-reloading for its core application logic (`app.py`, `agent.py`, `models.py`, `templates/index.html`, etc.). 
+
+If you make a change, it will NOT take effect until the process running on port 8001 is killed and restarted.
+
+**Protocol for Testing Changes:**
+1. If you implemented a fix, you must restart the server using: `lsof -t -i :8001 | xargs kill -9 && bash run.sh` (or appropriately kill the active process).
+2. ONLY AFTER the server is freshly started can you tell the user that the changes are ready to test.
+
+Violating this rule causes extreme confusion for the user, as they will be testing stale code.

@@ -30,14 +30,15 @@ class PackageItem(BaseModel):
 class Package(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
-    user_id: str = "web_user" # Default for now
+    user_id: Optional[str] = "web_user" # Default for now
     title: str = "New Package"
     description: Optional[str] = None
     type: PackageType = PackageType.MIXED
     items: List[PackageItem] = []
-    total_price: float = 0.0
+    total_price: Optional[float] = 0.0
     status: BookingStatus = BookingStatus.DRAFT
     booking_window_opens_at: Optional[str] = None
+    metadata: Dict = {}
     
     def calculate_total(self):
         self.total_price = sum(item.price for item in self.items)
