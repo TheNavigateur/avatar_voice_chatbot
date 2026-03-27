@@ -604,19 +604,26 @@
             }
         }
 
-        #avatar-loader {
+        .avatar-boot-sequence-container {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #888;
-            font-size: 1rem;
-            font-weight: 500;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
             z-index: 20;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 5px 10px;
-            border-radius: var(--border-radius);
-            backdrop-filter: blur(2px);
+            background-color: transparent;
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .avatar-boot-sequence-container::-webkit-scrollbar {
+            display: none;
         }
 
         #status {
@@ -1259,6 +1266,11 @@
         .bot-status-message-left {
             align-self: flex-start;
             text-align: left;
+        }
+
+        .bot-status-message-center {
+            align-self: center;
+            text-align: center;
         }
 
         .bot-status-message-right {
@@ -2061,7 +2073,7 @@
                 </div>
 
                 <div class="avatar-container">
-                    <div id="avatar-loader">Loading...</div>
+                    <div id="avatar-boot-sequence" class="avatar-boot-sequence-container" style="display: none;"></div>
                     <canvas id="avatar-canvas"></canvas>
 
                     <!-- Secondary Avatar Tile Wrapper -->
@@ -2213,6 +2225,65 @@
 
     const cameraYForVRM = 1.4;
     const cameraZForVRM = 1.2;
+
+    // Avatar Boot Sequence Logic
+    let bootSequenceInterval = null;
+    let currentBootMsgIndex = 0;
+    const bootMessages = [
+        "Fetching Ray and Rae...",
+        "Setting up the help desk...",
+        "Opening the holiday search tools...",
+        "Initializing the vibe-a-holiday engine...",
+        "Polishing the 3D models...",
+        "Almost there..."
+    ];
+
+    function startBootSequence() {
+        const container = document.getElementById('avatar-boot-sequence');
+        const canvas = document.getElementById('avatar-canvas');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        container.style.display = 'flex';
+        if (canvas) canvas.style.opacity = '0'; // Hide canvas during boot
+        currentBootMsgIndex = 0;
+
+        if (bootSequenceInterval) clearInterval(bootSequenceInterval);
+
+        const addMessage = () => {
+            if (currentBootMsgIndex >= bootMessages.length) {
+                return; // Reached the end, let it spin
+            }
+            const msg = bootMessages[currentBootMsgIndex];
+            currentBootMsgIndex++;
+            
+            const div = document.createElement('div');
+            div.className = 'bot-status-message bot-status-message-center';
+            div.style.marginBottom = '10px';
+            div.innerHTML = `<span class="status-spinner" aria-hidden="true"></span><span class="status-msg-text">${msg}</span>`;
+            
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight; // Auto-scroll
+        };
+        
+        addMessage(); // First message immediately
+        bootSequenceInterval = setInterval(addMessage, 1200);
+    }
+
+    function stopBootSequence() {
+        if (bootSequenceInterval) {
+            clearInterval(bootSequenceInterval);
+            bootSequenceInterval = null;
+        }
+        const container = document.getElementById('avatar-boot-sequence');
+        const canvas = document.getElementById('avatar-canvas');
+        if (container) {
+            container.style.display = 'none'; // Immediate transition as requested
+        }
+        if (canvas) {
+            canvas.style.opacity = '1';
+        }
+    }
 
     function initThreeJS() {
         const canvas = document.getElementById('avatar-canvas');
@@ -2433,13 +2504,8 @@
             return new VRMLoaderPlugin(parser);
         });
 
-        const avatarLoader = document.getElementById('avatar-loader');
-
-        if (avatarLoader) {
-            avatarLoader.textContent = "Loading VRM...";
-            avatarLoader.classList.remove('hidden');
-        }
         console.log("Loading VRM:", modelUrl);
+        startBootSequence();
 
         loader.load(
             modelUrl,
@@ -2469,7 +2535,7 @@
                     vrm.scene.rotation.y = Math.PI;
                 }
 
-                if (avatarLoader) avatarLoader.classList.add('hidden');
+                stopBootSequence();
 
                 // Adjust Camera for VRM (Portrait)
                 // Use humanoid bone for head position if available
@@ -2507,15 +2573,11 @@
 
     function loadGLB(url) {
         const loader = new GLTFLoader();
-        const avatarLoader = document.getElementById('avatar-loader');
         // Use passed URL or fallback
         const modelUrl = url || '/static/avatar.glb';
 
-        if (avatarLoader) {
-            avatarLoader.textContent = "Loading RPM...";
-            avatarLoader.classList.remove('hidden');
-        }
         console.log("Loading GLB:", modelUrl);
+        startBootSequence();
 
         loader.load(modelUrl, (gltf) => {
             if (currentVrm) {
@@ -2615,7 +2677,7 @@
                 window.daydreamCycleStarted = true;
             }
 
-            if (avatarLoader) avatarLoader.classList.add('hidden');
+            stopBootSequence();
         });
     }
 
@@ -5743,6 +5805,14 @@
                                         if (checklistContainer && checklistHtml) checklistContainer.innerHTML = checklistHtml;
                                         if (optionsContainer && optionsHtml) optionsContainer.innerHTML = optionsHtml;
                                     }
+                                    continue;
+                                }
+
+                                if (data.event === 'error' || data.error) {
+                                    const errMsg = data.content || data.error;
+                                    console.error("[Stream] Backend Error:", errMsg);
+                                    currentFullResponse += "\\n\\nBackend Error: " + errMsg;
+                                    continue;
                                 }
                             } catch (e) {
                                 console.warn("[Stream] Failed to parse block:", block);

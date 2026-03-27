@@ -47,6 +47,30 @@ def clean_location_from_title(title: str) -> str:
     t = re.sub(r'\s+', ' ', t).strip()
     return t
 
+def parse_price(price_str) -> float:
+    """Robustly parses a price string including currencies, 'k', 'grand', etc. into a float."""
+    if not price_str:
+        return 0.0
+    s = str(price_str).lower().replace(',', '').strip()
+    
+    # Remove common currency symbols
+    for sym in ['£', '$', '€', 'p', 'pounds', 'dollars', 'euros']:
+        s = s.replace(sym, '')
+    s = s.strip()
+    
+    multiplier = 1.0
+    if 'grand' in s:
+        multiplier = 1000.0
+        s = s.replace('grand', '').strip()
+    elif 'k' in s:
+        multiplier = 1000.0
+        s = s.replace('k', '').strip()
+        
+    try:
+        return float(s) * multiplier
+    except ValueError:
+        return 0.0
+
 def is_discovery_complete(profile_content: str, current_message: str = "", session_history: str = "") -> bool:
     """ Checks if the 6 mandatory requirements are present specifically for the current intent. """
     msg_only = (current_message or "").lower()
@@ -667,6 +691,8 @@ class VoiceAgent:
             if not name:
                 return "FAILED: Name missing. Correct Format: {'name': 'Specific Venue Name', 'item_type': 'hotel/flight/activity/restaurant', ...}"
             
+            price = parse_price(price)
+            
             try:
                 validate_item_realism(name, itype, price)
             except ValueError as ve:
@@ -692,7 +718,7 @@ class VoiceAgent:
                     # Alias support: title -> name, type -> item_type
                     name = (item_v.get('name') or item_v.get('title') or '').strip()
                     itype = (item_v.get('item_type') or item_v.get('type') or 'activity').lower()
-                    price = float(item_v.get('price', 0.0))
+                    price = parse_price(item_v.get('price', 0.0))
                     day = item_v.get('day')
 
                     # Check for empty/null name
@@ -1021,8 +1047,14 @@ class VoiceAgent:
         with open(prompt_file, "r") as f:
             instruction_template = f.read()
             
+        import calendar
+        month_name = calendar.month_name[datetime.now().month]
+        current_month_str = f"{month_name} {datetime.now().year}"
+
         instruction = instruction_template.replace(
             "{current_time}", current_time or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        ).replace(
+            "{current_month}", current_month_str
         ).replace(
             "{avatar_name}", avatar_name or 'Ray and Rae'
         ).replace(
