@@ -38,28 +38,7 @@
         .gsi-modal p { color: #666; margin-bottom: 20px; }
         #gsi-button-container { display: flex; justify-content: center; }
 
-        /* Simulation Banner */
-        .simulation-banner {
-            position: fixed;
-            top: 15px;
-            right: 15px;
-            background: rgba(30, 41, 59, 0.7);
-            color: rgba(255, 255, 255, 0.9);
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            backdrop-filter: blur(4px);
-            z-index: 10000;
-            display: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: opacity 0.3s;
-        }
-        .simulation-banner:hover {
-            opacity: 1;
-            background: rgba(30, 41, 59, 1);
-        }
-        .simulation-mode .simulation-banner { display: block; }
+        /* Simulation Mode Styles */
         .simulation-mode .action-btn { background: var(--primary-color) !important; } 
 
         /* Checkout Modal */
@@ -1939,7 +1918,7 @@
         <img src="/static/icons/logo.svg" class="sidebar-logo" alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
         <div class="sidebar-subtitle">Vibe-a-Holiday!</div>
-        <span class="dev-badge">IN DEVELOPMENT<span class="dev-tooltip">This app is in active development. Real booking is currently disabled and prices shown may not be accurate.</span></span>
+        <span class="dev-badge">TEST MODE<span class="dev-tooltip">This app is in active development. Real booking is currently disabled and prices shown may not be accurate.</span></span>
     </div>
     <nav class="sidebar-nav">
         <button class="nav-item active" onclick="switchView('chat')">
@@ -1972,7 +1951,7 @@
             alt="Ray and Rae Logo">
         <h2>Ray and Rae</h2>
         <div class="mobile-subtitle">Vibe-a-Holiday!</div>
-        <span class="dev-badge">IN DEVELOPMENT<span class="dev-tooltip">This app is in active development. Real booking is currently disabled and prices shown may not be accurate.</span></span>
+        <span class="dev-badge">TEST MODE<span class="dev-tooltip">This app is in active development. Real booking is currently disabled and prices shown may not be accurate.</span></span>
     </div>
     <div style="width: 24px;"></div> <!-- Spacer for symmetry -->
 </header>
@@ -2039,12 +2018,6 @@
         </div>
     </div>
 
-    <div class="simulation-banner" id="sim-banner">
-        <span>Test Mode</span>
-        <label style="margin-left: 8px; font-size: 0.7rem; cursor: pointer; display: inline-flex; align-items: center;">
-            <input type="checkbox" id="sim-toggle" checked onclick="toggleSimMode()" style="margin-right: 4px; width: 12px; height: 12px;"> Sim ON
-        </label>
-    </div>
 
     <div id="main-view">
 
@@ -4462,14 +4435,49 @@
     };
 
     async function startListeningAnimation() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-        
         // 1. Force stop any previous loop before starting new one
         if (listeningAnimRequest) {
             cancelAnimationFrame(listeningAnimRequest);
             listeningAnimRequest = null;
         }
 
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        if (isMobile) {
+            let lastUpdate = 0;
+            let nextThreshold = 150; // Randomize the next update gap
+
+            function updateFake(timestamp) {
+                if (!isManualListeningActive) return; // Clean exit if state is off
+                
+                if (timestamp - lastUpdate > nextThreshold) { 
+                    nextThreshold = 100 + Math.random() * 200; // Between 100ms and 300ms for chaotic but slow rhythm
+
+                    document.querySelectorAll('.listening-animation').forEach(animEl => {
+                        if (window.getComputedStyle(animEl).display === 'none') return;
+                        
+                        const bars = animEl.querySelectorAll('.listening-bar');
+                        bars.forEach((bar) => {
+                            // Smooth random height between 4px and 22px
+                            const height = 4 + Math.random() * 18;
+                            
+                            // Randomize how fast THIS specific bar reaches its target height (0.15s - 0.35s)
+                            const transTime = 0.15 + Math.random() * 0.2;
+                            bar.style.transition = `height ${transTime.toFixed(2)}s ease-in-out`;
+                            bar.style.height = `${height}px`;
+                        });
+                    });
+                    lastUpdate = timestamp;
+                }
+                
+                listeningAnimRequest = requestAnimationFrame(updateFake);
+            }
+            listeningAnimRequest = requestAnimationFrame(updateFake);
+            return;
+        }
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+        
         try {
             // 2. Ensure microphone stream is active
             if (!microphoneStream || microphoneStream.getAudioTracks()[0].readyState === 'ended') {
