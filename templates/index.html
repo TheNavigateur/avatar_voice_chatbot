@@ -3514,6 +3514,14 @@
         if (!window.audioElement) {
             console.log("[Audio] Initializing audio context and element on gesture.");
             window.audioElement = new Audio();
+            
+            // iOS Safari Audio Unlock Pattern: Play a silent base64 MP3
+            window.audioElement.src = "data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/zRMQAAADSAAAAAB";
+            window.audioElement.play().then(() => {
+                window.audioElement.pause();
+                window.audioElement.src = "";
+            }).catch(e => console.log("[Audio] Silent unlock deferred:", e.message));
+
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             if (AudioContext) {
                 window.audioContext = new AudioContext();
