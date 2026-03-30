@@ -83,6 +83,7 @@
             height: 100%;
             height: 100dvh;
             overflow: hidden;
+            overscroll-behavior: none;
             color: var(--text-color);
             padding-bottom: env(safe-area-inset-bottom);
         }
@@ -1465,6 +1466,7 @@
         #transcript {
             flex: 1;
             overflow-y: auto;
+            overscroll-behavior: none;
             padding-bottom: 10px;
         }
 
@@ -1911,8 +1913,22 @@
         }
     </script>
 </head>
+<body>
 
-<!-- Navigation Sidebar (Desktop) -->
+<!-- In-App Browser Warning Banner -->
+<div id="in-app-browser-warning" style="display:none; position:fixed; top:0; left:0; width:100%; background-color:#fee2e2; color:#991b1b; text-align:center; padding:12px; font-weight:700; z-index:100000; box-shadow:0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+    ⚠️ Voice features are disabled in this internal browser.<br>
+    <button onclick="navigator.clipboard.writeText(window.location.href); alert('Link copied! Open Safari or Chrome to paste.');" style="margin-top:8px; padding:6px 16px; border-radius:12px; border:none; background-color:#991b1b; color:white; font-weight:bold; cursor:pointer;">Copy Link & Exit ↗</button>
+</div>
+<script>
+    // Detect In-App browsers (Instagram, TikTok, FB, Line, etc) which break getUserMedia
+    var ua = navigator.userAgent || navigator.vendor || window.opera;
+    if ((ua.indexOf("FBAN") > -1) || (ua.indexOf("FBAV") > -1) || (ua.indexOf("Instagram") > -1) || (ua.indexOf("Line") > -1) || (ua.indexOf("TikTok") > -1)) {
+        document.addEventListener("DOMContentLoaded", function() {
+            document.getElementById('in-app-browser-warning').style.display = 'block';
+        });
+    }
+</script><!-- Navigation Sidebar (Desktop) -->
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <img src="/static/icons/logo.svg" class="sidebar-logo" alt="Ray and Rae Logo">
@@ -2280,6 +2296,22 @@
             alpha: true,
             antialias: true
         });
+
+        // WebGL Context Management for iOS
+        canvas.addEventListener('webglcontextlost', function(event) {
+            event.preventDefault();
+            console.warn("[WebGL] Context Lost. User likely backgrounded the app.");
+            if (window.animationRequestId) cancelAnimationFrame(window.animationRequestId);
+            document.getElementById('avatar-canvas').style.opacity = '0.3';
+            setBotStatusMessage("Avatar reloading...", "left"); // Subtly inform user
+        }, false);
+
+        canvas.addEventListener('webglcontextrestored', function(event) {
+            console.log("[WebGL] Context Restored. Reloading avatar.");
+            document.getElementById('avatar-canvas').style.opacity = '1';
+            clearBotStatusMessage();
+            loadCurrentAvatar(); // Rebuild scene/model
+        }, false);
         renderer.setSize(container.clientWidth, container.clientHeight);
         renderer.setClearColor(0x000000, 0);
         renderer.outputEncoding = THREE.sRGBEncoding;
@@ -4540,7 +4572,13 @@
             }
             update();
         } catch (e) {
-            console.warn("[Mic] Animation error:", e);
+            console.warn("[Mic] Permission or Animation error:", e);
+            
+            // Handle specific NotAllowedError for clear UI feedback instead of silent block
+            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                isManualListeningActive = false;
+                alert("Microphone access was denied! Please check your iOS/Browser settings and reload the page to use Voice Chat.");
+            }
         }
     }
 
@@ -6306,7 +6344,32 @@
     })();
 </script>
 
-
+    // --- Page Visibility & Background Throttle Management ---
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === 'visible') {
+            console.log("[Lifecycle] App foregrounded. Ensuring connections...");
+            
+            // Re-kick AudioContext if conversation was active
+            if (isConversationActive && window.audioContext && window.audioContext.state === 'suspended') {
+                window.audioContext.resume().catch(()=>{});
+            }
+            
+            // If the UI is stuck 'processing' but no active fetch object exists (or it timed out), reset UI
+            if (isProcessing && !document.getElementById('chat-stream')) {
+                // Not a perfect catch-all, but if they background the app for 10 mins during a build,
+                // we'll unblock the UI so they aren't stuck on a spinner.
+                setTimeout(() => {
+                    if (isProcessing) {
+                        console.log("[Lifecycle] Resetting potentially hung UI state from backgrounding.");
+                        isProcessing = false;
+                        renderStartButton();
+                        clearBotStatusMessage();
+                    }
+                }, 5000); 
+            }
+        }
+    });
+</script>
 
 </body>
 
